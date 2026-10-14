@@ -1,74 +1,154 @@
-﻿# 🏛️ AsistenciasUCO-Infra — 4ª Capa: Gobernanza, Documentación e Historias de Usuario
+# 🏛️ AsistenciasUCO-Infra — 4ª Capa: Gobernanza, Infraestructura y Flujo de Desarrollo
 
 > **Ecosistema:** Sistema de Gestión de Asistencia UCO  
-> **Propósito:** Capa transversal y única fuente de verdad (SSOT) para la gobernanza, especificación de contratos inmutables (WORM), gestión del ciclo de vida de Historias de Usuario (HU001 – HU174) y work items SDD/TDD.  
-> **Versión:** 1.0.0  
-> **Fecha:** Septiembre 2026
+> **Ámbito:** Repositorio Unificado `GestioAsistencia` (Base de Datos, Backend API, Frontend Web e Infraestructura)  
+> **Rol:** Cuarta Capa Transversal — Única Fuente de Verdad (SSOT) para Gobernanza, Hardening, Contratos WORM, Orquestación de Contenedores y Automatización DevSecOps.  
+> **Versión:** 2.0.0  
+> **Fecha de Actualización:** Octubre 2026  
 
 ---
 
-## 1. Visión y Propósito de la 4ª Capa
+## 1. Visión y Arquitectura de la 4ª Capa
 
-El ecosistema AsistenciasUCO se compone de 3 capas técnicas de ejecución y 1 capa transversal de gobernanza:
+El ecosistema Asistencias UCO está diseñado en 3 capas de ejecución desacopladas gobernadas y soportadas por 1 capa transversal de infraestructura y ley técnica:
 
-`	ext
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       4. AsistenciasUCO-Infra                               │
-│  (Gobernanza, Especificaciones WORM, Historias de Usuario & Work Items)     │
-│   • SSOT de Contratos OpenAPI, DDL/SPs y Eventos SSE                        │
-│   • Trazabilidad de Historias de Usuario (HU001 – HU174)                    │
-│   • Work Items SDD/TDD unificados (PLAN, CONTRACT, TEST_PLAN, VALIDATION)   │
-│   • Orquestación de infraestructura Docker y automatización                 │
+│     (Gobernanza SSOT, Contratos WORM, Hardening, Contenedores & Scripts)    │
+│  • Constitución Técnica Única (CONSTITUTION.md)                             │
+│  • Contratos Inmutables SHA-256 (OpenAPI 3.0, T-SQL SPs/Vistas, Eventos SSE)│
+│  • Orquestador Docker Compose modular por Perfiles (core, full)             │
+│  • Hardening Least Privilege (app_asistencias_user, 127.0.0.1, Security Headers)│
+│  • Suite de Automatización PowerShell (Orquestación, Cloud Sync, Calidad)   │
 └──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ Rige y gobierna a:
+                                       │ Rige, despliega y monitorea:
         ┌──────────────────────────────┼──────────────────────────────┐
         ▼                              ▼                              ▼
 ┌──────────────────┐          ┌──────────────────┐          ┌──────────────────┐
 │ 1. Base de Datos │          │    2. Backend    │          │   3. Frontend    │
 │  (SQL Server)    │          │  (Spring Boot)   │          │   (Angular 19)   │
+│  • Smart Database│          │  • Clean Arch    │          │  • Standalone    │
+│  • Transaccional │          │  • Puertos & Adp │          │  • Signals       │
+│  • Vistas/SPs    │          │  • REST & OTel   │          │  • Tailwind CSS  │
 └──────────────────┘          └──────────────────┘          └──────────────────┘
-`
-
-Al centralizar la documentación en AsistenciasUCO-Infra, evitamos la dispersión de especificaciones dentro de subcarpetas técnicas del Backend o Frontend y garantizamos que cada cambio funcional responda a un requerimiento formalmente congelado.
+```
 
 ---
 
 ## 2. Estructura de Directorios
 
-`	ext
+```text
 AsistenciasUCO-Infra/
-├── docs/
-│   ├── governance/            # Reglas de negocio, arquitectura y constitución técnica
-│   │   ├── CONSTITUTION.md    # Ley suprema del proyecto (Clean Architecture, SDD)
-│   │   ├── SOURCE_OF_TRUTH.md # Precedencia de fuentes de verdad
-│   │   └── API_DESIGN_RULES.md# Estándares HTTP, errores y paginación
-│   ├── contracts/             # Contratos públicos WORM (Write Once, Read Many)
-│   │   ├── openapi/           # Especificación formal OpenAPI 3.0 / YAML
-│   │   ├── db/                # Firmas de Stored Procedures, Vistas y Esquemas
-│   │   └── events/            # Contratos de eventos en tiempo real (SSE)
-│   ├── user-stories/          # Catálogo maestro de Historias de Usuario (HU001 - HU174)
-│   │   ├── HU-CATALOG.md      # Matriz integral de estado por capas
-│   │   └── modules/           # Fichas técnicas detalladas por módulo (Estudiante, Docente...)
-│   └── work-items/            # Pipeline SDD/TDD unificado por Historia de Usuario
-│       └── HUxxx-nombre/      # Carpeta por HU con sus 5 artefactos estándar
-│           ├── PLAN.md
-│           ├── CONTRACT.md
-│           ├── TEST_PLAN.md
-│           ├── VALIDATION.md
-│           └── CLOSURE.md
+├── .env.example               # SSOT Canónico de variables de entorno y límites
+├── .gitignore                 # Blindaje contra fugas de .env, certificados y .bak
+├── docker-compose.yml         # Orquestador Docker maestro gobernado por perfiles
+│
+├── components/                # Definiciones modulares de contenedores e inicialización
+│   ├── sqlserver/             # SQL Server 2022 (Collation Modern_Spanish_CI_AS, RAM 2GB)
+│   │   ├── init/              # 01-hardening-least-privilege.sql (Rol db_app_executor)
+│   │   └── scripts/           # deploy-schema.ps1, seed-clean-data.ps1, test-summary.ps1
+│   ├── keycloak/              # Keycloak 26.7.1 + PostgreSQL 17 dedicado
+│   │   ├── realm-import/      # asistencias-uco-realm.json (Roles, clients, idUsuario)
+│   │   └── scripts/           # bootstrap.ps1, seed-users.ps1, get-token.ps1, etc.
+│   ├── observability/         # OTel Collector Contrib + Prometheus v3 + Grafana
+│   │   ├── otel-collector/    # config.yaml (OTLP gRPC/HTTP pipelines)
+│   │   ├── prometheus/        # prometheus.yml (Scrape de OTel, Actuator, Keycloak)
+│   │   └── grafana/           # Provisioning automático de Prometheus datasource
+│   └── proxy/                 # Traefik v3 Reverse Proxy
+│       ├── traefik.yml        # Configuración estática y dashboard
+│       └── dynamic/           # middlewares.yml (HSTS, CSP, X-Frame-Options DENY)
+│
+├── scripts/                   # Suite de automatización centralizada (21 scripts)
+│   ├── orchestration/         # start-dev.ps1, stop-dev.ps1, status-dev.ps1, start-apps.ps1, load-env.ps1
+│   ├── cloud-sync/            # sync-appconfig.ps1, export-catalogs.ps1
+│   ├── security/              # check-secrets.ps1 (Escaneo estático DevSecOps)
+│   └── quality/               # verify-contracts.ps1, test-backend.ps1, test-e2e-hus.ps1
+│
+├── docs/                      # Biblioteca de conocimiento, contratos y gobernanza
+│   ├── governance/            # CONSTITUTION.md, SOURCE_OF_TRUTH.md, API_DESIGN_RULES.md, DoR, DoD
+│   ├── contracts/             # Contratos públicos inmutables WORM y firmas .sha256
+│   │   ├── openapi/           # openapi-golden-path.yaml, BACKEND_GOLDEN_PATH_CONTRACT.md
+│   │   ├── db/                # DB_BASELINE_CONTRACT.md, DB_DEVELOP_FREEZE_ADDENDUM.md
+│   │   └── events/            # REALTIME_EVENT_CONTRACT.md (SSE Events)
+│   ├── baseline/              # LINEA_BASE.md, TECHNICAL_DEBT.md (TD-001 a TD-054)
+│   ├── hardening/             # SECURITY_AND_HARDENING.md
+│   ├── runbooks/              # LOCAL_ENVIRONMENT_SETUP.md, MIGRATION_GUIDE.md
+│   └── user-stories/          # Catálogo maestro de Historias de Usuario (HU001 - HU174)
 └── README.md                  # Este documento
-`
+```
 
 ---
 
-## 3. Flujo Operativo para Nuevas Historias de Usuario
+## 3. Perfiles de Contenedores Docker (Ahorro de RAM)
 
-Cuando se aborde una nueva Historia de Usuario:
+Para evitar saturar la memoria RAM en el equipo de desarrollo, el orquestador maestro gestiona los servicios mediante **perfiles (`profiles`)**:
 
-1. **Selección:** Se toma la historia desde docs/user-stories/HU-CATALOG.md.
-2. **Apertura de Work Item:** Se crea la carpeta en docs/work-items/HUxxx-descripcion/ con la plantilla canónica:
-   - PLAN.md: Análisis AS-IS vs TARGET, alcance y Definition of Ready.
-   - CONTRACT.md: Congelamiento de SPs y Endpoints OpenAPI con firmas .sha256.
-   - TEST_PLAN.md: Derivación de pruebas RED (Base de Datos, Backend y Frontend).
-   - VALIDATION.md: Comandos ejecutados, salidas de Quality Gates y cobertura.
-   - CLOSURE.md: Dictamen final y actualización del catálogo general a [CERTIFICADA].
+| Perfil | Servicios Incluidos | RAM Máxima | Caso de Uso |
+| :--- | :--- | :---: | :--- |
+| **`core`** *(Default)* | SQL Server 2022 + Keycloak 26 + Postgres DB | ~3.5 GB | Desarrollo diario de Backend y Frontend. |
+| **`observability`** | OpenTelemetry Collector + Prometheus + Grafana | ~1.0 GB | Monitoreo de trazas OTLP, logs JSONL y métricas. |
+| **`azure`** | Azurite (Emulación de Storage Blobs/Queues) | ~512 MB | Pruebas de almacenamiento offline. |
+| **`proxy`** | Traefik v3 con Hardened Headers | ~128 MB | Terminación de cabeceras de seguridad y proxy. |
+| **`full`** | Todos los 8 contenedores simultáneos | ~5.2 GB | Pruebas de integración total antes de release. |
+
+---
+
+## 4. Comandos Rápidos del Flujo de Desarrollo
+
+Todos los comandos se ejecutan desde PowerShell:
+
+```powershell
+# 1. Iniciar entorno de desarrollo local (Perfil core por defecto: BD + IAM + Apps)
+cd AsistenciasUCO-Infra\scripts\orchestration
+.\start-dev.ps1
+
+# 2. Levantar solo los contenedores de BD e IAM (sin lanzar Backend ni Frontend en host)
+.\start-dev.ps1 -ContainersOnly
+
+# 3. Levantar con suite completa de observabilidad
+.\start-dev.ps1 -Profile observability
+
+# 4. Diagnosticar estado de contenedores, puertos y endpoints HTTP
+.\status-dev.ps1
+
+# 5. Detener limpiamente aplicaciones (8080, 4200) y apagar contenedores
+.\stop-dev.ps1
+
+# 6. Detener aplicaciones pero mantener contenedores activos en background
+.\stop-dev.ps1 -KeepContainers
+```
+
+---
+
+## 5. Quality Gates y Seguridad DevSecOps
+
+```powershell
+# Verificar integridad criptográfica de contratos WORM (OpenAPI, DB, SSE)
+cd AsistenciasUCO-Infra\scripts
+.\quality\verify-contracts.ps1
+
+# Escanear código buscando credenciales quemadas o archivos .env expuestos
+.\security\check-secrets.ps1
+
+# Ejecutar suite de pruebas de Backend (Java 25)
+.\quality\test-backend.ps1 -Profile Unit
+.\quality\test-backend.ps1 -Profile Integration
+
+# Ejecutar suite de pruebas E2E de Historias de Usuario (HU001 a HU174)
+.\quality\test-e2e-hus.ps1 -Module All
+```
+
+---
+
+## 6. Enlaces a la Documentación Normativa
+
+* **Constitución Técnica Suprema:** [`docs/governance/CONSTITUTION.md`](docs/governance/CONSTITUTION.md)
+* **Fuentes de Verdad (SSOT):** [`docs/governance/SOURCE_OF_TRUTH.md`](docs/governance/SOURCE_OF_TRUTH.md)
+* **Reglas de Diseño de API:** [`docs/governance/API_DESIGN_RULES.md`](docs/governance/API_DESIGN_RULES.md)
+* **Definition of Ready (DoR):** [`docs/governance/DEFINITION_OF_READY.md`](docs/governance/DEFINITION_OF_READY.md)
+* **Definition of Done (DoD):** [`docs/governance/DEFINITION_OF_DONE.md`](docs/governance/DEFINITION_OF_DONE.md)
+* **Guía de Hardening y Mínimo Privilegio:** [`docs/hardening/SECURITY_AND_HARDENING.md`](docs/hardening/SECURITY_AND_HARDENING.md)
+* **Runbook de Puesta en Marcha:** [`docs/runbooks/LOCAL_ENVIRONMENT_SETUP.md`](docs/runbooks/LOCAL_ENVIRONMENT_SETUP.md)
+* **Guía de Migración y Rollback:** [`docs/runbooks/MIGRATION_GUIDE.md`](docs/runbooks/MIGRATION_GUIDE.md)
+* **Catálogo de Deuda Técnica:** [`docs/baseline/TECHNICAL_DEBT.md`](docs/baseline/TECHNICAL_DEBT.md)

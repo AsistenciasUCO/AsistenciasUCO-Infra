@@ -1,0 +1,30 @@
+# ==============================================================================
+# Prometheus Configuration - Asistencias UCO
+# ==============================================================================
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  # 1. Prometheus Auto-Métricas
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 2. OpenTelemetry Collector (Métricas exportadas)
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8889']
+
+  # 3. Backend Spring Boot (Micrometer Actuator Prometheus)
+  - job_name: 'asistencias-backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+
+  # 4. Keycloak Identity Provider (Métricas Quarkus)
+  - job_name: 'keycloak'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['keycloak:9000']

@@ -1,0 +1,235 @@
+# ==============================================================================
+# 🏛️ ASISTENCIAS UCO - ORQUESTADOR MAESTRO DOCKER COMPOSE
+# ==============================================================================
+# Servicios divididos por perfiles ('profiles') para control de consumo de RAM:
+#  • 'core' (Por defecto): SQL Server 2022 + Keycloak 26 (y su PostgreSQL dedicado)
+#  • 'observability'     : OpenTelemetry Collector + Prometheus + Grafana
+#  • 'azure'             : Azurite (Emulación de Storage para pruebas offline)
+#  • 'proxy'             : Traefik Reverse Proxy & Terminación TLS
+#  • 'full'              : Levanta la suite completa de contenedores
+#
+# ACCESO LOCAL:
+# Todos los puertos se publican en 127.0.0.1 permitiendo conexión directa desde
+# IDEs (IntelliJ, VS Code, DBeaver) sin obligar a pasar por el proxy.
+# ==============================================================================
+
+name: asistencias-uco-infra
+
+networks:
+  asistencias_network:
+    driver: bridge
+    name: asistencias_network
+
+volumes:
+  asistencias_mssql_data:
+    name: asistencias_mssql_data
+  asistencias_keycloak_db_data:
+    name: asistencias_keycloak_db_data
+  asistencias_prometheus_data:
+    name: asistencias_prometheus_data
+  asistencias_grafana_data:
+    name: asistencias_grafana_data
+  asistencias_azurite_data:
+    name: asistencias_azurite_data
+
+services:
+
+  # ----------------------------------------------------------------------------
+  # 1. CORE: Base de Datos Institucional (Microsoft SQL Server 2022 Developer)
+  # ----------------------------------------------------------------------------
+  sqlserver:
+    profiles: ["core", "full"]
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: ${SQL_CONTAINER_NAME:-sql_server_asistencias}
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: ${ACCEPT_EULA:-Y}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-TuPasswordSeguro123}
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+      MSSQL_COLLATION: ${MSSQL_COLLATION:-Modern_Spanish_CI_AS}
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${SQL_HOST_PORT:-1433}:1433"
+    deploy:
+      resources:
+        limits:
+          memory: ${SQL_MEM_LIMIT:-2g}
+    volumes:
+      - asistencias_mssql_data:/var/opt/mssql
+    healthcheck:
+      test:
+        - "CMD"
+        - "/opt/mssql-tools18/bin/sqlcmd"
+        - "-S"
+        - "localhost"
+        - "-U"
+        - "sa"
+        - "-P"
+        - "${MSSQL_SA_PASSWORD}"
+        - "-C"
+        - "-Q"
+        - "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 2. CORE: Base de Datos Dedicada para Keycloak (PostgreSQL 17)
+  # ----------------------------------------------------------------------------
+  keycloak-db:
+    profiles: ["core", "full"]
+    image: postgres:17.11-alpine3.24
+    container_name: ${KC_DB_CONTAINER_NAME:-keycloak_db_asistencias}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${KC_DB_DATABASE:-keycloak}
+      POSTGRES_USER: ${KC_DB_USERNAME:-keycloak}
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:-change-me-postgres-keycloak}
+    volumes:
+      - asistencias_keycloak_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${KC_DB_MEM_LIMIT:-512m}
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U ${KC_DB_USERNAME:-keycloak} -d ${KC_DB_DATABASE:-keycloak}"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 3. CORE: Gestor de Identidad Institucional (Keycloak 26.0.0+)
+  # ----------------------------------------------------------------------------
+  keycloak:
+    profiles: ["core", "full"]
+    image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION:-26.7.1}
+    container_name: ${KEYCLOAK_CONTAINER_NAME:-keycloak_asistencias}
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-kcadmin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-change-me-kcadmin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KC_DB_DATABASE:-keycloak}
+      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-change-me-postgres-keycloak}
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_PASSWORD_MIN_LENGTH: ${KC_PASSWORD_MIN_LENGTH:-12}
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${KEYCLOAK_HOST_PORT:-8081}:8080"
+      - "${HOST_BIND_IP:-127.0.0.1}:${KEYCLOAK_MANAGEMENT_HOST_PORT:-9001}:9000"
+    volumes:
+      - ./components/keycloak/realm-import:/opt/keycloak/data/import:ro
+    deploy:
+      resources:
+        limits:
+          memory: ${KEYCLOAK_MEM_LIMIT:-1g}
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && exit 0 || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 4. OBSERVABILIDAD: OpenTelemetry Collector (Contrib)
+  # ----------------------------------------------------------------------------
+  otel-collector:
+    profiles: ["observability", "full"]
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: otel_collector_asistencias
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${OTEL_GRPC_PORT:-4317}:4317"
+      - "${HOST_BIND_IP:-127.0.0.1}:${OTEL_HTTP_PORT:-4318}:4318"
+    volumes:
+      - ./components/observability/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 5. OBSERVABILIDAD: Prometheus (Métricas)
+  # ----------------------------------------------------------------------------
+  prometheus:
+    profiles: ["observability", "full"]
+    image: prom/prometheus:v3.0.1
+    container_name: prometheus_asistencias
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${PROMETHEUS_HOST_PORT:-9090}:9090"
+    volumes:
+      - ./components/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - asistencias_prometheus_data:/prometheus
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 6. OBSERVABILIDAD: Grafana (Dashboards)
+  # ----------------------------------------------------------------------------
+  grafana:
+    profiles: ["observability", "full"]
+    image: grafana/grafana:11.3.1
+    container_name: grafana_asistencias
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${GRAFANA_HOST_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - asistencias_grafana_data:/var/lib/grafana
+      - ./components/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 7. AZURE EMULATION: Azurite (Storage / Blobs / Queues / Tables offline)
+  # ----------------------------------------------------------------------------
+  azurite:
+    profiles: ["azure", "full"]
+    image: mcr.microsoft.com/azure-storage/azurite:3.33.0
+    container_name: azurite_asistencias
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${AZURITE_BLOB_PORT:-10000}:10000"
+      - "${HOST_BIND_IP:-127.0.0.1}:${AZURITE_QUEUE_PORT:-10001}:10001"
+      - "${HOST_BIND_IP:-127.0.0.1}:${AZURITE_TABLE_PORT:-10002}:10002"
+    volumes:
+      - asistencias_azurite_data:/data
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 8. PROXY: Traefik Reverse Proxy (Opcional bajo demanda)
+  # ----------------------------------------------------------------------------
+  proxy:
+    profiles: ["proxy", "full"]
+    image: traefik:v3.2
+    container_name: proxy_asistencias
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8082:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./components/proxy/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./components/proxy/dynamic:/etc/traefik/dynamic:ro
+    networks:
+      - asistencias_network
+

@@ -1,0 +1,56 @@
+# ==============================================================================
+# 🏛️ ASISTENCIAS UCO - COMPONENTE STANDALONE SQL SERVER 2022
+# ==============================================================================
+# Este archivo permite levantar exclusivamente el contenedor de base de datos
+# de manera desacoplada para pruebas unitarias de persistencia o despliegue DDL.
+# ==============================================================================
+
+name: asistencias-sqlserver
+
+networks:
+  asistencias_network:
+    name: asistencias_network
+    driver: bridge
+
+volumes:
+  asistencias_mssql_data:
+    name: asistencias_mssql_data
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: ${SQL_CONTAINER_NAME:-sql_server_asistencias}
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: ${ACCEPT_EULA:-Y}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-TuPasswordSeguro123}
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+      MSSQL_COLLATION: ${MSSQL_COLLATION:-Modern_Spanish_CI_AS}
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${SQL_HOST_PORT:-1433}:1433"
+    deploy:
+      resources:
+        limits:
+          memory: ${SQL_MEM_LIMIT:-2g}
+    volumes:
+      - asistencias_mssql_data:/var/opt/mssql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - "CMD"
+        - "/opt/mssql-tools18/bin/sqlcmd"
+        - "-S"
+        - "localhost"
+        - "-U"
+        - "sa"
+        - "-P"
+        - "${MSSQL_SA_PASSWORD}"
+        - "-C"
+        - "-Q"
+        - "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - asistencias_network

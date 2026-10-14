@@ -1,0 +1,82 @@
+# ==============================================================================
+# 🏛️ ASISTENCIAS UCO - COMPONENTE STANDALONE KEYCLOAK 26
+# ==============================================================================
+# Despliegue modular de Keycloak IAM y su base de datos PostgreSQL dedicada
+# para pruebas aisladas de autenticación, emisión de tokens y gestión de roles.
+# ==============================================================================
+
+name: asistencias-keycloak
+
+networks:
+  asistencias_network:
+    name: asistencias_network
+    driver: bridge
+
+volumes:
+  asistencias_keycloak_db_data:
+    name: asistencias_keycloak_db_data
+
+services:
+  keycloak-db:
+    image: postgres:17.11-alpine3.24
+    container_name: ${KC_DB_CONTAINER_NAME:-keycloak_db_asistencias}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${KC_DB_DATABASE:-keycloak}
+      POSTGRES_USER: ${KC_DB_USERNAME:-keycloak}
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:-change-me-postgres-keycloak}
+    volumes:
+      - asistencias_keycloak_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${KC_DB_MEM_LIMIT:-512m}
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U ${KC_DB_USERNAME:-keycloak} -d ${KC_DB_DATABASE:-keycloak}"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - asistencias_network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION:-26.7.1}
+    container_name: ${KEYCLOAK_CONTAINER_NAME:-keycloak_asistencias}
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-kcadmin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-change-me-kcadmin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KC_DB_DATABASE:-keycloak}
+      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-change-me-postgres-keycloak}
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_PASSWORD_MIN_LENGTH: ${KC_PASSWORD_MIN_LENGTH:-12}
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${KEYCLOAK_HOST_PORT:-8081}:8080"
+      - "${HOST_BIND_IP:-127.0.0.1}:${KEYCLOAK_MANAGEMENT_HOST_PORT:-9001}:9000"
+    volumes:
+      - ./realm-import:/opt/keycloak/data/import:ro
+    deploy:
+      resources:
+        limits:
+          memory: ${KEYCLOAK_MEM_LIMIT:-1g}
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && exit 0 || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    networks:
+      - asistencias_network

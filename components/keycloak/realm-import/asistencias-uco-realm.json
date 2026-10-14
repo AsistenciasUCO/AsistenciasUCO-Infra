@@ -1,0 +1,144 @@
+{
+  "realm": "asistencias-uco",
+  "enabled": true,
+  "sslRequired": "external",
+  "passwordPolicy": "length(${KC_PASSWORD_MIN_LENGTH:12}) and digits(1) and lowerCase(1) and upperCase(1) and specialChars(1) and notUsername and notEmail and passwordHistory(5) and hashAlgorithm(argon2)",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "clients": [
+    {
+      "clientId": "asistencias-api",
+      "name": "AsistenciasUCO API",
+      "description": "Resource/API client y namespace de roles institucionales de AsistenciasUCO. No tiene login interactivo.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [],
+      "webOrigins": []
+    },
+    {
+      "clientId": "asistencias-uco-frontend",
+      "name": "AsistenciasUCO Frontend",
+      "description": "SPA Angular de AsistenciasUCO. Direct Access Grants habilitado para desarrollo local.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:4200",
+      "baseUrl": "http://localhost:4200",
+      "redirectUris": [
+        "http://localhost:4200/*",
+        "http://127.0.0.1:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "http://127.0.0.1:4200"
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "roles",
+        "email",
+        "asistencias-api-scope"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "asistencias-backend-admin",
+      "name": "AsistenciasUCO Backend Admin Service Account",
+      "description": "Service account confidencial usado exclusivamente por KeycloakIdentityProviderAdapter para la Admin REST API. El secret real se define via bootstrap.ps1 desde KEYCLOAK_ADMIN_CLIENT_SECRET (.env), nunca en este archivo.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [],
+      "webOrigins": []
+    }
+  ],
+  "roles": {
+    "client": {
+      "asistencias-api": [
+        {
+          "name": "ADMINISTRADOR",
+          "description": "Administrador institucional. Acceso administrativo completo a AsistenciasUCO."
+        },
+        {
+          "name": "DECANO",
+          "description": "Decano de facultad. Gestiona coordinadores, docentes y reportes de su facultad."
+        },
+        {
+          "name": "COORDINADOR",
+          "description": "Coordinador de programa. Gestiona docentes, grupos y asistencias de su programa."
+        },
+        {
+          "name": "DOCENTE",
+          "description": "Docente. Registra y consulta asistencias de sus grupos asignados."
+        },
+        {
+          "name": "ESTUDIANTE",
+          "description": "Estudiante. Consulta su propia asistencia y participa en registro autonomo."
+        }
+      ]
+    }
+  },
+  "clientScopes": [
+    {
+      "name": "asistencias-api-scope",
+      "description": "Claims institucionales de AsistenciasUCO: idUsuario + audience de asistencias-api.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "idUsuario",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "idUsuario",
+            "claim.name": "idUsuario",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "audience-asistencias-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "asistencias-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": []
+}
