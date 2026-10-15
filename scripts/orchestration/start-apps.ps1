@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Lanzador de aplicaciones web de desarrollo (Backend Spring Boot y Frontend Angular).
 
@@ -33,7 +33,7 @@ $backendDir  = Join-Path $repoRoot "GestioAsistenciaBackend"
 $frontendDir = Join-Path $repoRoot "GestioAsistenciaFrontend"
 
 Write-Host "==============================================================================" -ForegroundColor Cyan
-Write-Host "🏛️ ASISTENCIAS UCO - INICIO DE APLICACIONES LOCALES" -ForegroundColor Cyan
+Write-Host "[INFO] ASISTENCIAS UCO - INICIO DE APLICACIONES LOCALES" -ForegroundColor Cyan
 Write-Host "Backend  : $backendDir (Puerto 8080)" -ForegroundColor Gray
 Write-Host "Frontend : $frontendDir (Puerto 4200)" -ForegroundColor Gray
 Write-Host "==============================================================================" -ForegroundColor Cyan
@@ -41,8 +41,8 @@ Write-Host "====================================================================
 # Función para verificar si un puerto TCP está ocupado
 function Test-PortInUse {
     param([int]$Port)
-    $conns = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-    return ($null -ne $conns -and $conns.Count -gt 0)
+    $conns = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    return ($conns.Count -gt 0)
 }
 
 # 1. Iniciar Backend (Spring Boot en 8080)
@@ -56,7 +56,8 @@ if (-not $SkipBackend) {
             Write-Host "  -> ERROR: No se encontró mvnw.cmd en $backendDir" -ForegroundColor Red
         } else {
             Write-Host "  -> Lanzando Spring Boot en nueva consola de PowerShell..." -ForegroundColor Green
-            $backendCommand = "Set-Location '$backendDir'; .\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev"
+            $loadEnv = Join-Path $infraRoot "scripts\orchestration\load-env.ps1"
+            $backendCommand = ". '$loadEnv'; Set-Location '$backendDir'; `$env:SPRING_PROFILES_ACTIVE='dev'; .\mvnw.cmd spring-boot:run"
             Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $backendCommand -WorkingDirectory $backendDir
         }
     }
@@ -80,7 +81,7 @@ if (-not $SkipFrontend) {
 }
 
 Write-Host "`n==============================================================================" -ForegroundColor Green
-Write-Host "✅ Aplicaciones lanzadas exitosamente." -ForegroundColor Green
-Write-Host "  • Backend API  : http://localhost:8080/swagger-ui.html" -ForegroundColor Cyan
-Write-Host "  • Frontend Web : http://localhost:4200" -ForegroundColor Cyan
+Write-Host "[OK] Aplicaciones lanzadas exitosamente." -ForegroundColor Green
+Write-Host "  * Backend API  : http://localhost:8080/swagger-ui.html" -ForegroundColor Cyan
+Write-Host "  * Frontend Web : http://localhost:4200" -ForegroundColor Cyan
 Write-Host "==============================================================================" -ForegroundColor Green

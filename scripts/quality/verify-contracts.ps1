@@ -119,6 +119,29 @@ if ($Mode -eq 'Generate') {
         Write-Host "  [ACTUALIZADO] $($sc.Name) -> $hash" -ForegroundColor Green
     }
 
+    $fullDbManifestPath = Join-Path $Root $dbManifestRel
+    if (Test-Path $fullDbManifestPath) {
+        $manifestLines = [System.IO.File]::ReadAllLines($fullDbManifestPath)
+        $newManifestLines = [System.Collections.Generic.List[string]]::new()
+        foreach ($mLine in $manifestLines) {
+            $trimmed = $mLine.Trim()
+            if (-not $trimmed) { continue }
+            if ($trimmed -match '^([0-9a-f]{64})\s+(.+)$') {
+                $objRelPath = $matches[2]
+                $objFullPath = Join-Path $dbBaseDir $objRelPath
+                if (Test-Path $objFullPath) {
+                    $newHash = Get-NormalizedSha256 -Path $objFullPath
+                    $newManifestLines.Add("$newHash  $objRelPath")
+                    Write-Host "  [ACTUALIZADO DB OBJ] $objRelPath -> $newHash" -ForegroundColor Green
+                } else {
+                    $newManifestLines.Add($mLine)
+                }
+            }
+        }
+        $manifestContent = [string]::Join("`n", $newManifestLines) + "`n"
+        [System.IO.File]::WriteAllText($fullDbManifestPath, $manifestContent, [System.Text.UTF8Encoding]::new($false))
+    }
+
     Write-Host "`nGeneración de hashes completada." -ForegroundColor Cyan
     exit 0
 }

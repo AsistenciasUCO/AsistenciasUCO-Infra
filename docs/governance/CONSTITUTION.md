@@ -128,6 +128,18 @@ Ninguna especificación funcional, solicitud de usuario, atajo de desarrollo o c
 1. Los endpoints deben entregar DTOs completamente preparados para el consumo de la interfaz de usuario (`UI-Ready DTOs`), incluyendo nombres completos formateados, descripciones legibles de catálogos y métricas calculadas.
 2. Queda prohibido obligar al frontend a implementar mappers pesados o complejos en el cliente para transformar entidades crudas del backend.
 
+### Sección 3.05: Almacenamiento de Objetos Stateless (MinIO) y Escaneo Antivirus (ClamAV)
+1. **Arquitectura Stateless y Serverless-Ready:** El backend Spring Boot no almacena archivos en el sistema de archivos local ni en campos BLOB/VARBINARY de SQL Server. La persistencia de soportes (médicos, laborales, justificaciones) se delega a un almacenamiento compatible con Amazon S3 (MinIO en desarrollo local).
+2. **Prohibición de Acceso Directo desde el Frontend:** Queda terminantemente prohibido (`FRONTEND_DIRECT_STORAGE_ACCESS: FORBIDDEN`) entregar endpoints directos de MinIO o presigned URLs de subida/descarga al cliente Angular. Toda carga y descarga de soportes se procesa, valida, autentica y autoriza exclusivamente a través del backend Spring Boot.
+3. **Escaneo Antivirus Obligatorio (ClamAV):** Ningún archivo de soporte puede persistirse en el almacenamiento S3 sin ser analizado previamente por el demonio ClamAV (`clamd` puerto 3310 vía `INSTREAM`). Si el archivo contiene malware o se detecta anomalía, la solicitud debe ser rechazada inmediatamente antes de interactuar con el bucket.
+4. **Principio de Menor Privilegio (Least-Privilege Policy):**
+   - El backend opera exclusivamente con credenciales técnicas de aplicación (`MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`). Queda terminantemente prohibido el uso de credenciales de administración `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` en runtime.
+   - La política IAM (`asistencias-backend`) restringe las operaciones estrictamente a `s3:GetObject`, `s3:PutObject` y `s3:DeleteObject` sobre `arn:aws:s3:::asistencias-soportes/soportes/*`, y `s3:GetBucketLocation` sobre `arn:aws:s3:::asistencias-soportes`.
+   - Queda prohibido crear o eliminar buckets en tiempo de ejecución, modificar políticas o acceder a prefijos fuera de `soportes/*`.
+5. **Hardening de Red y Superficie de Ataque:**
+   - La interfaz web de administración de MinIO debe permanecer deshabilitada (`MINIO_BROWSER: "off"`).
+   - Los binds de MinIO API (puerto 9000) y ClamAV (puerto 3310) quedan restringidos exclusivamente a la interfaz loopback `127.0.0.1` (`DEV_ONLY`), sin exposición a redes externas ni públicas.
+
 ---
 
 ## Artículo IV — Capa de Cliente Frontend (Angular 18/19 / TypeScript)

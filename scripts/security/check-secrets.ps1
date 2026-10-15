@@ -215,6 +215,9 @@ foreach ($file in $allFiles) {
                 Line = 0
                 Type = "TRACKED_ENV_FILE"
             }
+        } else {
+            # Los archivos .env locales no versionados son el almacén legítimo de credenciales de desarrollo
+            continue
         }
     }
 

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Diagnóstico profundo de claims institucionales (idUsuario y roles) en tokens de Keycloak.
 
@@ -26,9 +26,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($EnvFile)) {
-    $parentEnv = Join-Path (Join-Path (Join-Path $PSScriptRoot '..') '..') '.env'
-    $localEnv = Join-Path (Join-Path $PSScriptRoot '..') '.env'
-    $EnvFile = if (Test-Path $parentEnv) { $parentEnv } elseif (Test-Path $localEnv) { $localEnv } else { $parentEnv }
+    $candidates = @(
+        (Join-Path $PSScriptRoot '..\..\..\.env'),
+        (Join-Path $PSScriptRoot '..\..\.env'),
+        (Join-Path $PSScriptRoot '..\.env')
+    )
+    foreach ($cand in $candidates) {
+        if (Test-Path -LiteralPath $cand) {
+            $EnvFile = (Resolve-Path $cand).Path
+            break
+        }
+    }
 }
 
 Import-Module (Join-Path (Join-Path $PSScriptRoot 'lib') 'KeycloakAdmin.psm1') -Force

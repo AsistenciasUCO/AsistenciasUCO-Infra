@@ -69,3 +69,10 @@ La resolución de bloqueos contractuales exige:
 1. Dictamen formal del rol de contratos y arquitectura.
 2. Modificación consensuada del contrato y actualización de su firma `.sha256`.
 3. Verificación de paridad con `AsistenciasUCO-Infra/scripts/quality/verify-contracts.ps1`.
+
+---
+
+## 5. Directorio y Referencia de Agentes y Skills Operativos
+
+Para consultar el inventario completo de agentes por fases (01 a 06 en Backend) y habilidades operativas (*skills*) de cada capa (Raíz, Base de Datos y Backend), consulta:
+👉 [`AGENTS_AND_SKILLS_INDEX.md`](AGENTS_AND_SKILLS_INDEX.md)

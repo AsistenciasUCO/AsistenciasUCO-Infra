@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Compilador y desplegador del esquema relacional DDL en Microsoft SQL Server (Docker).
 
@@ -87,8 +87,8 @@ if ($LASTEXITCODE -ne 0) { throw "Fallo al verificar/crear la base de datos $Dat
 
 # 5. Copiar esquema al contenedor para prevenir problemas de codificación BOM y stdin de Windows
 Write-Host "[2/6] Copiando archivos DDL al contenedor (/tmp/schema)..." -ForegroundColor Yellow
-docker exec $ContainerName rm -rf /tmp/schema | Out-Null
-docker exec $ContainerName mkdir -p /tmp/schema
+docker exec -u 0 $ContainerName rm -rf /tmp/schema | Out-Null
+docker exec -u 0 $ContainerName mkdir -p /tmp/schema
 if ($LASTEXITCODE -ne 0) { throw "No se pudo crear /tmp/schema en el contenedor." }
 docker cp "$SchemaPath" "${ContainerName}:/tmp/"
 if ($LASTEXITCODE -ne 0) { throw "Error al copiar $SchemaPath hacia ${ContainerName}:/tmp/" }

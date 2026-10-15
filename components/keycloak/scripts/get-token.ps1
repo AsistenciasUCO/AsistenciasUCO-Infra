@@ -36,9 +36,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($EnvFile)) {
-    $parentEnv = Join-Path (Join-Path (Join-Path $PSScriptRoot '..') '..') '.env'
-    $localEnv = Join-Path (Join-Path $PSScriptRoot '..') '.env'
-    $EnvFile = if (Test-Path $parentEnv) { $parentEnv } elseif (Test-Path $localEnv) { $localEnv } else { $parentEnv }
+    $candidates = @(
+        (Join-Path $PSScriptRoot '..\..\..\.env'),
+        (Join-Path $PSScriptRoot '..\..\.env'),
+        (Join-Path $PSScriptRoot '..\.env')
+    )
+    foreach ($cand in $candidates) {
+        if (Test-Path -LiteralPath $cand) {
+            $EnvFile = (Resolve-Path $cand).Path
+            break
+        }
+    }
 }
 
 Import-Module (Join-Path (Join-Path $PSScriptRoot 'lib') 'KeycloakAdmin.psm1') -Force
@@ -59,9 +67,11 @@ if ([string]::IsNullOrWhiteSpace($Password)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($Password)) {
-    if ($Username -eq 'docente.prueba' -and $env:TEST_DOCENTE_PASSWORD) { $Password = $env:TEST_DOCENTE_PASSWORD }
-    elseif ($Username -eq 'admin.prueba' -and $env:TEST_ADMIN_PASSWORD) { $Password = $env:TEST_ADMIN_PASSWORD }
-    else {
+    if ($Username -eq 'docente.prueba') {
+        $Password = if ($env:TEST_DOCENTE_PASSWORD) { $env:TEST_DOCENTE_PASSWORD } else { 'Docente123456!' }
+    } elseif ($Username -eq 'admin.prueba') {
+        $Password = if ($env:TEST_ADMIN_PASSWORD) { $env:TEST_ADMIN_PASSWORD } else { 'Admin1234567!' }
+    } else {
         $securePass = Read-Host -Prompt "Introduce la contraseña para $Username" -AsSecureString
         $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePass)
         try {

@@ -63,6 +63,14 @@ if (-not $KeepContainers) {
     Write-Host "`nDeteniendo contenedores Docker de infraestructura..." -ForegroundColor Yellow
     try {
         docker compose -f "$composeFile" --profile full down
+        # Detener contenedores de almacenamiento y antivirus si existen
+        $storageContainers = @("asistencias-files-minio-1", "asistencias-files-clamav-1", "minio_asistencias", "clamav_asistencias")
+        foreach ($sc in $storageContainers) {
+            $st = docker ps -q --filter "name=^/${sc}$" 2>$null
+            if ($st) {
+                docker stop $sc > $null 2>&1
+            }
+        }
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  -> [OK] Contenedores detenidos y redes liberadas." -ForegroundColor Green
         } else {

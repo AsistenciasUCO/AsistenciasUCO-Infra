@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Bootstrap idempotente del realm Keycloak de AsistenciasUCO (asistencias-uco).
 
@@ -24,9 +24,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($EnvFile)) {
-    $parentEnv = Join-Path (Join-Path (Join-Path $PSScriptRoot '..') '..') '.env'
-    $localEnv = Join-Path (Join-Path $PSScriptRoot '..') '.env'
-    $EnvFile = if (Test-Path $parentEnv) { $parentEnv } elseif (Test-Path $localEnv) { $localEnv } else { $parentEnv }
+    $candidates = @(
+        (Join-Path $PSScriptRoot '..\..\..\.env'),
+        (Join-Path $PSScriptRoot '..\..\.env'),
+        (Join-Path $PSScriptRoot '..\.env')
+    )
+    foreach ($cand in $candidates) {
+        if (Test-Path -LiteralPath $cand) {
+            $EnvFile = (Resolve-Path $cand).Path
+            break
+        }
+    }
 }
 
 Import-Module (Join-Path (Join-Path $PSScriptRoot 'lib') 'KeycloakAdmin.psm1') -Force
@@ -392,7 +400,7 @@ foreach ($attr in $attributes) {
     $reconciledAttributes.Add($attr) | Out-Null
 }
 if (-not $inserted) { $reconciledAttributes.Add($desiredProfileAttribute) | Out-Null }
-$userProfile.attributes = @($reconciledAttributes)
+$userProfile | Add-Member -NotePropertyName attributes -NotePropertyValue $reconciledAttributes.ToArray() -Force
 Invoke-KcAdminApi -Method Put -ServerUrl $serverUrl -Path "/admin/realms/$realmName/users/profile" -Token $adminToken -Body $userProfile | Out-Null
 Write-KcResult -Status 'OK' -Message "User Profile: $userIdAttribute reconciliado"
 
