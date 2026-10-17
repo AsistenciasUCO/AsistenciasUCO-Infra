@@ -106,3 +106,17 @@ Para registrar o sincronizar un nuevo usuario con el componente de seguridad:
 2. En el panel de administración (`http://localhost:5173` o en `/app/seguridad`):
    * El usuario aparecerá en la pestaña **Usuarios**.
    * Ir a **Asignaciones** ➔ Asignar el rol/perfil correspondiente para la aplicación `asistencias-backend`.
+
+---
+
+## 6. Estado Operativo Actual (Standby) y Switch de Seguridad
+
+> [!NOTE]
+> Actualmente la integración con **Security Baseline v0.1.6** se encuentra en estado **STANDBY**. El sistema de Asistencias opera de forma activa con el **Keycloak propio institucional** (`asistencias-uco` en puerto `8081`).
+> Toda la lógica del filtro PEP ([`SecurityPepEnforcementFilter.java`](file:///c:/Proyectos/GestioAsistencia/GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/infrastructure/config/security/SecurityPepEnforcementFilter.java)), puertos y contratos de Security Baseline se conservan intactos.
+> Para alternar entre ambos modos, consulte la [Guía Operativa del Switch de Seguridad](../hardening/SECURITY_SWITCH_GUIDE.md) o ejecute:
+> ```powershell
+> .\AsistenciasUCO-Infra\infra.ps1 security-status
+> .\AsistenciasUCO-Infra\infra.ps1 security-switch -Mode own|baseline
+> ```
+
