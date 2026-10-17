@@ -71,6 +71,12 @@ if (-not $KeepContainers) {
                 docker stop $sc > $null 2>&1
             }
         }
+
+        # Detener plataforma de seguridad si existe
+        $secScript = Join-Path $infraDir "components\security\start-security.ps1"
+        if (Test-Path $secScript) {
+            & $secScript -Down
+        }
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  -> [OK] Contenedores detenidos y redes liberadas." -ForegroundColor Green
         } else {

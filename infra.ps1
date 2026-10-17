@@ -34,7 +34,7 @@ param(
     [string]$Command = "help",
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'full')]
+    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'full')]
     [string]$Profile,
 
     [Parameter(Mandatory = $false)]
@@ -59,6 +59,9 @@ param(
     [string]$Password,
 
     [Parameter(Mandatory = $false)]
+    [string]$Mode,
+
+    [Parameter(Mandatory = $false)]
     [switch]$Fix,
 
     [Parameter(Mandatory = $false)]
@@ -74,6 +77,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $infraRoot = $PSScriptRoot
+$repoRoot  = (Resolve-Path (Join-Path $infraRoot "..")).Path
 
 function Show-Help {
     Write-Host "==============================================================================" -ForegroundColor Cyan
@@ -99,6 +103,7 @@ function Show-Help {
     Write-Host "  db-deploy        Compila el esquema DDL relacional (tablas, funciones, vistas, SPs)." -ForegroundColor White
     Write-Host "  db-seed          Restablece la semilla limpia institucional (11 usuarios canonicos)." -ForegroundColor White
     Write-Host "  db-test          Ejecuta la suite transaccional de pruebas de BD (test_suite.sql)." -ForegroundColor White
+    Write-Host "  db-cupos         Amplia la capacidad de cupos de todos los grupos (+40 cupos) para pruebas." -ForegroundColor White
     Write-Host ""
     Write-Host "3. IDENTIDAD Y KEYCLOAK (OIDC / OAuth2):" -ForegroundColor Yellow
     Write-Host "  kc-token         Obtiene un JWT Bearer valido para un rol especifico." -ForegroundColor White
@@ -112,7 +117,15 @@ function Show-Help {
     Write-Host "  storage-down     Detiene los contenedores de almacenamiento (MinIO y ClamAV)." -ForegroundColor White
     Write-Host "  storage-test     Valida la salud de MinIO S3 (port 9000) y politicas de menor privilegio." -ForegroundColor White
     Write-Host ""
-    Write-Host "5. CALIDAD, GOBERNANZA Y SEGURIDAD (DEVSECOPS):" -ForegroundColor Yellow
+    Write-Host "5. PLATAFORMA DE SEGURIDAD (PDP / PEP / SURREALDB / OPA):" -ForegroundColor Yellow
+    Write-Host "  security-up      Levanta el stack de seguridad (PDP, PEP, SurrealDB, Redis, OPA)." -ForegroundColor White
+    Write-Host "  security-down    Detiene los contenedores de la plataforma de seguridad." -ForegroundColor White
+    Write-Host "  security-ui      Lanza la consola web de administración Security UI (Vue 3 / Vite)." -ForegroundColor White
+    Write-Host "  security-switch  Alterna el switch de seguridad entre Keycloak propio y Security Baseline." -ForegroundColor White
+    Write-Host "                   Opciones: -Mode own | baseline" -ForegroundColor Gray
+    Write-Host "  security-status  Consulta el estado activo del switch de seguridad en Backend y Frontend." -ForegroundColor White
+    Write-Host ""
+    Write-Host "6. CALIDAD, GOBERNANZA Y SEGURIDAD (DEVSECOPS):" -ForegroundColor Yellow
     Write-Host "  verify           Pre-Flight Check integral: Auditoria de Secretos + Contratos WORM." -ForegroundColor White
     Write-Host "  check-secrets    Escanea el repositorio en busca de credenciales o secretos expuestos." -ForegroundColor White
     Write-Host "  verify-contracts Valida firmas SHA-256 de contratos WORM y paridad cross-repo." -ForegroundColor White
@@ -224,6 +237,12 @@ switch ($Command.ToLowerInvariant()) {
         Invoke-TargetScript (Join-Path $infraRoot "components\sqlserver\scripts\test-summary.ps1")
     }
 
+    "db-cupos" {
+        $cuposScript = Join-Path $repoRoot "scripts\database\aumentar-cupos.ps1"
+        & $cuposScript
+        exit $LASTEXITCODE
+    }
+
     "kc-token" {
         $getToken = Join-Path $infraRoot "components\keycloak\scripts\get-token.ps1"
         $splat = @{}
@@ -294,6 +313,37 @@ switch ($Command.ToLowerInvariant()) {
         } else {
             & $storageTest @splat
         }
+        exit $LASTEXITCODE
+    }
+
+    { $_ -in "security-up", "security-start" } {
+        $secScript = Join-Path $infraRoot "components\security\start-security.ps1"
+        & $secScript
+        exit $LASTEXITCODE
+    }
+
+    { $_ -in "security-down", "security-stop" } {
+        $secScript = Join-Path $infraRoot "components\security\start-security.ps1"
+        & $secScript -Down
+        exit $LASTEXITCODE
+    }
+
+    "security-ui" {
+        $secScript = Join-Path $infraRoot "components\security\start-security.ps1"
+        & $secScript -WithUi
+        exit $LASTEXITCODE
+    }
+
+    "security-switch" {
+        $switchScript = Join-Path $infraRoot "scripts\orchestration\switch-security-mode.ps1"
+        $targetMode = if ($PSBoundParameters.ContainsKey('Mode')) { $Mode } else { 'status' }
+        & $switchScript -Mode $targetMode
+        exit $LASTEXITCODE
+    }
+
+    "security-status" {
+        $switchScript = Join-Path $infraRoot "scripts\orchestration\switch-security-mode.ps1"
+        & $switchScript -Mode status
         exit $LASTEXITCODE
     }
 

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Siembra y restablecimiento de datos limpios canónicos para el Sistema de Asistencias UCO.
 
@@ -124,9 +124,9 @@ BEGIN
         VALUES (NEWID(), 'F1A2B3C4-0000-0000-0000-000000000008', @idGrupo2, @estadoA);
 END;
 
--- 8. Actualizar cupos y contadores en Grupo
+-- 8. Actualizar cupos y contadores en Grupo (Añade margen de 40 cupos disponibles para pruebas)
 UPDATE g
-SET g.cantidadEstudiantes = (SELECT COUNT(1) FROM dbo.EstudianteGrupo eg WHERE eg.grupo = g.id)
+SET g.cantidadEstudiantes = (SELECT COUNT(1) FROM dbo.EstudianteGrupo eg WHERE eg.grupo = g.id) + 40
 FROM dbo.Grupo g;
 
 -- 9. Resumen de Verificación

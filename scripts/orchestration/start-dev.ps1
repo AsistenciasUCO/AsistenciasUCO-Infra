@@ -30,7 +30,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Position = 0, Mandatory = $false)]
-    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'full')]
+    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'full')]
     [string]$Profile = 'core',
 
     [Parameter(Mandatory = $false)]
@@ -173,6 +173,15 @@ foreach ($cName in $clamavCandidateContainers) {
 # Levantar otros servicios del perfil si aplica (ej. storage, observability)
 if ($Profile -eq 'storage' -or $Profile -eq 'observability' -or $Profile -eq 'full') {
     docker compose -f "$composeFile" --profile "$Profile" up -d 2>$null
+}
+
+# Levantar plataforma de seguridad si se especifica el perfil 'security' o 'full'
+if ($Profile -eq 'security' -or $Profile -eq 'full') {
+    $secScript = Join-Path $infraDir "components\security\start-security.ps1"
+    if (Test-Path $secScript) {
+        Write-Host "`n  -> [PERFIL SEGURIDAD] Iniciando plataforma de seguridad (PDP, PEP, SurrealDB, OPA)..." -ForegroundColor Yellow
+        & $secScript
+    }
 }
 
 # 4. Esperar Healthcheck real de SQL Server
