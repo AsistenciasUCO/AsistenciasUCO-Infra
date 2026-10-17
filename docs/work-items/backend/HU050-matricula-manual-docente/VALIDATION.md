@@ -1,35 +1,47 @@
-# VALIDATION REPORT — HU050: registrarEstudianteEnGrupo (JPA Migration + Enrolamiento)
+---
+status: closed
+type: work-item
+scope: backend
+owner: backend-team
+last-reviewed: 2026-10-17
+---
 
-Fase 05-auditor.
+# VALIDATION — HU050: Matrícula Manual de Estudiantes por Docente
 
-## 1. Identidad y Alcance
-- **Historia de Usuario:** HU050 (Matrícula o registro manual del estudiante por docente).
-- **Work Item:** HU050-matricula-manual-docente.
-- **Fecha:** 2026-09-29.
-- **Ámbito:** Backend (Java 25 / Spring Boot 4.0.6) y Frontend (Angular 19).
+## Evidencias de Ejecución
 
-## 2. Comandos Ejecutados y Resultados
+### 1. Pruebas Unitarias de Interactor y Negocio
+- **Comando:** `.\mvnw.cmd test "-Dtest=RegistrarEstudianteInteractorTest,RegistrarEstudianteUseCaseImplTest"`
+- **Resultados:**
+  - `RegistrarEstudianteInteractorTest`: 5/5 PASS (0 failures, 0 errors, 0 skipped).
+    - Escenario 1: Registro con datos completos -> delega al caso de uso.
+    - Escenario 2: Matrícula con `estudianteId` -> resuelve datos personales vía `EstudianteRepositoryPort`.
+    - Escenario 3: Matrícula por documento de identidad -> resuelve usuario vía `UsuarioRepositoryPort`.
+    - Escenario 4: Matrícula por documento inexistente -> lanza `ValidationException`.
+    - Escenario 5: Matrícula por `estudianteId` inexistente -> lanza `ResourceNotFoundException`.
+  - `RegistrarEstudianteUseCaseImplTest`: 12/12 PASS (0 failures, 0 errors, 0 skipped).
 
-### 2.1 Backend (Clean Architecture, JPA Command & Controller)
-- **Comando:** `.\mvnw.cmd test`
-- **Exit Code:** `0` (BUILD SUCCESS)
-- **Resultados:** `1298 tests run, 0 failures, 0 errors, 0 skipped`
-  - `GrupoJpaCommandPersistenceTest`: PASS (Validación de bindings IN de los 11 parámetros de dbo.usp_registrar_estudiante_en_grupo, ResultSet canónico de 4 columnas, y traducción de fallos con CorrelationId).
-  - `GrupoRepositorySqlServerAdapterTest`: PASS (Validación de fallback JDBC y delegación transparente a JPA cuando está configurado).
-  - `GrupoControllerWriteEndpointsTest`: PASS (Eliminación de FeatureUnavailableException ante estudianteId y respuesta HTTP 201 Created).
-  - `CleanArchitectureRulesTest`: PASS (Cero dependencias de framework o JPA en Application/Domain).
+### 2. Pruebas de Endpoints y Controladores HTTP
+- **Comando:** `.\mvnw.cmd test "-Dtest=GrupoControllerWriteEndpointsTest"`
+- **Resultados:**
+  - `GrupoControllerWriteEndpointsTest`: 9/9 PASS.
+  - Verifica que `POST /api/v1/grupos/{grupoId}/estudiantes` responda `201 Created` y no `FeatureUnavailableException`.
 
-### 2.2 Frontend (Angular Signals & Workflows)
-- **Comando:** `npm run test:ci`
-- **Exit Code:** `0` (SUCCESS)
-- **Resultados:** `323 tests run, 323 passed, 0 failures`
-  - `AttendanceControlComponent public workflows`: PASS (Matrícula con credenciales y matrícula de estudiante existente institucional).
-- **Comando:** `npm run build`
-- **Exit Code:** `0` (SUCCESS)
-  - Compilación de producción con cero errores tipados.
+### 3. Pruebas de Seguridad y RBAC
+- **Comando:** `.\mvnw.cmd test "-Dtest=RbacSecurityFilterChainTest"`
+- **Resultados:**
+  - `RbacSecurityFilterChainTest`: 40/40 PASS.
+  - Rol `DOCENTE` autorizado para consultar `GET /api/v1/estudiantes/**` (para validación de identidad en frontend).
+  - Rol `DOCENTE` autorizado para registrar alumnos en `POST /api/v1/grupos/{grupoId}/estudiantes`.
 
-## 3. Estado de Calidad
-- [x] Cumple Clean Architecture y reglas de persistencia (ADR-002 / JDBC_TO_JPA.md).
-- [x] Cero datos quemados.
-- [x] Cero excepciones ficticias de no disponibilidad.
-- [x] Paridad y consistencia en Frontend y Backend.
+### 4. Pruebas de Inyección de Dependencias y Wiring
+- **Comando:** `.\mvnw.cmd test "-Dtest=GrupoWiringConfigurationTest"`
+- **Resultados:**
+  - `GrupoWiringConfigurationTest`: 1/1 PASS.
+  - Se inyectan correctamente `UsuarioRepositoryPort` y `EstudianteRepositoryPort` en el bean `RegistrarEstudianteInputPort`.
+
+### 5. Resumen de Calidad
+- **Total de pruebas ejecutadas:** 67 tests.
+- **Fallos:** 0.
+- **Errores:** 0.
+- **Regresiones:** Ninguna detectada.

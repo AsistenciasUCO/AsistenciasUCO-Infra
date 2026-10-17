@@ -1,42 +1,45 @@
-﻿# TEST PLAN — HU050: registrarEstudianteEnGrupo (JPA Migration + Enrolamiento)
+---
+status: closed
+type: work-item
+scope: backend
+owner: backend-team
+last-reviewed: 2026-10-17
+---
 
-Fase 03-tester-red.
+# TEST_PLAN — HU050: Matrícula Manual de Estudiantes por Docente
 
-## 1. Alcance de Pruebas
-1. **Persistencia JPA (GrupoJpaCommandPersistence):**
-   - Ejecución de dbo.usp_registrar_estudiante_en_grupo mediante EntityManager.createStoredProcedureQuery.
-   - Registro y mapeo de los 11 parámetros en orden exacto (idGrupo, numeroIdentificacion, primerNombre, segundoNombre, primerApellido, segundoApellido, correo, password, idCorrelacion, idUsuarioEjecutor, idTipoIdIdentificacion).
-   - Mapeo canónico del ResultSet (4 columnas: idCorrelacion, mensajeUsuarioResultado, mensajeTecnicoResultado, estadoResultado).
-   - Validación de correlación con CorrelationIdContext.
-   - Manejo de excepciones y traducción semántica con DbExceptionTranslator.
-   - Control de parámetros nulos opcionales (segundoNombre, segundoApellido, password, idTipoIdIdentificacion).
+## Fuentes
 
-2. **Controlador HTTP (GrupoController):**
-   - Eliminar throw new FeatureUnavailableException ante la presencia de estudianteId (enrolamiento de estudiante existente).
-   - Verificar que POST /api/v1/grupos/{grupoId}/estudiantes con estudiante existente responde 201 Created y ejecuta el caso de uso pasando los datos.
-   - Preservar validación de errores HTTP 400 y formato.
+- [PLAN](PLAN.md)
+- [CONTRACT](CONTRACT.md)
+- Endpoint canónico: `POST /api/v1/grupos/{grupoId}/estudiantes`
+- Endpoint auxiliar de consulta de identidad: `GET /api/v1/estudiantes`
+- Procedimiento almacenado canónico: `dbo.usp_registrar_estudiante_en_grupo`
 
-3. **Arquitectura y Reglas Clean (CleanArchitectureRulesTest):**
-   - Verificar que no haya @Entity, EntityManager, ni imports de JPA en Application/Domain.
+---
 
-## 2. Casos de Prueba Unitarios y de Integración
+## Behavioral Matrix
 
-### Caso T-HU050-01: Ejecución exitosa con los 11 parámetros en JPA
-- Componente: GrupoJpaCommandPersistenceTest
-- Entrada: RegistrarEstudianteRepositoryDTO completo con correlación activa.
-- Expectativa: Llama a createStoredProcedureQuery('dbo.usp_registrar_estudiante_en_grupo'), registra los 11 parámetros tipados (ParameterMode.IN), obtiene el ResultSet canónico con estadoResultado = true, valida correlación y retorna RegistrarEstudianteRepositoryProjection.
+| ID | Requisito / Escenario | Precondición | Acción / Entrada | Observable | Resultado Esperado | Nivel |
+|---|---|---|---|---|---|---|
+| T-HU050-01 | Matrícula de nuevo estudiante con datos completos | Usuario no existe en BD institucional | `POST /grupos/{id}/estudiantes` con DTO completo (tipoId, doc, nombres, apellidos, correo, password) | Status HTTP, body y llamada a caso de uso | `201 Created`, `exitoso=true`, delega al caso de uso con domain completo | Controller + Interactor |
+| T-HU050-02 | Matrícula de estudiante existente por `estudianteId` | Estudiante registrado previamente en el sistema | `POST /grupos/{id}/estudiantes` con solo `estudianteId` | Resolución de datos en `EstudianteRepositoryPort` y ejecución | `201 Created`, resuelve nombres/correo y delega al caso de uso | Controller + Interactor |
+| T-HU050-03 | Matrícula de estudiante existente por documento | Usuario institucional existe en BD (`UsuarioRepositoryPort`) | `POST /grupos/{id}/estudiantes` con solo `tipoIdentificacionId` y `numeroIdentificacion` | Resolución en `UsuarioRepositoryPort` y mapping a domain | `201 Created`, resuelve identidad institucional y delega a caso de uso | Controller + Interactor |
+| T-HU050-04 | Error al matricular por documento inexistente | Documento no existe en BD institucional | `POST /grupos/{id}/estudiantes` con documento desconocido y sin datos personales | Excepción capturada en interactor | `ValidationException` exigiendo datos completos para nuevo registro | Interactor Slice |
+| T-HU050-05 | Error al matricular por `estudianteId` inexistente | ID no existe en BD | `POST /grupos/{id}/estudiantes` con `estudianteId` inexistente | Excepción capturada en interactor | `ResourceNotFoundException` | Interactor Slice |
+| T-HU050-06 | Validación de autorización RBAC docente en `/api/v1/estudiantes/**` | JWT con rol `DOCENTE` | `GET /api/v1/estudiantes?tipoIdentificacionId=...` | HTTP Status en SecurityFilterChain | `200 OK` (No 403 Forbidden) | Security Slice (`RbacSecurityFilterChainTest`) |
+| T-HU050-07 | Validación de autorización RBAC en `POST /api/v1/grupos/{id}/estudiantes` | JWT con rol `DOCENTE` o `COORDINADOR` | `POST /api/v1/grupos/{id}/estudiantes` | HTTP Status en SecurityFilterChain | Permitido (`201 Created` o validación de negocio) | Security Slice (`RbacSecurityFilterChainTest`) |
+| T-HU050-08 | Wiring canónico de Clean Architecture en IoC Spring | Contexto de Spring / Configuration | Creación del bean `RegistrarEstudianteInputPort` | Inyección de puertos secundarios | Bean creado con `RegistrarEstudianteUseCase`, `UsuarioRepositoryPort` y `EstudianteRepositoryPort` | Wiring Unit Test (`GrupoWiringConfigurationTest`) |
 
-### Caso T-HU050-02: Manejo de error de negocio devuelto por el SP
-- Componente: GrupoJpaCommandPersistenceTest
-- Entrada: RegistrarEstudianteRepositoryDTO que genera conflicto (e.g. cruce de horario o matrícula duplicada en BD).
-- Expectativa: DbExceptionTranslator traduce el fallo a la excepción semántica de negocio correspondiente (e.g. ConflictException).
+---
 
-### Caso T-HU050-03: Manejo de fallo de infraestructura JPA
-- Componente: GrupoJpaCommandPersistenceTest
-- Entrada: Lanzamiento de PersistenceException durante la ejecución.
-- Expectativa: Captura y traduce a DatabaseOperationException preservando el correlationId en logs y sin fugas de excepciones de Hibernate.
+## Estrategia de Pruebas
 
-### Caso T-HU050-04: Enrolamiento de estudiante existente en GrupoController
-- Componente: GrupoControllerWriteEndpointsTest
-- Entrada: Request con estudianteId != null y datos del alumno.
-- Expectativa: No lanza FeatureUnavailableException. Delega al puerto y responde 201 Created.
+1. **Unitarias / Slice (MockMvc y Mockito):**
+   - `RegistrarEstudianteInteractorTest`: Verifica los 5 caminos de resolución de identidad (datos completos, `estudianteId`, solo documento, documento no encontrado, estudianteId no encontrado).
+   - `GrupoControllerWriteEndpointsTest`: Verifica la aceptación del request en el controlador REST sin lanzar `FeatureUnavailableException`.
+   - `RbacSecurityFilterChainTest`: Verifica que la cadena de filtros de Spring Security permita a `DOCENTE` consultar el directorio de estudiantes y registrar en el grupo.
+   - `GrupoWiringConfigurationTest`: Valida la inyección de dependencias y el ensamblado arquitectónico hexagonal sin violaciones de inversión de control.
+
+2. **Integración con Base de Datos:**
+   - La persistencia se delega a `GrupoJpaRepository` invocando el SP `dbo.usp_registrar_estudiante_en_grupo`, cubierto por la suite de integración de JPA y pruebas E2E.
