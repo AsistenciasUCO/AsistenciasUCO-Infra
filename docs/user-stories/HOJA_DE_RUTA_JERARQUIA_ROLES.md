@@ -107,8 +107,14 @@ Para construir la estructura sin bloqueos, se debe seguir la siguiente **secuenc
 
 ---
 
-## 🎯 4. Próximo Paso Recomendado
+## 🎯 4. Estado de Avance y Próximo Paso Recomendado
 
-Para construir la jerarquía académica de forma limpia, determinística y sin bloqueos de integridad referencial:
-👉 **Precondición:** Contar con el Decano titular aprovisionado en el sistema (bien sea el decano institucional precargado en las semillas o registrado mediante **`HU117-B: Alta de Decano`**).  
-👉 **Paso Inmediato:** Conectar y verificar el flujo de **`HU116: Alta institucional de nueva Facultad`** asociando obligatoriamente al Decano titular titular (`NOT NULL` en persistencia y dominio), asegurando la integridad referencial antes de habilitar la creación de programas académicos subordinados.
+### 4.1 Hitos Alcanzados en Etapa 1:
+- [x] **`HU117-B: Alta de Decano y Aprovisionamiento IAM`**: `[CERTIFICADA]` (Decano institucional aprovisionado en persistencia y Keycloak).
+- [x] **`HU116: Alta institucional de nueva Facultad`**: `[CERTIFICADA]` (Persistencia DDL con `usp_crear_facultad`, Backend REST en `/api/v1/admin/facultades` con Clean Architecture, Decano obligatorio y UI reactiva en Angular con Signals).
+
+### 4.2 Próximo Paso Inmediato en la Jerarquía Institucional:
+Para continuar con la construcción jerárquica de la universidad:
+👉 **Paso Inmediato (Etapa 2 - Custodia de Coordinación):**
+- **`HU076: Alta de Programa Académico en Facultad`** (`usp_crear_programa` / `POST /api/v1/decano/programas`), permitiendo al Decano titular de la Facultad crear programas académicos oficiales bajo su jurisdicción.
+- Alternativamente, si se requiere ajustar la custodia de la facultad antes de crear programas: **`HU117: Modificar sede y decano responsable de facultad`**.
