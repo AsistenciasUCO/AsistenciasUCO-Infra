@@ -142,3 +142,33 @@ Antes de dar por finalizada la implementación de una HU, marca cada casilla:
 - [ ] ¿Las pruebas de Frontend pasan con `npm run test:ci`?
 - [ ] ¿Se ejecutó `.\AsistenciasUCO-Infra\infra.ps1 verify` con resultado `[PASS]`?
 - [ ] ¿Se actualizó el estado en `docs/historias-de-usuario.md` a `[CERTIFICADA]`?
+
+---
+
+## 🧠 5. Lecciones Aprendidas y Antipatrones Evitados (Best Practices Clave)
+
+A partir de la experiencia en la implementación integral de HUs jerárquicas (caso canónico `HU116: Alta de Facultad` y `HU117-B: Aprovisionamiento de Decano`), todo agente y desarrollador debe interiorizar las siguientes directrices operativas:
+
+### 5.1 Precedencia Relacional y Prevención de Candados Circulares (Foreign Keys NOT NULL)
+- **Análisis de Dependencias en DoR:** Antes de redactar contratos o código, verificar el esquema relacional físico (`dbo.<Entidad>`). Si la tabla de destino posee una Foreign Key obligatoria (`NOT NULL`, ej. `Facultad.decano NOT NULL`), la entidad de referencia (`Decano`) **DEBE ser aprovisionada antes** en la hoja de ruta (`HOJA_DE_RUTA_JERARQUIA_ROLES.md`).
+- **Prohibición Estricta de UUIDs Vacíos ("00000000-0000-0000-0000-000000000000"):** Jamás recurrir a UUIDs falsos o valores por defecto para eludir una FK. La regla constitucional exige evaluar `IS NULL` y forzar que el identificador sea provisto explícitamente desde una entidad real preexistente.
+
+### 5.2 Desacoplamiento de Contratos: DTOs de Backend vs. Modelos de Frontend
+- **Paridad de Propiedades:** Los contratos del backend (`*DTO`) pueden exponer nombres compactos o canónicos (ej: `nombreCompleto`, `numeroIdentificacion`, `estaActivoDecano`). No asumir que coinciden ciegamente con interfaces mock del frontend (`nombres`, `apellidos`, `correo`).
+- **Normalización en Servicios del Cliente:** En el Frontend, los métodos de consulta (`*Service`) deben mapear y normalizar las respuestas del API hacia el modelo de UI (`DecanoItem`), extrayendo nombres/apellidos si vienen consolidados y tolerando campos opcionales sin generar cadenas vacías ni antipatrones visuales (como ` ()`).
+- **Plantillas con Fallbacks Seguros:** Toda interpolación en vistas HTML debe contemplar alternativas elegantes:
+  ```html
+  {{ dec.nombreCompleto || (dec.nombres + ' ' + dec.apellidos).trim() }} (CC {{ dec.numeroIdentificacion }})
+  ```
+
+### 5.3 Deduplicación Determinista en Catálogos del Cliente
+- **Vistas con Joins Múltiples:** Las vistas relacionales (`uv_*`) a menudo enlazan entidades principales con tablas de asignación (ej. `uv_decano` cruzando `Decano` con `Facultad`). Si una autoridad tiene múltiples facultades asignadas o registros históricos, la consulta devolverá múltiples filas para el mismo sujeto.
+- **Deduplicación por `id`:** Todo selector o dropdown que consuma catálogos institucionales debe procesar la lista usando un `Map<string, T>` por `item.id` antes de emitir la señal (`signal<T[]>`), garantizando que cada profesional o entidad aparezca una sola vez en pantalla.
+
+### 5.4 Registro Explícito de Dependencias en Clean Architecture (Spring Boot)
+- **POJOs Puros sin Inyección Mágica:** Los casos de uso (`*UseCaseImpl`) e interactors (`*Interactor`) son clases puras de Java en la capa de aplicación y no deben llevar anotaciones `@Service` ni `@Component`.
+- **Wiring Centralizado:** Cada nuevo caso de uso debe ser cableado explícitamente como `@Bean` en su clase de configuración de infraestructura (`*WiringConfiguration.java`). De omitirse, el contenedor de inversión de control fallará al arrancar el API.
+
+### 5.5 Higiene de Procesos Locales y Puertos de Red
+- **Detección Preventiva de Conflictos:** Antes de iniciar scripts de orquestación local (`scripts/iniciar-app.ps1` o `infra.ps1 start`), comprobar el estado de los puertos críticos (8080 para Backend, 4200 para Frontend, 8081 para Keycloak, 1433 para SQL Server) para evitar excepciones `EADDRINUSE` o procesos huérfanos que impidan desplegar nuevas versiones de los artefactos.
+

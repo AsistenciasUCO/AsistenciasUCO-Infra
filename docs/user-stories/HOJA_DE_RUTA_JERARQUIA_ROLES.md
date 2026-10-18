@@ -11,8 +11,8 @@ En el Sistema de Asistencias UCO, **ningún rol puede realizar todas las operaci
 
 ```mermaid
 flowchart TD
-    Admin["1. Administrador Institucional<br/>(Gobierno Global UCO)"] -->|"Registra & Custodia"| Fac["Facultad"]
-    Admin -->|"Designa & Aprovisiona"| Dec["2. Decano de Facultad<br/>(Titular de Facultad)"]
+    Admin["1. Administrador Institucional<br/>(Gobierno Global UCO)"] -->|"Aprovisiona & Registra"| Dec["2. Decano de Facultad<br/>(Titular Académico)"]
+    Admin -->|"Registra con Decano Asignado"| Fac["Facultad Institucional"]
     Dec -->|"Registra & Custodia en su Facultad"| Prog["Programa Académico"]
     Dec -->|"Designa & Aprovisiona en su Programa"| Coord["3. Coordinador de Programa<br/>(Titular de Programa)"]
     Coord -->|"Estructura & Habilita"| Plan["Plan de Estudios & Asignaturas"]
@@ -28,7 +28,7 @@ flowchart TD
 ```
 
 ### Reglas de Delimitación Inviolables:
-1. **Administrador:** Solo registra Facultades y asigna Decanos titulares. No gestiona materias, grupos ni docentes individuales.
+1. **Administrador:** Aprovisiona Decanos titulares y registra Facultades vinculando obligatoriamente a su Decano responsable (conforme a la restricción `[decano] NOT NULL` e integridad referencial en base de datos). No gestiona materias, grupos ni docentes individuales.
 2. **Decano:** Solo opera dentro de su **Facultad** asignada (`UserScopeService.resolveFacultadId()`). Da de alta Programas y designa a sus Coordinadores.
 3. **Coordinador:** Solo opera dentro de su **Programa Académico** (`UserScopeService.resolveProgramaId()`). Crea asignaturas, vincula docentes y abre grupos académicos asignando docentes titulares.
 4. **Docente:** Solo opera sobre los **Grupos donde es titular**. Es el **único** que puede registrar asistencias, justificaciones y matricular/retirar alumnos de su curso.
@@ -45,11 +45,12 @@ A continuación se presenta el catálogo consolidado de HUs vinculadas al regist
 | **0** | *Sistema* | Catálogos Base (Tipos ID, Programas, Áreas) | **HU022 / HU153** | Catálogo: Tipos de Identificación | `[CERTIFICADA]` |
 | **0** | *Sistema* | Tipos de Programa Académico | **HU023 / HU154** | Catálogo: Modalidades y Tipos de Programa | `[PARCIAL]` |
 | **0** | *Sistema* | Institución Universitaria (UCO) | **HU163** | Consulta de Institución | `[CERTIFICADA]` |
+| **1** | **Administrador** | **Decano** (Directorio institucional) | **HU137 / Portal** | Directorio administrativo y consulta de Decanos (`GET /admin/decanos`) | `[CERTIFICADA]` |
+| **1** | **Administrador** | **Decano** (Alta y aprovisionamiento IAM) | **HU117-B (Nueva)** | Registrar Decano titular y sincronizar cuenta IAM (`POST /admin/decanos` / `usp_crear_decano`) | `[CERTIFICADA]` |
 | **1** | **Administrador** | **Facultad** (Estructura física y académica) | **HU107** | Consultar estructura institucional de facultades | `[CERTIFICADA]` |
-| **1** | **Administrador** | **Facultad** (Alta institucional) | **HU116** | Alta institucional de nueva facultad (`usp_crear_facultad`) | `[BLOQUEADO 501]` |
+| **1** | **Administrador** | **Facultad** (Alta con Decano asignado) | **HU116** | Alta institucional de nueva facultad (`usp_crear_facultad`, requiere Decano titular) | `[CERTIFICADA]` |
 | **1** | **Administrador** | **Facultad** (Modificación y estado) | **HU110 / HU111** | Modificar denominación y alternar estado de facultad | `[BLOQUEADO 501]` |
-| **1** | **Administrador** | **Decano** (Designación y vinculación) | **HU117** | Modificar sede y decano responsable de facultad | `[BLOQUEADO 501]` |
-| **1** | **Administrador** | **Decano** (Alta y aprovisionamiento IAM) | **HU117-B (Nueva)** | Registrar Decano titular y sincronizar cuenta IAM | `[PENDIENTE]` |
+| **1** | **Administrador** | **Decano** (Reasignación de titularidad) | **HU117** | Modificar sede y decano responsable de facultad | `[BLOQUEADO 501]` |
 | **2** | **Decano** | **Programa Académico** (Apertura) | **HU076** | Agregar nuevo programa académico a la facultad | `[PENDIENTE]` |
 | **2** | **Decano** | **Programa Académico** (Modificación) | **HU077 / HU078** | Modificar datos y alternar estado de programa | `[PENDIENTE]` |
 | **2** | **Decano** | **Coordinador** (Directorio y Búsqueda) | **HU124 / HU123** | Directorio y búsqueda predictiva de coordinadores | `[CERTIFICADA]` |
@@ -71,10 +72,11 @@ Para construir la estructura sin bloqueos, se debe seguir la siguiente **secuenc
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ ETAPA 1: CUSTODIA DE DECANATURA (Administrador ➔ Facultad ➔ Decano)         │
-│ 1.1 HU116: Alta de Facultad (SP usp_crear_facultad + Endpoint Backend + UI) │
-│ 1.2 HU117 / HU117-B: Alta de Usuario Decano y Vinculación a su Facultad     │
-│ 1.3 HU110 / HU111: Modificación de atributos y switch de estado de Facultad │
+│ ETAPA 1: CUSTODIA DE DECANATURA (Administrador ➔ Decano ➔ Facultad)         │
+│ 1.1 HU117-B: Alta de Usuario Decano y Aprovisionamiento IAM (POST /decanos) │
+│ 1.2 HU116: Alta de Facultad vinculando Decano Titular (POST /facultades)    │
+│ 1.3 HU117: Modificar sede y reasignar decano responsable de facultad        │
+│ 1.4 HU110 / HU111: Modificación de atributos y switch de estado de Facultad │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │ Permite iniciar sesión como Decano
                                        ▼
@@ -107,5 +109,6 @@ Para construir la estructura sin bloqueos, se debe seguir la siguiente **secuenc
 
 ## 🎯 4. Próximo Paso Recomendado
 
-Para iniciar de forma limpia y ordenada, la primera historia de usuario que se debe abordar es:
-👉 **`HU116: Alta institucional de nueva Facultad`** seguida de **`HU117 / HU117-B: Alta y Asignación de Decano`**, ya que son la raíz de toda la jerarquía académica del sistema.
+Para construir la jerarquía académica de forma limpia, determinística y sin bloqueos de integridad referencial:
+👉 **Precondición:** Contar con el Decano titular aprovisionado en el sistema (bien sea el decano institucional precargado en las semillas o registrado mediante **`HU117-B: Alta de Decano`**).  
+👉 **Paso Inmediato:** Conectar y verificar el flujo de **`HU116: Alta institucional de nueva Facultad`** asociando obligatoriamente al Decano titular titular (`NOT NULL` en persistencia y dominio), asegurando la integridad referencial antes de habilitar la creación de programas académicos subordinados.

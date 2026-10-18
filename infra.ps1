@@ -70,6 +70,12 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$Volumes,
 
+    [Parameter(Mandatory = $false)]
+    [switch]$Force,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$CheckOnly,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemainingArgs
 )
@@ -91,9 +97,15 @@ function Show-Help {
     Write-Host "1. ORQUESTACION Y ENTORNO LOCAL:" -ForegroundColor Yellow
     Write-Host "  all | dev        Arranca TODO: Contenedores + Despliegue BD + Backend + Frontend." -ForegroundColor White
     Write-Host "                   Opciones: -Profile core|observability|full, -SkipSeed, -ContainersOnly" -ForegroundColor Gray
+    Write-Host "  init-env         Construye y sincroniza atómicamente todos los .env y env.js del ecosistema." -ForegroundColor White
+    Write-Host "                   Opciones: -Profile local|docker|ci, -Mode own|baseline, -Force, -CheckOnly" -ForegroundColor Gray
     Write-Host "  apps             Inicia Backend (Spring Boot) y Frontend (Angular) juntos en consolas." -ForegroundColor White
     Write-Host "  backend          Inicia unicamente la API Backend (Spring Boot en puerto 8080)." -ForegroundColor White
     Write-Host "  frontend         Inicia unicamente la SPA Frontend (Angular en puerto 4200)." -ForegroundColor White
+    Write-Host "  restart          Reinicia Backend y Frontend liberando puertos y arrancando en modo rapido." -ForegroundColor White
+    Write-Host "  restart-backend  Reinicia solo la API Backend en modo agil (-Dmaven.test.skip=true)." -ForegroundColor White
+    Write-Host "  restart-frontend Reinicia solo la SPA Frontend (Angular en puerto 4200)." -ForegroundColor White
+    Write-Host "  reload-backend   Compila en caliente (DevTools) en ~2s sin reiniciar Tomcat ni tumbar puerto 8080." -ForegroundColor White
     Write-Host "  up | start       Alias de 'all' (o solo contenedores pasando -ContainersOnly)." -ForegroundColor White
     Write-Host "  down | stop      Detiene limpiamente contenedores y libera puertos 8080/4200." -ForegroundColor White
     Write-Host "                   Opciones: -Volumes (elimina volumenes locales)" -ForegroundColor Gray
@@ -102,6 +114,7 @@ function Show-Help {
     Write-Host "2. BASE DE DATOS (SQL Server 2022+):" -ForegroundColor Yellow
     Write-Host "  db-deploy        Compila el esquema DDL relacional (tablas, funciones, vistas, SPs)." -ForegroundColor White
     Write-Host "  db-seed          Restablece la semilla limpia institucional (11 usuarios canonicos)." -ForegroundColor White
+    Write-Host "  reload-db        Compila esquema DDL y restablece la semilla limpia en un solo paso." -ForegroundColor White
     Write-Host "  db-test          Ejecuta la suite transaccional de pruebas de BD (test_suite.sql)." -ForegroundColor White
     Write-Host "  db-cupos         Amplia la capacidad de cupos de todos los grupos (+40 cupos) para pruebas." -ForegroundColor White
     Write-Host ""
@@ -221,6 +234,57 @@ switch ($Command.ToLowerInvariant()) {
             & $startApps -SkipBackend @RemainingArgs
         } else {
             & $startApps -SkipBackend
+        }
+        exit $LASTEXITCODE
+    }
+
+    { $_ -in "init-env", "setup-env", "build-env", "config-env" } {
+        $initScript = Join-Path $infraRoot "scripts\orchestration\init-env.ps1"
+        $splat = @{}
+        if ($PSBoundParameters.ContainsKey('Profile') -and -not [string]::IsNullOrWhiteSpace($Profile)) { $splat['Profile'] = $Profile }
+        if ($PSBoundParameters.ContainsKey('Mode') -and -not [string]::IsNullOrWhiteSpace($Mode)) { $splat['SecurityMode'] = $Mode }
+        if ($PSBoundParameters.ContainsKey('Force') -and $Force) { $splat['Force'] = $true }
+        if ($PSBoundParameters.ContainsKey('CheckOnly') -and $CheckOnly) { $splat['CheckOnly'] = $true }
+        if ($RemainingArgs -and $RemainingArgs.Length -gt 0) {
+            & $initScript @splat @RemainingArgs
+        } else {
+            & $initScript @splat
+        }
+        exit $LASTEXITCODE
+    }
+
+    { $_ -in "restart", "reiniciar", "restart-apps", "reboot" } {
+        $startApps = Join-Path $infraRoot "scripts\orchestration\start-apps.ps1"
+        & $startApps -Restart -Fast
+        exit $LASTEXITCODE
+    }
+
+    { $_ -in "restart-backend", "reiniciar-backend", "rb" } {
+        $startApps = Join-Path $infraRoot "scripts\orchestration\start-apps.ps1"
+        & $startApps -Restart -SkipFrontend -Fast
+        exit $LASTEXITCODE
+    }
+
+    { $_ -in "restart-frontend", "reiniciar-frontend", "rf" } {
+        $startApps = Join-Path $infraRoot "scripts\orchestration\start-apps.ps1"
+        & $startApps -Restart -SkipBackend
+        exit $LASTEXITCODE
+    }
+
+    { $_ -in "reload-backend", "recargar-backend", "recompile", "reload" } {
+        Write-Host "[INFO] Recompilando clases en caliente para Spring Boot DevTools..." -ForegroundColor Cyan
+        Set-Location (Join-Path $repoRoot "GestioAsistenciaBackend")
+        .\mvnw.cmd compile "-Dmaven.test.skip=true"
+        Write-Host "[OK] Clases recompiladas. DevTools reiniciará el contexto en ~2 segundos." -ForegroundColor Green
+        exit $LASTEXITCODE
+    }
+
+    { $_ -in "reload-db", "reseed-db", "reiniciar-bd" } {
+        Write-Host "[INFO] Desplegando esquema relacional..." -ForegroundColor Cyan
+        & (Join-Path $infraRoot "components\sqlserver\scripts\deploy-schema.ps1")
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[INFO] Restableciendo semilla canónica de datos limpios..." -ForegroundColor Cyan
+            & (Join-Path $infraRoot "components\sqlserver\scripts\seed-clean-data.ps1")
         }
         exit $LASTEXITCODE
     }

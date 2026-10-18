@@ -32,9 +32,10 @@ $scriptDir = $PSScriptRoot
 $infraRoot = (Resolve-Path (Join-Path $scriptDir "..\..")).Path
 $repoRoot  = (Resolve-Path (Join-Path $infraRoot "..")).Path
 
-$backendEnv     = Join-Path $repoRoot "GestioAsistenciaBackend\.env"
-$frontendEnvJs  = Join-Path $repoRoot "GestioAsistenciaFrontend\public\assets\env.js"
-$frontendEnv    = Join-Path $repoRoot "GestioAsistenciaFrontend\.env"
+$backendEnv        = Join-Path $repoRoot "GestioAsistenciaBackend\.env"
+$frontendPublicJs  = Join-Path $repoRoot "GestioAsistenciaFrontend\public\assets\env.js"
+$frontendSrcJs     = Join-Path $repoRoot "GestioAsistenciaFrontend\src\assets\env.js"
+$frontendEnv       = Join-Path $repoRoot "GestioAsistenciaFrontend\.env"
 
 function Get-CurrentStatus {
     Write-Host "`n==============================================================================" -ForegroundColor Cyan
@@ -53,8 +54,9 @@ function Get-CurrentStatus {
         }
     }
 
-    if (Test-Path $frontendEnvJs) {
-        $frontendContent = Get-Content $frontendEnvJs -Raw
+    $jsFileToCheck = if (Test-Path $frontendSrcJs) { $frontendSrcJs } else { $frontendPublicJs }
+    if (Test-Path $jsFileToCheck) {
+        $frontendContent = Get-Content $jsFileToCheck -Raw
         if ($frontendContent -match "KEYCLOAK_REALM'\s*\]\s*=\s*'security-baseline'") {
             $frontendMode = "SECURITY BASELINE (Keycloak 19090, realm security-baseline)"
         } elseif ($frontendContent -match "KEYCLOAK_REALM'\s*\]\s*=\s*'asistencias-uco'") {
@@ -99,21 +101,26 @@ if ($targetMode -eq 'own') {
     }
 
     Write-Host "`n[2/3] Configurando Frontend env.js para Keycloak propio (8081)..." -ForegroundColor Yellow
-    if (Test-Path $frontendEnvJs) {
-        $envJsContent = @"
+    $envJsContent = @"
 (function (window) {
   window.env = window.env || {};
-  window.env['API_URL'] = 'http://localhost:8080/api/v1';
+  var host = window.location.hostname || 'localhost';
+  window.env['API_URL'] = 'http://' + host + ':8080/api/v1';
   // Switch de Seguridad: Modo Propio (8081 / asistencias-uco)
-  window.env['KEYCLOAK_URL'] = 'http://127.0.0.1:8081';
+  window.env['KEYCLOAK_URL'] = 'http://' + host + ':8081';
   window.env['KEYCLOAK_REALM'] = 'asistencias-uco';
   window.env['KEYCLOAK_CLIENT_ID'] = 'asistencias-uco-frontend';
   window.env['USE_MOCKS'] = 'false';
   window.env['SECURITY_BASELINE_ENABLED'] = 'false';
 })(this);
 "@
-        Set-Content -Path $frontendEnvJs -Value $envJsContent.Trim() -Encoding utf8
-        Write-Host "  -> Frontend env.js actualizado." -ForegroundColor Green
+    if (Test-Path $frontendPublicJs) {
+        Set-Content -Path $frontendPublicJs -Value $envJsContent.Trim() -Encoding utf8
+        Write-Host "  -> Frontend public/assets/env.js actualizado." -ForegroundColor Green
+    }
+    if (Test-Path $frontendSrcJs) {
+        Set-Content -Path $frontendSrcJs -Value $envJsContent.Trim() -Encoding utf8
+        Write-Host "  -> Frontend src/assets/env.js actualizado." -ForegroundColor Green
     }
 
     Write-Host "`n[3/3] Configurando Frontend .env para Keycloak propio (8081)..." -ForegroundColor Yellow
@@ -159,21 +166,26 @@ USE_MOCKS=false
     }
 
     Write-Host "`n[2/3] Configurando Frontend env.js para Security Baseline (19090)..." -ForegroundColor Yellow
-    if (Test-Path $frontendEnvJs) {
-        $envJsContent = @"
+    $envJsContent = @"
 (function (window) {
   window.env = window.env || {};
-  window.env['API_URL'] = 'http://localhost:8080/api/v1';
+  var host = window.location.hostname || 'localhost';
+  window.env['API_URL'] = 'http://' + host + ':8080/api/v1';
   // Switch de Seguridad: Modo Security Baseline (19090 / security-baseline)
-  window.env['KEYCLOAK_URL'] = 'http://127.0.0.1:19090';
+  window.env['KEYCLOAK_URL'] = 'http://' + host + ':19090';
   window.env['KEYCLOAK_REALM'] = 'security-baseline';
   window.env['KEYCLOAK_CLIENT_ID'] = 'asistencias-uco-frontend';
   window.env['USE_MOCKS'] = 'false';
   window.env['SECURITY_BASELINE_ENABLED'] = 'true';
 })(this);
 "@
-        Set-Content -Path $frontendEnvJs -Value $envJsContent.Trim() -Encoding utf8
-        Write-Host "  -> Frontend env.js actualizado." -ForegroundColor Green
+    if (Test-Path $frontendPublicJs) {
+        Set-Content -Path $frontendPublicJs -Value $envJsContent.Trim() -Encoding utf8
+        Write-Host "  -> Frontend public/assets/env.js actualizado." -ForegroundColor Green
+    }
+    if (Test-Path $frontendSrcJs) {
+        Set-Content -Path $frontendSrcJs -Value $envJsContent.Trim() -Encoding utf8
+        Write-Host "  -> Frontend src/assets/env.js actualizado." -ForegroundColor Green
     }
 
     Write-Host "`n[3/3] Configurando Frontend .env para Security Baseline (19090)..." -ForegroundColor Yellow

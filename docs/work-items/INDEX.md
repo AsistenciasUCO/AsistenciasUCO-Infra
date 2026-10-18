@@ -2,7 +2,7 @@
 > **Ecosistema:** Sistema de Gestion de Asistencia UCO  
 > **Proposito:** Registro centralizado y trazabilidad de ciclo de vida SDD/TDD para Backend, Frontend y Base de Datos.  
 > **Generacion:** Automatizada via AsistenciasUCO-Infra/scripts/quality/sync-work-items.ps1  
-> **Ultima Actualizacion:** 2026-10-17 18:48:33  
+> **Ultima Actualizacion:** 2026-10-17 20:42:23  
 
 ---
 
@@ -10,10 +10,10 @@
 
 | Capa Tecnologica | Work Items / Fases | Archivos Sincronizados |
 | :--- | :---: | :---: |
-| **Backend API (Spring Boot)** | 26 | 142 |
+| **Backend API (Spring Boot)** | 27 | 142 |
 | **Frontend Web (Angular 19)** | 7 | 25 |
 | **Base de Datos (SQL Server)** | 6 | 10 |
-| **TOTAL CONSOLIDADO** | **39** | **279** |
+| **TOTAL CONSOLIDADO** | **40** | **284** |
 
 ---
 
@@ -25,6 +25,7 @@
 | :--- | :---: | :---: | :--- |
 | FIX-001-sse-error-content-negotiation | 3 | active | [Ver carpeta](backend/FIX-001-sse-error-content-negotiation/) |
 | HU050-matricula-manual-docente | 5 | closed | [Ver carpeta](backend/HU050-matricula-manual-docente/) |
+| HU116-alta-facultad | 5 | closed | [Ver carpeta](backend/HU116-alta-facultad/) |
 | LB-000-gobernanza-documentacion | 7 | active | [Ver carpeta](backend/LB-000-gobernanza-documentacion/) |
 | LB-001A-db-backend-asistencia | 4 | active | [Ver carpeta](backend/LB-001A-db-backend-asistencia/) |
 | LB-001B-backend-frontend-asistencia | 5 | N/A | [Ver carpeta](backend/LB-001B-backend-frontend-asistencia/) |

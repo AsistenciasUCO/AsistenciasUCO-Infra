@@ -36,7 +36,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # 1. Cargar variables de entorno desde .env de Infraestructura si existen
-$infraEnv = Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "..") ".env"
+$infraEnv = Join-Path (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName ".env"
+if (-not (Test-Path $infraEnv)) {
+    $infraEnv = Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "..") ".env"
+}
 if (Test-Path $infraEnv) {
     Get-Content $infraEnv | ForEach-Object {
         $line = $_.Trim()
