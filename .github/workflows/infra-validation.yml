@@ -1,0 +1,91 @@
+name: Infra Contents Validation
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  infra-contents:
+    name: Validate official Infra contents
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Compose syntax without starting services
+        shell: bash
+        run: |
+          test -f docker-compose.yml
+          docker compose -f docker-compose.yml config --quiet
+
+      - name: Validate Compose referenced files
+        shell: bash
+        run: |
+          required_paths=(
+            components/keycloak/realm-import
+            components/observability/otel-collector/config.yaml
+            components/observability/prometheus/prometheus.yml
+            components/observability/grafana/provisioning
+            components/proxy/traefik.yml
+            components/proxy/dynamic
+          )
+          for required_path in "${required_paths[@]}"; do
+            test -e "$required_path" || {
+              echo "::error::Missing Compose referenced path: $required_path"
+              exit 1
+            }
+          done
+
+      - name: Trivy configuration and filesystem inventory
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          format: sarif
+          output: infra-trivy.sarif
+          severity: HIGH,CRITICAL
+          exit-code: 0
+          ignore-unfixed: false
+
+      - name: Upload Trivy inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infra-trivy-inventory
+          path: infra-trivy.sarif
+          if-no-files-found: ignore
+
+      - name: Inspect runtime artifacts without deploying
+        shell: pwsh
+        run: |
+          $runtimeCandidates = @(
+            'Dockerfile',
+            'docker-compose.yml',
+            'docker-compose.yaml',
+            'docker',
+            'k8s',
+            'helm',
+            'terraform',
+            'bicep',
+            'manifests',
+            'scripts'
+          )
+          $present = @($runtimeCandidates | Where-Object { Test-Path -LiteralPath $_ })
+          if ($present.Count -eq 0) {
+              $status = 'NOT_APPLICABLE'
+              Write-Host 'INFRA_RUNTIME_VALIDATION=NOT_APPLICABLE'
+              Write-Host 'No runtime/deployment artifacts are present in the official Infra repository.'
+          } else {
+              $status = 'PRESENT_REQUIRES_OWNER_REVIEW'
+              Write-Host ('INFRA_RUNTIME_ARTIFACTS=' + ($present -join ','))
+              Write-Host 'INFRA_RUNTIME_VALIDATION=PRESENT_REQUIRES_OWNER_REVIEW'
+              Write-Host 'Runtime artifacts are present; owner review is required before any controlled runtime validation.'
+          }
+          "INFRA_RUNTIME_VALIDATION=$status" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
