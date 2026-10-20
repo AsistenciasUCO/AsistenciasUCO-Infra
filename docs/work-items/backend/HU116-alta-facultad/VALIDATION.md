@@ -16,12 +16,13 @@ Todas las pruebas planificadas en `TEST_PLAN.md` fueron ejecutadas satisfactoria
 
 ## 2. Pruebas Unitarias de Negocio y Aplicación (Backend)
 - **Comando:** `.\mvnw.cmd test "-Dtest=CrearFacultadUseCaseImplTest"`
-- **Resultados:** `5/5 PASS` (0 failures, 0 errors, 0 skipped. Time elapsed: 1.96 s).
-  - Escenario 1 (`deberiaCrearFacultadExitosamenteCuandoDatosSonValidos`): Delega correctamente a `FacultadCommandPort` y retorna dominio completo.
-  - Escenario 2 (`deberiaFallarCuandoNombreEsNuloOVacio`): Dispara `ValidationException` ante nombre inválido.
-  - Escenario 3 (`deberiaFallarCuandoNombreExcedeLongitudMaxima`): Dispara `ValidationException` ante nombre > 100 caracteres.
-  - Escenario 4 (`deberiaPropagarExcepcionDeNegocioCuandoFallaPersistencia`): Propaga `BusinessException` ante error reportado por persistencia.
-  - Escenario 5 (`deberiaFallarCuandoDatosSonNulos`): Dispara `ValidationException` ante DTO nulo.
+- **Resultados:** `6/6 PASS` (0 failures, 0 errors, 0 skipped. Time elapsed: 1.70 s).
+  - Escenario 1 (`crearFacultad_valida_persiste_exitosamente`): Delega correctamente a `FacultadCommandPort` con datos completos.
+  - Escenario 2 (`crearFacultad_domain_nulo_lanza_validationException`): Dispara `ValidationException` ante dominio nulo.
+  - Escenario 3 (`crearFacultad_nombre_vacio_lanza_validationException`): Dispara `ValidationException` ante nombre en blanco.
+  - Escenario 4 (`crearFacultad_nombre_corto_lanza_validationException`): Dispara `ValidationException` ante nombre menor a 3 caracteres.
+  - Escenario 5 (`crearFacultad_decano_nulo_lanza_validationException`): Dispara `ValidationException` ante `idDecano` nulo (Decano obligatorio).
+  - Escenario 6 (`crearFacultad_error_persistencia_se_propaga`): Propaga la excepción ante error reportado por persistencia.
 
 ---
 

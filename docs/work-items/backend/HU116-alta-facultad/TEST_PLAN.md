@@ -32,6 +32,7 @@ El propósito de este plan de pruebas es garantizar la verificación estricta y 
 | **TC-BK-04** | Backend / Controller | `POST /api/v1/admin/facultades` con payload válido | HTTP `201 Created`, JSON con `ApiDataResponse<FacultadDTO>`, delegación a `CrearFacultadInputPort`. | Unitario MockMvc |
 | **TC-BK-05** | Backend / Controller | `POST /api/v1/admin/facultades` con body vacío | HTTP `400 Bad Request` procesado por `GlobalExceptionHandler`. | Unitario MockMvc |
 | **TC-BK-06** | Backend / Security | Invocación sin token o con rol ajeno a `ADMINISTRADOR` | HTTP `401 Unauthorized` o `403 Forbidden`. | Integración Seguridad |
+| **TC-BK-07** | Backend / UseCase | Insumo con `idDecano = NULL` | Lanza `ValidationException` ("El decano titular de la facultad es obligatorio."), cero persistencia. | Unitario |
 | **TC-FE-01** | Frontend / Component | Envío de formulario `catalog-facultades.component.ts` | Dispara `save.emit()`, actualiza Signal reactivo `_facultades` y muestra Toast. | Unitario Angular |
 
 ---

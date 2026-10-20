@@ -44,7 +44,7 @@ dbo.usp_crear_facultad
 | `@id` | `UNIQUEIDENTIFIER` | `IN` | **NO** | Identificador de la nueva facultad. Si es `NULL`, se genera automáticamente con `NEWID()`. |
 | `@nombre` | `NVARCHAR(50)` | `IN` | **SÍ** | Nombre único de la facultad (longitud 3 a 50 caracteres). Se aplica `TRIM()`. |
 | `@idInstitucion` | `UNIQUEIDENTIFIER` | `IN` | **NO** | ID de la institución educativa. Si es `NULL`, se resuelve la institución activa UCO por defecto. |
-| `@idDecano` | `UNIQUEIDENTIFIER` | `IN` | **NO** | ID del decano titular (`dbo.Decano`). Si es `NULL`, se resuelve el decano por defecto o primer decano activo disponible para satisfacer la FK. |
+| `@idDecano` | `UNIQUEIDENTIFIER` | `IN` | **SÍ** | ID del decano titular (`dbo.Decano`). Obligatorio por restricción relacional `NOT NULL` en `dbo.Facultad` y `FK_Facultad_Decano`. No se admiten nulos ni identificadores en ceros. |
 | `@idCorrelacion` | `UNIQUEIDENTIFIER` | `IN` | **NO** | Identificador de correlación W3C para observabilidad distribuida. Si es `NULL`, se genera `NEWID()`. |
 | `@idUsuarioEjecutor` | `UNIQUEIDENTIFIER` | `IN` | **NO** | ID del usuario autenticado que ejecuta la operación (para auditoría). |
 
@@ -56,8 +56,8 @@ dbo.usp_crear_facultad
    - Si `EXISTS (SELECT 1 FROM dbo.Facultad WHERE LOWER(nombre) = LOWER(TRIM(@nombre)))` $\longrightarrow$ Retorna `exitoso = 0`, código de error `ERR_FACULTAD_YA_EXISTE` ("Ya existe una facultad registrada con el nombre ingresado.").
 3. **Existencia de Institución:**
    - Si `@idInstitucion` especificado no existe en `dbo.Institucion` $\longrightarrow$ Retorna `exitoso = 0`, error `ERR_INSTITUCION_NO_EXISTE` ("La institución especificada no existe en el sistema.").
-4. **Existencia de Decano:**
-   - Si `@idDecano` especificado no existe en `dbo.Decano` $\longrightarrow$ Retorna `exitoso = 0`, error `ERR_DECANO_NO_EXISTE` ("El decano especificado no existe en el sistema.").
+4. **Obligatoriedad y Existencia de Decano Titular:**
+   - Si `@idDecano IS NULL` o no existe en `dbo.Decano` (vía `dbo.uv_decano_identidad`) $\longrightarrow$ Retorna `exitoso = 0`, error `GEN_002` ("Decano obligatorio") / `GEN_001` ("Decano inexistente"). No se permiten magic values ni nulos.
 
 ### 2.4 Mutación de Persistencia
 ```sql
@@ -101,7 +101,7 @@ SELECT
 | :--- | :--- | :---: | :--- |
 | `nombre` | `String` | **SÍ** | `@NotBlank`, `@Size(min = 3, max = 50)` |
 | `idInstitucion` | `UUID` | **NO** | Opcional |
-| `idDecano` | `UUID` | **NO** | Opcional |
+| `idDecano` | `UUID` | **SÍ** | `@NotNull`, ID del decano titular existente en el directorio |
 
 ### 3.3 Respuestas HTTP
 
