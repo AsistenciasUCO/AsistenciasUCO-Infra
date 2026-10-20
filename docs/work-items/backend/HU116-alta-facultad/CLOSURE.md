@@ -16,7 +16,7 @@ El work item **HU116-alta-facultad** ha sido completado, auditado y certificado 
 1. **Base de Datos (SQL Server 2022+):**
    - Estandarización del procedimiento almacenado `dbo.usp_crear_facultad`.
    - Control transaccional explícito `SET XACT_ABORT ON;` con manejo de excepciones `BEGIN TRY / BEGIN CATCH` y rollback seguro.
-   - Validación de duplicidad de nombres y resolución automática de dependencias institucionales (Universidad Católica de Oriente y decanatura default).
+   - Validación de duplicidad de nombres y resolución obligatoria de Decano titular (`NOT NULL`).
    - Formato canónico de salida de 4 columnas compatible con `JpaProcedureExecutor` y `ProcedureResultMapper`.
    - Suite transaccional SQL (`test_usp_crear_facultad.sql`) con escenarios de inserción exitosa y rechazo por duplicados.
 2. **Backend (Spring Boot 4.0.6 / Java 25):**
@@ -25,7 +25,7 @@ El work item **HU116-alta-facultad** ha sido completado, auditado y certificado 
    - Implementación del puerto secundario en `FacultadJpaRepository` invocando el procedimiento almacenado canónico mediante `JpaProcedureExecutor`.
    - Exposición del endpoint `POST /api/v1/admin/facultades` en `AdminPortalController`, respondiendo `HTTP 201 Created` con `ApiDataResponse<FacultadDTO>`.
    - Desbloqueo de la excepción artificial previa `501 Not Implemented (FeatureUnavailableException)`.
-   - Verificación de 100% de pruebas unitarias y de arquitectura (`CleanArchitectureRulesTest`: 20/20 PASS, `JpaRepositoryArchitectureRulesTest`: 3/3 PASS, `CrearFacultadUseCaseImplTest`: 5/5 PASS, `AdminPortalControllerTest`: 9/9 PASS).
+   - Verificación de 100% de pruebas unitarias y de arquitectura (`CleanArchitectureRulesTest`: 20/20 PASS, `JpaRepositoryArchitectureRulesTest`: 3/3 PASS, `CrearFacultadUseCaseImplTest`: 6/6 PASS, `AdminPortalControllerTest`: 9/9 PASS).
 3. **Frontend (Angular 19 Standalone & Signals):**
    - Consumo reactivo del endpoint a través de `AdminManagementService.crearFacultad()` y actualización inmutable del Signal `_facultades`.
    - Componente `catalog-facultades.component.ts` integrado para captura de datos y emisión del evento de guardado.

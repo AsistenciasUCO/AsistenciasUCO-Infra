@@ -80,9 +80,10 @@ Fase 01: Planificación y Definition of Ready (DoR) conforme a `GUIA_METODICA_IM
    - Comprobar que la lista de facultades se refresca automáticamente vía Signals al crear una nueva.
 
 ### No Alcance (Out of Scope)
-1. **Asignación o creación de Decano:** La designación de Decano titular corresponde formalmente a **`HU117`** y **`HU117-B`**. Si una facultad se crea sin decano asignado inicialmente, el SP manejará el campo con valor por defecto o nullable según la regla de base de datos.
-2. **Creación de Programas Académicos:** Corresponde a **`HU076`** y es potestad del Decano, no del Administrador.
-3. **Edición o Desactivación de Facultades:** Corresponde a **`HU110`** y **`HU111`**.
+1. **Alta y provisión del Usuario Decano:** La creación y aprovisionamiento IAM del Decano titular se gestiona mediante **`HU117-B`** (`POST /api/v1/admin/decanos`). HU116 asume como precondición que el Decano titular ya existe en el sistema para asociar su ID obligatorio (`NOT NULL` en `dbo.Facultad`).
+2. **Reasignación de Decano o cambio de Sede:** Corresponde a **`HU117`**.
+3. **Creación de Programas Académicos:** Corresponde a **`HU076`** y es potestad del Decano, no del Administrador.
+4. **Edición o Desactivación de Facultades:** Corresponde a **`HU110`** y **`HU111`**.
 
 ---
 

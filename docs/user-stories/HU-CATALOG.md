@@ -185,6 +185,7 @@
 | **HU115** | Validación de coherencia en ofertas académicas | Procedimiento no existe en DB | Endpoint no existe en backend | Validación de reglas al publicar calendario | `[PENDIENTE]` |
 | **HU116** | Alta institucional de nueva facultad | SP `usp_crear_facultad` | `POST /api/v1/admin/facultades` | Formulario de creación de facultad en UCO | `[CERTIFICADA]` |
 | **HU117** | Modificar sede y decano responsable | SP pendiente en DB | Endpoint arroja 501 | Asignación de decano en formulario | `[BLOQUEADO 501]` |
+| **HU117-B** | Registrar Decano titular y sincronizar cuenta IAM | SP `usp_crear_decano` | `POST /api/v1/admin/decanos` | Formulario de alta institucional en `/app/admin/decanos` | `[CERTIFICADA]` |
 | **HU118** | Bloqueo temporal de operaciones de facultad | SP pendiente en DB | Endpoint arroja 501 | Confirmación con credencial de administrador | `[BLOQUEADO 501]` |
 | **HU119** | Árbol departamental (Facultad ➔ Programa ➔ Plan)| SP no existe en DB | Endpoint no existe en backend | Visualizador jerárquico multinivel en UI | `[PENDIENTE]` |
 | **HU120** | Crear y asignar Coordinador a Programa | SP `usp_crear_coordinador` | `POST /api/v1/decano/coordinadores` | Modal de alta y asignación de coordinación | `[CERTIFICADA]` |
@@ -201,7 +202,7 @@
 | **HU134** | Tendencias temporales de ausentismo en reportería | SP no existe en DB | Endpoint no existe en backend | Gráfica de líneas no implementada | `[PENDIENTE]` |
 | **HU135** | Contador en tiempo real de censo estudiantil | SP no existe en DB | Endpoint no existe en backend | Contador numérico no implementado | `[PENDIENTE]` |
 | **HU136** | Contador en tiempo real de censo docente | SP no existe en DB | Endpoint no existe en backend | Contador no implementado | `[PENDIENTE]` |
-| **HU137** | Directorio administrativo institucional | SP no existe en DB | Endpoint no existe en backend | Directorio de personal no implementado | `[PENDIENTE]` |
+| **HU137** | Directorio administrativo institucional (Decanos) | Vista `uv_decano` | `GET /api/v1/admin/decanos` | Directorio de decanos en `/app/admin/decanos` | `[CERTIFICADA]` |
 | **HU138** | Ratio de sesiones dictadas con asistencia registrada| SP no existe en DB | Endpoint no existe en backend | Indicador de cumplimiento no implementado | `[PENDIENTE]` |
 | **HU139** | Tarjetas comparativas de inasistencia por facultad | SP no existe en DB | Endpoint no existe en backend | Tarjetas comparativas no implementadas | `[PENDIENTE]` |
 | **HU140** | Censo de estudiantes agrupado por sedes | SP no existe en DB | Endpoint no existe en backend | Gráfico de distribución no implementado | `[PENDIENTE]` |
@@ -260,12 +261,12 @@
 
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
-| **`[CERTIFICADA]`** | **33** | **19.4%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
+| **`[CERTIFICADA]`** | **35** | **20.5%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
 | **`Fase 3 (FRONTEND)`** | **5** | **2.9%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **28** | **16.5%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[BLOQUEADO 501]`** | **28** | **16.4%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
 | **`[PARCIAL]`** | **8** | **4.7%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
-| **`[PENDIENTE]`** | **96** | **56.5%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
-| **TOTAL** | **170** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
+| **`[PENDIENTE]`** | **95** | **55.5%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
+| **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
 

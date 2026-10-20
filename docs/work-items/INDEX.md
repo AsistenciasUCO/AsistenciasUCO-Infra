@@ -2,7 +2,7 @@
 > **Ecosistema:** Sistema de Gestion de Asistencia UCO  
 > **Proposito:** Registro centralizado y trazabilidad de ciclo de vida SDD/TDD para Backend, Frontend y Base de Datos.  
 > **Generacion:** Automatizada via AsistenciasUCO-Infra/scripts/quality/sync-work-items.ps1  
-> **Ultima Actualizacion:** 2026-10-17 20:42:23  
+> **Ultima Actualizacion:** 2026-10-19 19:41:43  
 
 ---
 
@@ -11,9 +11,9 @@
 | Capa Tecnologica | Work Items / Fases | Archivos Sincronizados |
 | :--- | :---: | :---: |
 | **Backend API (Spring Boot)** | 27 | 142 |
-| **Frontend Web (Angular 19)** | 7 | 25 |
+| **Frontend Web (Angular 19)** | 8 | 25 |
 | **Base de Datos (SQL Server)** | 6 | 10 |
-| **TOTAL CONSOLIDADO** | **40** | **284** |
+| **TOTAL CONSOLIDADO** | **41** | **288** |
 
 ---
 
@@ -62,6 +62,7 @@
 | LB-001C.2B-patch-consumer | 6 | N/A | [Ver carpeta](frontend/LB-001C.2B-patch-consumer/) |
 | MAINT-004-frontend-backend-db-alignment | 7 | N/A | [Ver carpeta](frontend/MAINT-004-frontend-backend-db-alignment/) |
 | MV-001-golden-path-real-e2e | 2 | N/A | [Ver carpeta](frontend/MV-001-golden-path-real-e2e/) |
+| UX-006-dean-coordinator-view-split | 4 | N/A | [Ver carpeta](frontend/UX-006-dean-coordinator-view-split/) |
 
 ### 2.3 Base de Datos (SQL Server) (database/)
 
