@@ -166,9 +166,9 @@
 
 | Código | Historia de Usuario (Requerimiento) | Base de Datos (SQL Server 2022+) | Backend API (Spring Boot / Hexagonal) | Frontend Web (Angular 19 OnPush) | Fase SDD / Estado |
 | :---: | :--- | :--- | :--- | :--- | :---: |
-| **HU076** | Agregar nuevo programa académico a la facultad | SP `usp_crear_programa_academico` | Endpoint no expuesto en controller | `DeanFacultyComponent` (`/app/decano/facultad`) | `[PENDIENTE]` |
-| **HU077** | Modificar modalidad y jornada de programa | SP pendiente en DB | Endpoint no existe en backend | Formulario de edición en `DeanFacultyComponent` | `[PENDIENTE]` |
-| **HU078** | Alternar estado activo/inactivo de programa | SP pendiente en DB | Endpoint no existe en backend | Control de estado de programa en facultad | `[PENDIENTE]` |
+| **HU076** | Agregar nuevo programa académico a la facultad | SP `usp_crear_programa_academico` (fachada + `_interno`) | `POST /api/v1/decano/programas` | `DeanProgramasComponent` (`/app/decano/programas`) | `[CERTIFICADA]` |
+| **HU077** | Modificar modalidad y jornada de programa | SP `usp_actualizar_programa_academico` | `PUT /api/v1/decano/programas/{id}` | Modal de edición en `DeanProgramasComponent` | `[CERTIFICADA]` |
+| **HU078** | Alternar estado activo/inactivo de programa | SP `usp_cambiar_estado_programa_academico` | `PATCH /api/v1/decano/programas/{id}/estado` | Modal de estado en `DeanProgramasComponent` | `[CERTIFICADA]` |
 | **HU102** | Tablero analítico de ausentismo por facultad | SP no existe en DB | Endpoint no existe en backend | Métrica "94%" quemada en HTML (`overview-dean`) | `[PENDIENTE]` |
 | **HU103** | Comparativa gráfica de inasistencias entre programas | SP no existe en DB | Endpoint no existe en backend | Gráfica comparativa no implementada | `[PENDIENTE]` |
 | **HU104** | Directorio consolidado de estudiantes de facultad | SP no existe en DB | Endpoint no existe en backend | No implementado | `[PENDIENTE]` |
