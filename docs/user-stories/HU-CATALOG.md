@@ -223,8 +223,8 @@
 | **HU148** | Crear nuevo componente de formación académica | SP pendiente en DB | Endpoint no existe en backend | Formulario de alta en `DeanFacultyComponent` | `[PENDIENTE]` |
 | **HU149** | Actualizar competencias asociadas a un componente | SP pendiente en DB | Endpoint no existe en backend | Edición de competencias curriculares | `[PENDIENTE]` |
 | **HU150** | Consultar catálogo de áreas de conocimiento UCO | Vista `uv_area` | `GET /api/v1/admin/areas` | Tabla de áreas en `DeanFacultyComponent` | `[CERTIFICADA]` |
-| **HU151** | Crear nueva área de conocimiento institucional | SP pendiente en DB | `POST /api/v1/admin/areas` (arroja 501) | Modal de creación de área de conocimiento | `[BLOQUEADO 501]` |
-| **HU152** | Modificar datos y estado de un área de conocimiento| SP pendiente en DB | `PUT /api/v1/admin/areas/{id}` (arroja 501) | Edición y switch de activación en UI | `[BLOQUEADO 501]` |
+| **HU151** | Crear nueva área de conocimiento institucional | dbo.usp_crear_area | POST /api/v1/admin/areas | Formulario creación de área (código máx 3, nombre máx 50) | [CERTIFICADA] |
+| **HU152** | Modificar datos de un área de conocimiento | dbo.usp_actualizar_area | PUT /api/v1/admin/areas/{id} | Formulario de edición de área (*estado no aplica a dbo.Area*) | [CERTIFICADA] |
 | **HU153** | Administración de Catálogo: Tipos de Documento | Vista `uv_tipo_identificacion` | `GET /api/v1/tipos-identificacion` (solo lectura) | Mantenimiento de catálogo en `AdminCatalogs` | `[PARCIAL]` |
 | **HU154** | Administración de Catálogo: Tipos de Programa | Vista `uv_tipo_programa` | Sin endpoint REST de administración | Modalidades formativas en UI | `[PARCIAL]` |
 | **HU155** | Administración de Catálogo: Estados del Sistema | Vista `uv_estado` | Sin endpoint REST de administración | Configuración en UI | `[PARCIAL]` |
