@@ -177,14 +177,14 @@
 | **HU107** | Consultar estructura institucional de facultades | Vista `uv_facultad` | `GET /api/v1/admin/facultades` | Estructura de facultades en `DeanFaculty` | `[CERTIFICADA]` |
 | **HU108** | Consultar programas vigentes y planes de estudio | SP no existe en DB | Endpoint no existe en backend | Lista de programas no implementada | `[PENDIENTE]` |
 | **HU109** | Organigrama jerárquico de dependencias | SP no existe en DB | Endpoint no existe en backend | Componente en árbol no implementado | `[PENDIENTE]` |
-| **HU110** | Modificar denominación y atributos de la facultad | SP pendiente en DB | `PUT /api/v1/admin/facultades/{id}` (arroja 501) | Formulario de modificación en `DeanFaculty` | `[BLOQUEADO 501]` |
-| **HU111** | Alternar estado operativo de la facultad | SP pendiente en DB | `PATCH /api/v1/admin/facultades/{id}/estado` (arroja 501)| Switch de activación con modal de seguridad | `[BLOQUEADO 501]` |
+| **HU110** | Modificar denominación y atributos de la facultad | SP `usp_actualizar_facultad` (nombre único 3–50) | `PUT /api/v1/admin/facultades/{id}` | Edición en `AdminFacultadesComponent` (`/app/admin/facultades`) | `[CERTIFICADA]` |
+| **HU111** | Alternar estado operativo de la facultad | SP `usp_cambiar_estado_facultad` (estado deseado, idempotente, sin cascada) | `PATCH /api/v1/admin/facultades/{id}/estado` | Switch de estado en `AdminFacultadesComponent` | `[CERTIFICADA]` |
 | **HU112** | Consultar tabla unificada de programas y créditos | SP no existe en DB | Endpoint no existe en backend | Tabla no implementada | `[PENDIENTE]` |
 | **HU113** | Modificar datos de registro calificado | SP no existe en DB | Endpoint no existe en backend | Edición de registro calificado | `[PENDIENTE]` |
 | **HU114** | Suspender o reactivar oferta de programa | SP no existe en DB | Endpoint no existe en backend | Switch de estado de oferta académica | `[PENDIENTE]` |
 | **HU115** | Validación de coherencia en ofertas académicas | Procedimiento no existe en DB | Endpoint no existe en backend | Validación de reglas al publicar calendario | `[PENDIENTE]` |
 | **HU116** | Alta institucional de nueva facultad | SP `usp_crear_facultad` | `POST /api/v1/admin/facultades` | Formulario de creación de facultad en UCO | `[CERTIFICADA]` |
-| **HU117** | Modificar sede y decano responsable | SP pendiente en DB | Endpoint arroja 501 | Asignación de decano en formulario | `[BLOQUEADO 501]` |
+| **HU117** | Reasignar decano responsable de la facultad (la sede no existe en el modelo; deuda técnica) | SP `usp_actualizar_facultad` (decano único por facultad activa) | `PUT /api/v1/admin/facultades/{id}` | Modal "Cambiar Decano(a)" en `AdminFacultadesComponent` | `[CERTIFICADA]` |
 | **HU117-B** | Registrar Decano titular y sincronizar cuenta IAM | SP `usp_crear_decano` | `POST /api/v1/admin/decanos` | Formulario de alta institucional en `/app/admin/decanos` | `[CERTIFICADA]` |
 | **HU118** | Bloqueo temporal de operaciones de facultad | SP pendiente en DB | Endpoint arroja 501 | Confirmación con credencial de administrador | `[BLOQUEADO 501]` |
 | **HU119** | Árbol departamental (Facultad ➔ Programa ➔ Plan)| SP no existe en DB | Endpoint no existe en backend | Visualizador jerárquico multinivel en UI | `[PENDIENTE]` |
@@ -261,9 +261,9 @@
 
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
-| **`[CERTIFICADA]`** | **35** | **20.5%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
+| **`[CERTIFICADA]`** | **38** | **22.2%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
 | **`Fase 3 (FRONTEND)`** | **5** | **2.9%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **28** | **16.4%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[BLOQUEADO 501]`** | **25** | **14.6%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
 | **`[PARCIAL]`** | **8** | **4.7%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
 | **`[PENDIENTE]`** | **95** | **55.5%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
 | **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
