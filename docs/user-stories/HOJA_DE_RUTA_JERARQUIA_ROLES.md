@@ -49,8 +49,8 @@ A continuación se presenta el catálogo consolidado de HUs vinculadas al regist
 | **1** | **Administrador** | **Decano** (Alta y aprovisionamiento IAM) | **HU117-B (Nueva)** | Registrar Decano titular y sincronizar cuenta IAM (`POST /admin/decanos` / `usp_crear_decano`) | `[CERTIFICADA]` |
 | **1** | **Administrador** | **Facultad** (Estructura física y académica) | **HU107** | Consultar estructura institucional de facultades | `[CERTIFICADA]` |
 | **1** | **Administrador** | **Facultad** (Alta con Decano asignado) | **HU116** | Alta institucional de nueva facultad (`usp_crear_facultad`, requiere Decano titular) | `[CERTIFICADA]` |
-| **1** | **Administrador** | **Facultad** (Modificación y estado) | **HU110 / HU111** | Modificar denominación y alternar estado de facultad | `[BLOQUEADO 501]` |
-| **1** | **Administrador** | **Decano** (Reasignación de titularidad) | **HU117** | Modificar sede y decano responsable de facultad | `[BLOQUEADO 501]` |
+| **1** | **Administrador** | **Facultad** (Modificación y estado) | **HU110 / HU111** | Modificar denominación y alternar estado de facultad | `[CERTIFICADA]` |
+| **1** | **Administrador** | **Decano** (Reasignación de titularidad) | **HU117** | Reasignar decano responsable de facultad (sede fuera de alcance: no está modelada) | `[CERTIFICADA]` |
 | **2** | **Decano** | **Programa Académico** (Apertura) | **HU076** | Agregar nuevo programa académico a la facultad | `[PENDIENTE]` |
 | **2** | **Decano** | **Programa Académico** (Modificación) | **HU077 / HU078** | Modificar datos y alternar estado de programa | `[PENDIENTE]` |
 | **2** | **Decano** | **Coordinador** (Directorio y Búsqueda) | **HU124 / HU123** | Directorio y búsqueda predictiva de coordinadores | `[CERTIFICADA]` |
@@ -111,10 +111,11 @@ Para construir la estructura sin bloqueos, se debe seguir la siguiente **secuenc
 
 ### 4.1 Hitos Alcanzados en Etapa 1:
 - [x] **`HU117-B: Alta de Decano y Aprovisionamiento IAM`**: `[CERTIFICADA]` (Decano institucional aprovisionado en persistencia y Keycloak).
+- [x] **`HU110 / HU111 / HU117: Gestión de Facultad`**: `[CERTIFICADA]` (`PUT` y `PATCH /api/v1/admin/facultades`, SP `usp_actualizar_facultad` y `usp_cambiar_estado_facultad`, UI sin actualización optimista; decano único por facultad activa).
 - [x] **`HU116: Alta institucional de nueva Facultad`**: `[CERTIFICADA]` (Persistencia DDL con `usp_crear_facultad`, Backend REST en `/api/v1/admin/facultades` con Clean Architecture, Decano obligatorio y UI reactiva en Angular con Signals).
 
 ### 4.2 Próximo Paso Inmediato en la Jerarquía Institucional:
 Para continuar con la construcción jerárquica de la universidad:
 👉 **Paso Inmediato (Etapa 2 - Custodia de Coordinación):**
 - **`HU076: Alta de Programa Académico en Facultad`** (`usp_crear_programa` / `POST /api/v1/decano/programas`), permitiendo al Decano titular de la Facultad crear programas académicos oficiales bajo su jurisdicción.
-- Alternativamente, si se requiere ajustar la custodia de la facultad antes de crear programas: **`HU117: Modificar sede y decano responsable de facultad`**.
+- La Etapa 1 queda cerrada con HU110, HU111 y HU117. Pendiente de la sede: requiere modelar el catálogo de sedes (`/admin/sedes`, hoy 501).
