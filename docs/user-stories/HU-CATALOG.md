@@ -125,8 +125,8 @@
 | :---: | :--- | :--- | :--- | :--- | :---: |
 | **HU060** | Consultar registros globales de asistencia del programa | Vista `uv_auth_estudiante` | `GET /api/v1/coordinador/estudiantes` (acotado a su programa)| `CoordinatorStudentsComponent` (solo lectura) | `[PARCIAL]` |
 | **HU061** | Ver consolidado por cohorte, materia y docente | SP no existe en DB | Endpoint no existe en backend | Vista de resumen agregado en tabla Angular | `[PENDIENTE]` |
-| **HU062** | Directorio de profesores adscritos al programa | SP pendiente en DB | `GET /api/v1/coordinador/docentes` (arroja 501) | `CoordinatorDocentesComponent` (`/app/coordinador/docentes`) | `[BLOQUEADO 501]` |
-| **HU063** | Búsqueda predictiva de docentes por cédula o nombre | SP pendiente en DB | Bloqueado por `GET /coordinador/docentes` (501) | Barra de búsqueda reactiva con Signals | `[BLOQUEADO 501]` |
+| **HU062** | Directorio de profesores adscritos al programa | SP `usp_consultar_docentes_programa` (paginado, incluye docentes sin grupos) | `GET /api/v1/coordinador/docentes` | `CoordinatorDocentesComponent` (`/app/coordinador/docentes`) | `[CERTIFICADA]` |
+| **HU063** | Búsqueda predictiva de docentes por cédula o nombre | SP `usp_consultar_docentes_programa` y `usp_consultar_candidatos_docente_programa` (prefijo de cédula o nombre, en servidor) | `GET /api/v1/coordinador/docentes` y `GET /api/v1/coordinador/docentes/candidatos` | Barra de búsqueda reactiva con Signals y debounce | `[CERTIFICADA]` |
 | **HU064** | Consultar grupos académicos adscritos al programa | Vista `uv_grupo` | `GET /api/v1/grupos` | Selector de grupos por período del programa | `[PARCIAL]` |
 | **HU065** | Cronograma de sesiones ejecutadas vs programadas | SP no existe en DB | Endpoint no existe en backend | Barra de progreso de cumplimiento de calendario | `[PENDIENTE]` |
 | **HU066** | Semáforo de alerta temprana de deserción (>15%) | SP no existe en DB | Endpoint no existe en backend | Filtro semafórico de ausentismo institucional | `[PENDIENTE]` |
@@ -149,11 +149,11 @@
 | **HU085** | Crear nueva asignatura en el plan de estudios | SP `usp_crear_asignatura` | `POST /api/v1/coordinador/planes-estudio/{id}/asignaturas` | Modal de alta de materia con créditos y código | `[CERTIFICADA]` |
 | **HU086** | Filtros de materias por área y componente | Filtro en frontend con Signals | Query params en endpoint de asignaturas | Filtros combinados de búsqueda en frontend | `[CERTIFICADA]` |
 | **HU087** | Actualizar créditos y horas de asignatura | SP `usp_actualizar_asignatura` | `PUT /api/v1/coordinador/planes-estudio/{pId}/asignaturas/{aId}` | Formulario de modificación de asignatura | `[CERTIFICADA]` |
-| **HU089** | Consultar listado de docentes adscritos al programa| SP pendiente en DB | `GET /api/v1/coordinador/docentes` (arroja 501) | Tabla de cuerpo docente con estado de contrato | `[BLOQUEADO 501]` |
-| **HU090** | Selector controlado de tipo de vinculación | Catálogo de tipos de vinculación | Sin endpoint REST específico | Desplegable controlado por tipo de contrato | `[PARCIAL]` |
-| **HU091** | Vincular docente al programa y sincronizar IAM | SP pendiente en DB | `POST /api/v1/coordinador/docentes` (arroja 501) | Modal de vinculación docente con IAM sync | `[BLOQUEADO 501]` |
-| **HU092** | Modificar datos profesionales de docente | SP pendiente en DB | `PUT /coordinador/docentes/{id}` (arroja 501) | Formulario de edición docente | `[BLOQUEADO 501]` |
-| **HU093** | Inactivar o reactivar vinculación docente | SP pendiente en DB | `PATCH /api/v1/coordinador/docentes/{id}/estado` (arroja 501)| Switch de estado con confirmación modal | `[BLOQUEADO 501]` |
+| **HU089** | Consultar listado de docentes adscritos al programa| SP `usp_consultar_docentes_programa` | `GET /api/v1/coordinador/docentes` | Tabla de cuerpo docente con estado de vinculación | `[CERTIFICADA]` |
+| **HU090** | Selector controlado de tipo de vinculación | Catálogo `TipoVinculacion` (PLA/MTI/CAT/OCA) y vista `uv_tipo_vinculacion` | `GET /api/v1/coordinador/tipos-vinculacion` | Desplegable controlado por tipo de vinculación | `[CERTIFICADA]` |
+| **HU091** | Vincular docente al programa y sincronizar IAM | SP `usp_vincular_docente_programa` (fachada + `_interno`) | `POST /api/v1/coordinador/docentes` (aprovisiona Keycloak tras el commit en DB) | Modal de vinculación docente (persona nueva o existente) | `[CERTIFICADA]` |
+| **HU092** | Modificar datos profesionales de docente | SP `usp_actualizar_docente_programa` | `PUT /api/v1/coordinador/docentes/{id}` | Formulario de edición docente | `[CERTIFICADA]` |
+| **HU093** | Inactivar o reactivar vinculación docente | SP `usp_cambiar_estado_docente_programa` | `PATCH /api/v1/coordinador/docentes/{id}/estado` | Switch de estado con confirmación modal | `[CERTIFICADA]` |
 | **HU094** | Ficha docente con historial de grupos dictados | SP pendiente en DB | Endpoint no existe en backend | Ficha con tarjeta resumen de carga académica | `[PENDIENTE]` |
 | **HU095** | Directorio consolidado con estado de vinculación | SP pendiente en DB | Endpoint no existe en backend | Directorio en cuadrícula con tarjetas tipadas | `[PENDIENTE]` |
 | **HU096** | Crear nuevo período académico | SP `usp_crear_periodo_academico` | `POST /api/v1/coordinador/periodos-academicos` (arroja 501)| Formulario de creación de semestre lectivo | `[BLOQUEADO 501]` |
@@ -189,8 +189,8 @@
 | **HU118** | Bloqueo temporal de operaciones de facultad | SP pendiente en DB | Endpoint arroja 501 | Confirmación con credencial de administrador | `[BLOQUEADO 501]` |
 | **HU119** | Árbol departamental (Facultad ➔ Programa ➔ Plan)| SP no existe en DB | Endpoint no existe en backend | Visualizador jerárquico multinivel en UI | `[PENDIENTE]` |
 | **HU120** | Crear y asignar Coordinador a Programa | SP `usp_crear_coordinador` | `POST /api/v1/decano/coordinadores` | Modal de alta y asignación de coordinación | `[CERTIFICADA]` |
-| **HU121** | Actualizar información del Coordinador | SP pendiente en DB | Endpoint no existe en backend | Formulario de edición en `DeanCoordinadores` | `[PENDIENTE]` |
-| **HU122** | Alternar estado activo/inactivo de Coordinador | SP pendiente en DB | `PATCH /api/v1/decano/coordinadores/{id}/estado` (arroja 501)| Switch de activación/suspensión de usuario | `[BLOQUEADO 501]` |
+| **HU121** | Actualizar información del Coordinador | SP `usp_actualizar_coordinador` (fachada + `_interno`) | `PUT /api/v1/decano/coordinadores/{id}` (sincroniza correo y nombres con Keycloak) | Modal de edición en `DeanCoordinadores` | `[CERTIFICADA]` |
+| **HU122** | Alternar estado activo/inactivo de Coordinador | SP `usp_cambiar_estado_coordinador` (fachada + `_interno`; rechaza con `COO_001` si tiene programa activo) | `PATCH /api/v1/decano/coordinadores/{id}/estado` (deshabilita o habilita la cuenta en Keycloak) | Switch de activación/suspensión con confirmación modal | `[CERTIFICADA]` |
 | **HU123** | Búsqueda predictiva de coordinadores de facultad | Búsqueda reactiva en cliente | Búsqueda sobre `GET /api/v1/decano/coordinadores` | Buscador predictivo en cabecera de tabla | `[CERTIFICADA]` |
 | **HU124** | Directorio consolidado de coordinadores | Vista `uv_coordinador` | `GET /api/v1/decano/coordinadores` | Tabla con estado y programa adscrito | `[CERTIFICADA]` |
 | **HU125** | Alta de docentes interdepartamentales | SP no existe en DB | Endpoint no existe en backend | Formulario de asignación de doble programa | `[PENDIENTE]` |
@@ -226,7 +226,7 @@
 | **HU151** | Crear nueva área de conocimiento institucional | SP pendiente en DB | `POST /api/v1/admin/areas` (arroja 501) | Modal de creación de área de conocimiento | `[BLOQUEADO 501]` |
 | **HU152** | Modificar datos y estado de un área de conocimiento| SP pendiente en DB | `PUT /api/v1/admin/areas/{id}` (arroja 501) | Edición y switch de activación en UI | `[BLOQUEADO 501]` |
 | **HU153** | Administración de Catálogo: Tipos de Documento | Vista `uv_tipo_identificacion` | `GET /api/v1/tipos-identificacion` (solo lectura) | Mantenimiento de catálogo en `AdminCatalogs` | `[PARCIAL]` |
-| **HU154** | Administración de Catálogo: Tipos de Programa | Vista `uv_tipo_programa` | Sin endpoint REST de administración | Modalidades formativas en UI | `[PARCIAL]` |
+| **HU154** | Administración de Catálogo: Tipos de Programa | SP `usp_crear_tipo_programa`, `usp_actualizar_tipo_programa` y `usp_cambiar_estado_tipo_programa` (fachadas + `_interno`) | `/api/v1/admin/tipos-programa` (alta, edición y estado) | Pantalla de administración pendiente | `[PARCIAL]` |
 | **HU155** | Administración de Catálogo: Estados del Sistema | Vista `uv_estado` | Sin endpoint REST de administración | Configuración en UI | `[PARCIAL]` |
 | **HU156** | Admisión demográfica y creación de usuario estudiante| SP `usp_sincronizar_estudiante_interno` | Endpoint `/admin/estudiantes/admision` no existe | Formulario de admisión en `CoordinatorStudents` | `[PENDIENTE]` |
 | **HU157** | Ficha unificada del estudiante con historial completo| SP no existe en DB | Endpoint no existe en backend | Ficha unificada no implementada | `[PENDIENTE]` |
@@ -261,11 +261,11 @@
 
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
-| **`[CERTIFICADA]`** | **38** | **22.2%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
-| **`Fase 3 (FRONTEND)`** | **5** | **2.9%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **25** | **14.6%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
-| **`[PARCIAL]`** | **8** | **4.7%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
-| **`[PENDIENTE]`** | **95** | **55.5%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
+| **`[CERTIFICADA]`** | **79** | **46.2%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
+| **`Fase 3 (FRONTEND)`** | **7** | **4.1%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
+| **`[BLOQUEADO 501]`** | **20** | **11.7%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[PARCIAL]`** | **12** | **7.0%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
+| **`[PENDIENTE]`** | **53** | **31.0%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
 | **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
