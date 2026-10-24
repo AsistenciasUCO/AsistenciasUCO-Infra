@@ -70,7 +70,7 @@
 | **HU020** | Consultar sede, aula y bloque por sesión | Sin campo de aula en contrato Golden Path | DTO sin aula (`HorarioEstudianteDTO`) | Tarjeta de sesión con datos horarios | `[PARCIAL]` |
 | **HU021** | Filtro de horario semanal por días lectivos | Filtro por día en cliente/horario | `GET /api/v1/estudiante/horarios` | Selector reactivo de días (Lunes a Sábado) | `[CERTIFICADA]` |
 | **HU022** | Consumo transversal de tipos de identificación | Vista `uv_tipo_identificacion` | `GET /api/v1/tipos-identificacion` | `FormFieldComponent` en perfil | `[CERTIFICADA]` |
-| **HU023** | Consumo transversal de tipos de programa | Vista `uv_tipo_programa` | Sin endpoint REST independiente | Badges en materias | `[PARCIAL]` |
+| **HU023** | Consumo transversal de tipos de programa | Vista `uv_tipo_programa` (solo activos) | `GET /api/v1/tipos-programa` (`CatalogoProgramaController`, HU076-HU078) | Selector de tipo en formulario de programa | `Fase 3 (FRONTEND)` — E2E pendiente |
 | **HU024** | Consumo transversal de estados de asistencia | Dominio de asistencia (`AN`, `SJC`, `EX`) | Mapeo en DTOs de asistencia | Leyenda de estados (Presente, Falta, Justificada) | `[CERTIFICADA]` |
 | **HU025** | Consultar prerrequisitos y correquisitos | SP no modelado en DB | `GET .../materias/{id}/prerrequisitos` (arroja 501) | Modal de prerrequisitos de asignatura | `[BLOQUEADO 501]` |
 | **HU026** | Solicitud de inscripción o matrícula por QR | SP no modelado en DB | `POST .../solicitudes-matricula` (arroja 501) | Escaneo de QR / PIN de curso | `[BLOQUEADO 501]` |
@@ -223,10 +223,10 @@
 | **HU148** | Crear nuevo componente de formación académica | SP pendiente en DB | Endpoint no existe en backend | Formulario de alta en `DeanFacultyComponent` | `[PENDIENTE]` |
 | **HU149** | Actualizar competencias asociadas a un componente | SP pendiente en DB | Endpoint no existe en backend | Edición de competencias curriculares | `[PENDIENTE]` |
 | **HU150** | Consultar catálogo de áreas de conocimiento UCO | Vista `uv_area` | `GET /api/v1/admin/areas` | Tabla de áreas en `DeanFacultyComponent` | `[CERTIFICADA]` |
-| **HU151** | Crear nueva área de conocimiento institucional | SP pendiente en DB | `POST /api/v1/admin/areas` (arroja 501) | Modal de creación de área de conocimiento | `[BLOQUEADO 501]` |
-| **HU152** | Modificar datos y estado de un área de conocimiento| SP pendiente en DB | `PUT /api/v1/admin/areas/{id}` (arroja 501) | Edición y switch de activación en UI | `[BLOQUEADO 501]` |
+| **HU151** | Crear nueva área de conocimiento institucional | SP `usp_crear_area` (código 3 caracteres inmutable, nombre único) | `POST /api/v1/admin/areas` | Formulario de alta en `AdminAreasComponent` | `Fase 3 (FRONTEND)` — E2E pendiente |
+| **HU152** | Modificar datos y estado de un área de conocimiento| SP `usp_actualizar_area`, `usp_cambiar_estado_area` (columna `Area.estado`) | `PUT /api/v1/admin/areas/{id}`, `PATCH /api/v1/admin/areas/{id}/estado` | Edición y switch de estado en `AdminAreasComponent` | `Fase 3 (FRONTEND)` — E2E pendiente |
 | **HU153** | Administración de Catálogo: Tipos de Documento | Vista `uv_tipo_identificacion` | `GET /api/v1/tipos-identificacion` (solo lectura) | Mantenimiento de catálogo en `AdminCatalogs` | `[PARCIAL]` |
-| **HU154** | Administración de Catálogo: Tipos de Programa | Vista `uv_tipo_programa` | Sin endpoint REST de administración | Modalidades formativas en UI | `[PARCIAL]` |
+| **HU154** | Administración de Catálogo: Tipos de Programa | SP `usp_crear_tipo_programa`, `usp_actualizar_tipo_programa`, `usp_cambiar_estado_tipo_programa` | `GET/POST /api/v1/admin/tipos-programa`, `PUT /{id}`, `PATCH /{id}/estado` | `AdminCatalogsComponent` (`/app/admin/catalogs`) | `Fase 3 (FRONTEND)` — E2E pendiente |
 | **HU155** | Administración de Catálogo: Estados del Sistema | Vista `uv_estado` | Sin endpoint REST de administración | Configuración en UI | `[PARCIAL]` |
 | **HU156** | Admisión demográfica y creación de usuario estudiante| SP `usp_sincronizar_estudiante_interno` | Endpoint `/admin/estudiantes/admision` no existe | Formulario de admisión en `CoordinatorStudents` | `[PENDIENTE]` |
 | **HU157** | Ficha unificada del estudiante con historial completo| SP no existe en DB | Endpoint no existe en backend | Ficha unificada no implementada | `[PENDIENTE]` |
