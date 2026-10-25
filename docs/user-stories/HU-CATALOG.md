@@ -128,12 +128,12 @@
 | **HU062** | Directorio de profesores adscritos al programa | SP `usp_consultar_docentes_programa` (paginado, incluye docentes sin grupos) | `GET /api/v1/coordinador/docentes` | `CoordinatorDocentesComponent` (`/app/coordinador/docentes`) | `[CERTIFICADA]` |
 | **HU063** | Búsqueda predictiva de docentes por cédula o nombre | SP `usp_consultar_docentes_programa` y `usp_consultar_candidatos_docente_programa` (prefijo de cédula o nombre, en servidor) | `GET /api/v1/coordinador/docentes` y `GET /api/v1/coordinador/docentes/candidatos` | Barra de búsqueda reactiva con Signals y debounce | `[CERTIFICADA]` |
 | **HU064** | Consultar grupos académicos adscritos al programa | Vista `uv_grupo` | `GET /api/v1/grupos` | Selector de grupos por período del programa | `[PARCIAL]` |
-| **HU065** | Cronograma de sesiones ejecutadas vs programadas | SP no existe en DB | Endpoint no existe en backend | Barra de progreso de cumplimiento de calendario | `[PENDIENTE]` |
-| **HU066** | Semáforo de alerta temprana de deserción (>15%) | SP no existe en DB | Endpoint no existe en backend | Filtro semafórico de ausentismo institucional | `[PENDIENTE]` |
-| **HU067** | Bitácora cronológica de asistencias por estudiante | SP no existe en DB | Endpoint no existe en backend | Historial cronológico con timeline visual | `[PENDIENTE]` |
+| **HU065** | Cronograma de sesiones ejecutadas vs programadas | SP `usp_consultar_kpis_coordinador` | `GET /api/v1/coordinador/indicadores` | `CoordinatorIndicatorsComponent` (`/app/coordinador/indicadores`), cumplimiento y progreso del calendario | `[CERTIFICADA]` |
+| **HU066** | Semáforo de alerta temprana de deserción (>15%) | SP `usp_consultar_alerta_temprana_programa` | `GET /api/v1/coordinador/alertas-tempranas` | Tabla paginada con filtro semafórico en `/app/coordinador/indicadores` | `[CERTIFICADA]` |
+| **HU067** | Bitácora cronológica de asistencias por estudiante | SP `usp_consultar_bitacora_estudiante_programa` | `GET /api/v1/coordinador/estudiantes/{id}/bitacora` | Bitácora paginada dentro del modal de ficha | `[CERTIFICADA]` |
 | **HU068** | Censo de estudiantes matriculados en el programa | Vista `uv_auth_estudiante` | `GET /api/v1/coordinador/estudiantes` (paginado) | Tabla unificada con `PaginationComponent` | `[CERTIFICADA]` |
-| **HU069** | Ficha integral del estudiante (contacto y faltas) | SP no existe en DB | Endpoint `/ficha` no existe en backend | Modal de expediente académico integral | `[PENDIENTE]` |
-| **HU070** | Cálculo de permanencia (Regular, Riesgo, Pérdida)| SP no existe en DB | Endpoint no existe en backend | Badge de estado de permanencia estudiantil | `[PENDIENTE]` |
+| **HU069** | Ficha integral del estudiante (contacto y faltas) | SP `usp_consultar_ficha_estudiante_programa` y `usp_consultar_resumen_asistencia_estudiante_programa` | `GET /api/v1/coordinador/estudiantes/{id}/ficha` | Modal de ficha con resumen por asignatura (abierto desde alertas) | `[CERTIFICADA]` |
+| **HU070** | Cálculo de permanencia (Regular, Riesgo, Pérdida)| `ufn_clasificar_permanencia` y `uv_resumen_asistencia_estudiante_grupo` | Incluida en indicadores, alertas y ficha | Estado de permanencia en alertas y ficha | `[CERTIFICADA]` |
 | **HU071** | Catálogo de asignaturas adscritas al programa | Vista `uv_asignatura` | `GET /api/v1/coordinador/asignaturas` | `CoordinatorStudyPlansComponent` | `[CERTIFICADA]` |
 | **HU072** | Resolución de programa académico vía UserScopeService | Validación de titularidad en DB / UserScope | `UserScopeService.resolveProgramaId()` | Control de ámbito de usuario en frontend | `[CERTIFICADA]` |
 | **HU073** | Consultar intensidad horaria y créditos | Vista `uv_asignatura` | DTO curricular en `GET /api/v1/coordinador/asignaturas` | Tabla de malla curricular con horas y créditos | `[CERTIFICADA]` |
@@ -169,11 +169,11 @@
 | **HU076** | Agregar nuevo programa académico a la facultad | SP `usp_crear_programa_academico` (fachada + `_interno`) | `POST /api/v1/decano/programas` | `DeanProgramasComponent` (`/app/decano/programas`) | `[CERTIFICADA]` |
 | **HU077** | Modificar modalidad y jornada de programa | SP `usp_actualizar_programa_academico` | `PUT /api/v1/decano/programas/{id}` | Modal de edición en `DeanProgramasComponent` | `[CERTIFICADA]` |
 | **HU078** | Alternar estado activo/inactivo de programa | SP `usp_cambiar_estado_programa_academico` | `PATCH /api/v1/decano/programas/{id}/estado` | Modal de estado en `DeanProgramasComponent` | `[CERTIFICADA]` |
-| **HU102** | Tablero analítico de ausentismo por facultad | SP no existe en DB | Endpoint no existe en backend | Métrica "94%" quemada en HTML (`overview-dean`) | `[PENDIENTE]` |
-| **HU103** | Comparativa gráfica de inasistencias entre programas | SP no existe en DB | Endpoint no existe en backend | Gráfica comparativa no implementada | `[PENDIENTE]` |
+| **HU102** | Tablero analítico de ausentismo por facultad | SP `usp_consultar_kpis_decano` | `GET /api/v1/decano/indicadores` | `DeanIndicatorsComponent` (`/app/decano/indicadores`) y tarjeta de `overview-dean` sin el 94% quemado | `[CERTIFICADA]` |
+| **HU103** | Comparativa gráfica de inasistencias entre programas | SP `usp_consultar_comparativa_programas_facultad` | `GET /api/v1/decano/comparativa-programas` | Barras de ausentismo por programa en `/app/decano/indicadores` | `[CERTIFICADA]` |
 | **HU104** | Directorio consolidado de estudiantes de facultad | SP no existe en DB | Endpoint no existe en backend | No implementado | `[PENDIENTE]` |
 | **HU105** | Búsqueda transversal de estudiantes en facultad | SP no existe en DB | Endpoint no existe en backend | Buscador transversal no implementado | `[PENDIENTE]` |
-| **HU106** | Indicador macro de retención estudiantil | SP no existe en DB | Endpoint no existe en backend | Tarjeta KPI no implementada | `[PENDIENTE]` |
+| **HU106** | Indicador macro de retención estudiantil | `usp_consultar_kpis_decano` (`tasaRetencion`) | `GET /api/v1/decano/indicadores` | Tarjeta «Retención por asistencia (período vigente)» | `[CERTIFICADA]` |
 | **HU107** | Consultar estructura institucional de facultades | Vista `uv_facultad` | `GET /api/v1/admin/facultades` | Estructura de facultades en `DeanFaculty` | `[CERTIFICADA]` |
 | **HU108** | Consultar programas vigentes y planes de estudio | SP no existe en DB | Endpoint no existe en backend | Lista de programas no implementada | `[PENDIENTE]` |
 | **HU109** | Organigrama jerárquico de dependencias | SP no existe en DB | Endpoint no existe en backend | Componente en árbol no implementado | `[PENDIENTE]` |
@@ -198,18 +198,18 @@
 | **HU127** | Gestión de estado y contratos en facultad | SP no existe en DB | Endpoint no existe en backend | Gestión de altas/bajas contractuales | `[PENDIENTE]` |
 | **HU128** | Filtro de profesores por programa asignado | SP no existe en DB | Endpoint no existe en backend | Filtro selector por programa en interfaz | `[PENDIENTE]` |
 | **HU129** | Reporte tabular de horas contratadas por docente | SP no existe en DB | Endpoint no existe en backend | Tabla de seguimiento de carga académica | `[PENDIENTE]` |
-| **HU133** | Indicador KPI global de asistencia en la universidad| SP no existe en DB | Endpoint no existe en backend | Tarjeta KPI con datos estáticos | `[PENDIENTE]` |
-| **HU134** | Tendencias temporales de ausentismo en reportería | SP no existe en DB | Endpoint no existe en backend | Gráfica de líneas no implementada | `[PENDIENTE]` |
-| **HU135** | Contador en tiempo real de censo estudiantil | SP no existe en DB | Endpoint no existe en backend | Contador numérico no implementado | `[PENDIENTE]` |
-| **HU136** | Contador en tiempo real de censo docente | SP no existe en DB | Endpoint no existe en backend | Contador no implementado | `[PENDIENTE]` |
+| **HU133** | Indicador KPI global de asistencia en la universidad| SP `usp_consultar_kpis_institucion` | `GET /api/v1/admin/indicadores` | `AdminIndicatorsComponent` (`/app/admin/indicadores`) | `[CERTIFICADA]` |
+| **HU134** | Tendencias temporales de ausentismo en reportería | SP `usp_consultar_tendencia_ausentismo` | `GET /api/v1/admin/tendencia-ausentismo` | Gráfica de línea SVG con selector semana/mes | `[CERTIFICADA]` |
+| **HU135** | Contador en tiempo real de censo estudiantil | `usp_consultar_kpis_institucion` (censo) | `GET /api/v1/admin/indicadores` | Contador de estudiantes con matrícula activa y registrados; sin actualización push (no hay canal SSE institucional ni eventos de matrícula) | `[PARCIAL]` |
+| **HU136** | Contador en tiempo real de censo docente | `usp_consultar_kpis_institucion` (censo) | `GET /api/v1/admin/indicadores` | Contador de docentes con grupo activo y registrados; sin actualización push (no hay canal SSE institucional ni eventos de alta) | `[PARCIAL]` |
 | **HU137** | Directorio administrativo institucional (Decanos) | Vista `uv_decano` | `GET /api/v1/admin/decanos` | Directorio de decanos en `/app/admin/decanos` | `[CERTIFICADA]` |
-| **HU138** | Ratio de sesiones dictadas con asistencia registrada| SP no existe en DB | Endpoint no existe en backend | Indicador de cumplimiento no implementado | `[PENDIENTE]` |
-| **HU139** | Tarjetas comparativas de inasistencia por facultad | SP no existe en DB | Endpoint no existe en backend | Tarjetas comparativas no implementadas | `[PENDIENTE]` |
-| **HU140** | Censo de estudiantes agrupado por sedes | SP no existe en DB | Endpoint no existe en backend | Gráfico de distribución no implementado | `[PENDIENTE]` |
+| **HU138** | Ratio de sesiones dictadas con asistencia registrada| `usp_consultar_kpis_institucion` (cumplimiento) | `GET /api/v1/admin/indicadores` | Tarjeta de cumplimiento con sus conteos | `[CERTIFICADA]` |
+| **HU139** | Tarjetas comparativas de inasistencia por facultad | SP `usp_consultar_comparativa_facultades` | `GET /api/v1/admin/comparativa-facultades` | Tarjetas por facultad en `/app/admin/indicadores` | `[CERTIFICADA]` |
+| **HU140** | Censo de estudiantes agrupado por sedes | Sin tabla de sedes en DB (`/admin/sedes` responde 501) | Endpoint no existe en backend | Gráfico de distribución no implementado | `[BLOQUEADO 501]` |
 | **HU141** | Censo de docentes clasificado por escalafón | SP no existe en DB | Endpoint no existe en backend | Gráfica de escalafón no implementada | `[PENDIENTE]` |
 | **HU142** | Consulta histórica de períodos académicos | Vista `uv_periodo_academico` | `GET /api/v1/coordinador/periodos-academicos` | Selector de períodos anteriores en reportes | `[CERTIFICADA]` |
 | **HU143** | Búsqueda transversal de asignaturas en toda la UCO| SP no existe en DB | Endpoint no existe en backend | Buscador transversal no implementado | `[PENDIENTE]` |
-| **HU144** | Censo de grupos activos y tasa de aforo de facultad | SP no existe en DB | Endpoint no existe en backend | Barras de ocupación no implementadas | `[PENDIENTE]` |
+| **HU144** | Censo de grupos activos y tasa de aforo de facultad | SP `usp_consultar_aforo_grupos_facultad` y aforo en `usp_consultar_kpis_decano` | `GET /api/v1/decano/aforo-grupos` | Tabla paginada de aforo con filtro por programa | `[CERTIFICADA]` |
 | **HU145** | Cronograma de sesiones en sedes de la facultad | SP no existe en DB | Endpoint no existe en backend | Calendario institucional no implementado | `[PENDIENTE]` |
 | **HU146** | Notificación de controversias en justificaciones (Trámite externo)| Trámite externo universitario | Notificación informativa de rechazo docente | Aviso informativo de trámite fuera del sistema | `[CERTIFICADA]` |
 
@@ -261,11 +261,11 @@
 
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
-| **`[CERTIFICADA]`** | **79** | **46.2%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
+| **`[CERTIFICADA]`** | **96** | **56.1%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
 | **`Fase 3 (FRONTEND)`** | **7** | **4.1%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **20** | **11.7%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[BLOQUEADO 501]`** | **19** | **11.1%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
 | **`[PARCIAL]`** | **12** | **7.0%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
-| **`[PENDIENTE]`** | **53** | **31.0%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
+| **`[PENDIENTE]`** | **37** | **21.6%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
 | **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
