@@ -169,11 +169,11 @@
 | **HU076** | Agregar nuevo programa académico a la facultad | SP `usp_crear_programa_academico` | Endpoint no expuesto en controller | `DeanFacultyComponent` (`/app/decano/facultad`) | `[PENDIENTE]` |
 | **HU077** | Modificar modalidad y jornada de programa | SP pendiente en DB | Endpoint no existe en backend | Formulario de edición en `DeanFacultyComponent` | `[PENDIENTE]` |
 | **HU078** | Alternar estado activo/inactivo de programa | SP pendiente en DB | Endpoint no existe en backend | Control de estado de programa en facultad | `[PENDIENTE]` |
-| **HU102** | Tablero analítico de ausentismo por facultad | SP no existe en DB | Endpoint no existe en backend | Métrica "94%" quemada en HTML (`overview-dean`) | `[PENDIENTE]` |
-| **HU103** | Comparativa gráfica de inasistencias entre programas | SP no existe en DB | Endpoint no existe en backend | Gráfica comparativa no implementada | `[PENDIENTE]` |
+| **HU102** | Tablero analítico de ausentismo por facultad | SP `usp_consultar_kpis_decano` | `GET /api/v1/decano/indicadores` | `DeanIndicatorsComponent` (`/app/decano/indicadores`) y tarjeta de `overview-dean` sin el 94% quemado | `[CERTIFICADA]` |
+| **HU103** | Comparativa gráfica de inasistencias entre programas | SP `usp_consultar_comparativa_programas_facultad` | `GET /api/v1/decano/comparativa-programas` | Barras de ausentismo por programa en `/app/decano/indicadores` | `[CERTIFICADA]` |
 | **HU104** | Directorio consolidado de estudiantes de facultad | SP no existe en DB | Endpoint no existe en backend | No implementado | `[PENDIENTE]` |
 | **HU105** | Búsqueda transversal de estudiantes en facultad | SP no existe en DB | Endpoint no existe en backend | Buscador transversal no implementado | `[PENDIENTE]` |
-| **HU106** | Indicador macro de retención estudiantil | SP no existe en DB | Endpoint no existe en backend | Tarjeta KPI no implementada | `[PENDIENTE]` |
+| **HU106** | Indicador macro de retención estudiantil | `usp_consultar_kpis_decano` (`tasaRetencion`) | `GET /api/v1/decano/indicadores` | Tarjeta «Retención por asistencia (período vigente)» | `[CERTIFICADA]` |
 | **HU107** | Consultar estructura institucional de facultades | Vista `uv_facultad` | `GET /api/v1/admin/facultades` | Estructura de facultades en `DeanFaculty` | `[CERTIFICADA]` |
 | **HU108** | Consultar programas vigentes y planes de estudio | SP no existe en DB | Endpoint no existe en backend | Lista de programas no implementada | `[PENDIENTE]` |
 | **HU109** | Organigrama jerárquico de dependencias | SP no existe en DB | Endpoint no existe en backend | Componente en árbol no implementado | `[PENDIENTE]` |
@@ -209,7 +209,7 @@
 | **HU141** | Censo de docentes clasificado por escalafón | SP no existe en DB | Endpoint no existe en backend | Gráfica de escalafón no implementada | `[PENDIENTE]` |
 | **HU142** | Consulta histórica de períodos académicos | Vista `uv_periodo_academico` | `GET /api/v1/coordinador/periodos-academicos` | Selector de períodos anteriores en reportes | `[CERTIFICADA]` |
 | **HU143** | Búsqueda transversal de asignaturas en toda la UCO| SP no existe en DB | Endpoint no existe en backend | Buscador transversal no implementado | `[PENDIENTE]` |
-| **HU144** | Censo de grupos activos y tasa de aforo de facultad | SP no existe en DB | Endpoint no existe en backend | Barras de ocupación no implementadas | `[PENDIENTE]` |
+| **HU144** | Censo de grupos activos y tasa de aforo de facultad | SP `usp_consultar_aforo_grupos_facultad` y aforo en `usp_consultar_kpis_decano` | `GET /api/v1/decano/aforo-grupos` | Tabla paginada de aforo con filtro por programa | `[CERTIFICADA]` |
 | **HU145** | Cronograma de sesiones en sedes de la facultad | SP no existe en DB | Endpoint no existe en backend | Calendario institucional no implementado | `[PENDIENTE]` |
 | **HU146** | Notificación de controversias en justificaciones (Trámite externo)| Trámite externo universitario | Notificación informativa de rechazo docente | Aviso informativo de trámite fuera del sistema | `[CERTIFICADA]` |
 
