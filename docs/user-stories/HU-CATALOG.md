@@ -198,14 +198,14 @@
 | **HU127** | Gestión de estado y contratos en facultad | SP no existe en DB | Endpoint no existe en backend | Gestión de altas/bajas contractuales | `[PENDIENTE]` |
 | **HU128** | Filtro de profesores por programa asignado | SP no existe en DB | Endpoint no existe en backend | Filtro selector por programa en interfaz | `[PENDIENTE]` |
 | **HU129** | Reporte tabular de horas contratadas por docente | SP no existe en DB | Endpoint no existe en backend | Tabla de seguimiento de carga académica | `[PENDIENTE]` |
-| **HU133** | Indicador KPI global de asistencia en la universidad| SP no existe en DB | Endpoint no existe en backend | Tarjeta KPI con datos estáticos | `[PENDIENTE]` |
-| **HU134** | Tendencias temporales de ausentismo en reportería | SP no existe en DB | Endpoint no existe en backend | Gráfica de líneas no implementada | `[PENDIENTE]` |
-| **HU135** | Contador en tiempo real de censo estudiantil | SP no existe en DB | Endpoint no existe en backend | Contador numérico no implementado | `[PENDIENTE]` |
-| **HU136** | Contador en tiempo real de censo docente | SP no existe en DB | Endpoint no existe en backend | Contador no implementado | `[PENDIENTE]` |
+| **HU133** | Indicador KPI global de asistencia en la universidad| SP `usp_consultar_kpis_institucion` | `GET /api/v1/admin/indicadores` | `AdminIndicatorsComponent` (`/app/admin/indicadores`) | `[CERTIFICADA]` |
+| **HU134** | Tendencias temporales de ausentismo en reportería | SP `usp_consultar_tendencia_ausentismo` | `GET /api/v1/admin/tendencia-ausentismo` | Gráfica de línea SVG con selector semana/mes | `[CERTIFICADA]` |
+| **HU135** | Contador en tiempo real de censo estudiantil | `usp_consultar_kpis_institucion` (censo) | `GET /api/v1/admin/indicadores` | Contador de estudiantes con matrícula activa y registrados; sin actualización push (no hay canal SSE institucional ni eventos de matrícula) | `[PARCIAL]` |
+| **HU136** | Contador en tiempo real de censo docente | `usp_consultar_kpis_institucion` (censo) | `GET /api/v1/admin/indicadores` | Contador de docentes con grupo activo y registrados; sin actualización push (no hay canal SSE institucional ni eventos de alta) | `[PARCIAL]` |
 | **HU137** | Directorio administrativo institucional (Decanos) | Vista `uv_decano` | `GET /api/v1/admin/decanos` | Directorio de decanos en `/app/admin/decanos` | `[CERTIFICADA]` |
-| **HU138** | Ratio de sesiones dictadas con asistencia registrada| SP no existe en DB | Endpoint no existe en backend | Indicador de cumplimiento no implementado | `[PENDIENTE]` |
-| **HU139** | Tarjetas comparativas de inasistencia por facultad | SP no existe en DB | Endpoint no existe en backend | Tarjetas comparativas no implementadas | `[PENDIENTE]` |
-| **HU140** | Censo de estudiantes agrupado por sedes | SP no existe en DB | Endpoint no existe en backend | Gráfico de distribución no implementado | `[PENDIENTE]` |
+| **HU138** | Ratio de sesiones dictadas con asistencia registrada| `usp_consultar_kpis_institucion` (cumplimiento) | `GET /api/v1/admin/indicadores` | Tarjeta de cumplimiento con sus conteos | `[CERTIFICADA]` |
+| **HU139** | Tarjetas comparativas de inasistencia por facultad | SP `usp_consultar_comparativa_facultades` | `GET /api/v1/admin/comparativa-facultades` | Tarjetas por facultad en `/app/admin/indicadores` | `[CERTIFICADA]` |
+| **HU140** | Censo de estudiantes agrupado por sedes | Sin tabla de sedes en DB (`/admin/sedes` responde 501) | Endpoint no existe en backend | Gráfico de distribución no implementado | `[BLOQUEADO 501]` |
 | **HU141** | Censo de docentes clasificado por escalafón | SP no existe en DB | Endpoint no existe en backend | Gráfica de escalafón no implementada | `[PENDIENTE]` |
 | **HU142** | Consulta histórica de períodos académicos | Vista `uv_periodo_academico` | `GET /api/v1/coordinador/periodos-academicos` | Selector de períodos anteriores en reportes | `[CERTIFICADA]` |
 | **HU143** | Búsqueda transversal de asignaturas en toda la UCO| SP no existe en DB | Endpoint no existe en backend | Buscador transversal no implementado | `[PENDIENTE]` |
