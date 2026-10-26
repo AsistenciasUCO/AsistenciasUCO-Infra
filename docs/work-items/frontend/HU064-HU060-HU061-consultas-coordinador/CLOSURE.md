@@ -1,0 +1,9 @@
+# CLOSURE — HU064-HU060-HU061-consultas-coordinador
+
+## Resultado
+
+PENDIENTE de la prueba en pantalla (MV-008). Integrado en `develop`.
+
+## Pendientes
+
+Validación manual en pantalla registrada como MV-007/MV-008 en el ledger del backend (`docs/baseline/MANUAL_VALIDATION_LEDGER.md`).
