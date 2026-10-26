@@ -123,14 +123,14 @@
 
 | Código | Historia de Usuario (Requerimiento) | Base de Datos (SQL Server 2022+) | Backend API (Spring Boot / Hexagonal) | Frontend Web (Angular 19 OnPush) | Fase SDD / Estado |
 | :---: | :--- | :--- | :--- | :--- | :---: |
-| **HU060** | Consultar registros globales de asistencia del programa | Vista `uv_auth_estudiante` | `GET /api/v1/coordinador/estudiantes` (acotado a su programa)| `CoordinatorStudentsComponent` (solo lectura) | `[PARCIAL]` |
-| **HU061** | Ver consolidado por cohorte, materia y docente | SP no existe en DB | Endpoint no existe en backend | Vista de resumen agregado en tabla Angular | `[PENDIENTE]` |
+| **HU060** | Consultar registros globales de asistencia del programa | SP `usp_consultar_grupos_paginado` y `usp_consultar_sesiones_grupo_paginado` (ámbito por programa vía `uv_auth_*`) | `GET /api/v1/coordinador/grupos`, `/grupos/{id}/sesiones` | `CoordinatorAttendanceComponent` (`/app/coordinador/asistencias`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
+| **HU061** | Ver consolidado por cohorte, materia y docente | SP `usp_consultar_asistencias_sesion_paginado` (detalle por sesión); consolidado agregado no modelado | `GET /api/v1/coordinador/sesiones/{id}/asistencias` | Detalle por estudiante en `CoordinatorAttendanceComponent`; sin vista consolidada por cohorte | `[PARCIAL]` |
 | **HU062** | Directorio de profesores adscritos al programa | SP `usp_consultar_docentes_programa` (paginado, incluye docentes sin grupos) | `GET /api/v1/coordinador/docentes` | `CoordinatorDocentesComponent` (`/app/coordinador/docentes`) | `[CERTIFICADA]` |
 | **HU063** | Búsqueda predictiva de docentes por cédula o nombre | SP `usp_consultar_docentes_programa` y `usp_consultar_candidatos_docente_programa` (prefijo de cédula o nombre, en servidor) | `GET /api/v1/coordinador/docentes` y `GET /api/v1/coordinador/docentes/candidatos` | Barra de búsqueda reactiva con Signals y debounce | `[CERTIFICADA]` |
-| **HU064** | Consultar grupos académicos adscritos al programa | Vista `uv_grupo` | `GET /api/v1/grupos` | Selector de grupos por período del programa | `[PARCIAL]` |
+| **HU064** | Consultar grupos académicos adscritos al programa | SP `usp_consultar_grupos_paginado` (ámbito por programa) | `GET /api/v1/coordinador/grupos` | `CoordinatorAttendanceComponent` (filtro por período y búsqueda) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU065** | Cronograma de sesiones ejecutadas vs programadas | SP `usp_consultar_kpis_coordinador` | `GET /api/v1/coordinador/indicadores` | `CoordinatorIndicatorsComponent` (`/app/coordinador/indicadores`), cumplimiento y progreso del calendario | `[CERTIFICADA]` |
 | **HU066** | Semáforo de alerta temprana de deserción (>15%) | SP `usp_consultar_alerta_temprana_programa` | `GET /api/v1/coordinador/alertas-tempranas` | Tabla paginada con filtro semafórico en `/app/coordinador/indicadores` | `[CERTIFICADA]` |
-| **HU067** | Bitácora cronológica de asistencias por estudiante | SP `usp_consultar_bitacora_estudiante_programa` | `GET /api/v1/coordinador/estudiantes/{id}/bitacora` | Bitácora paginada dentro del modal de ficha | `[CERTIFICADA]` |
+| **HU067** | Bitácora cronológica de asistencias por estudiante | SP `usp_consultar_bitacora_estudiante_programa` | `GET /api/v1/coordinador/estudiantes/{id}/bitacora` | Bitácora paginada dentro del modal de ficha | `[CERTIFICADA]`
 | **HU068** | Censo de estudiantes matriculados en el programa | Vista `uv_auth_estudiante` | `GET /api/v1/coordinador/estudiantes` (paginado) | Tabla unificada con `PaginationComponent` | `[CERTIFICADA]` |
 | **HU069** | Ficha integral del estudiante (contacto y faltas) | SP `usp_consultar_ficha_estudiante_programa` y `usp_consultar_resumen_asistencia_estudiante_programa` | `GET /api/v1/coordinador/estudiantes/{id}/ficha` | Modal de ficha con resumen por asignatura (abierto desde alertas) | `[CERTIFICADA]` |
 | **HU070** | Cálculo de permanencia (Regular, Riesgo, Pérdida)| `ufn_clasificar_permanencia` y `uv_resumen_asistencia_estudiante_grupo` | Incluida en indicadores, alertas y ficha | Estado de permanencia en alertas y ficha | `[CERTIFICADA]` |
@@ -142,9 +142,9 @@
 | **HU076B**| Creación y apertura oficial de grupos académicos | SP `usp_crear_grupo` (valida aforo y programa) | `POST /api/v1/grupos` | Formulario de alta de grupo en Coordinación | `[CERTIFICADA]` |
 | **HU079** | Crear nuevo plan de estudios para el programa | SP `usp_registrar_o_actualizar_plan_estudio` | `POST /api/v1/coordinador/planes-estudio` | Formulario de nuevo plan curricular | `[CERTIFICADA]` |
 | **HU080** | Modificar información curricular de plan | SP `usp_registrar_o_actualizar_plan_estudio` | `PUT /api/v1/coordinador/planes-estudio/{id}` | Formulario de edición de plan de estudios | `[CERTIFICADA]` |
-| **HU081** | Alternar estado activo/inactivo de plan | SP pendiente en DB | `PATCH .../planes-estudio/{id}/toggle-estado` (arroja 501)| Control de estado de vigencia curricular | `[BLOQUEADO 501]` |
-| **HU082** | Añadir nivel/semestre a la estructura del plan | SP pendiente en DB | `POST .../planes-estudio/{id}/semestres` (arroja 501) | Acción rápida "Añadir Semestre" en malla | `[BLOQUEADO 501]` |
-| **HU083** | Remover nivel/semestre sin asignaturas | SP pendiente en DB | `DELETE .../planes-estudio/{id}/semestres/{num}` (arroja 501)| Acción de remoción controlada con guardas | `[BLOQUEADO 501]` |
+| **HU081** | Alternar estado activo/inactivo de plan | SP `usp_cambiar_estado_plan_estudio` | `PATCH /api/v1/coordinador/planes-estudio/{id}/toggle-estado` | Control de vigencia en `CoordinatorStudyPlansComponent` (validado en pantalla) | `[CERTIFICADA]` |
+| **HU082** | Añadir nivel/semestre a la estructura del plan | SP `usp_agregar_semestre_plan_estudio` (máx. 10) | `POST /api/v1/coordinador/planes-estudio/{id}/semestres` | "Añadir Semestre" en la malla del coordinador (validado en pantalla) | `[CERTIFICADA]` |
+| **HU083** | Remover nivel/semestre sin asignaturas | SP `usp_quitar_semestre_plan_estudio` | `DELETE /api/v1/coordinador/planes-estudio/{id}/semestres/{num}` | Remoción controlada en la malla del coordinador (validado en pantalla) | `[CERTIFICADA]` |
 | **HU084** | Consultar distribución de materias por semestres | Vista `uv_asignatura` | `GET /api/v1/coordinador/planes-estudio/{id}/asignaturas`| Visualizador jerárquico de plan de estudios | `[CERTIFICADA]` |
 | **HU085** | Crear nueva asignatura en el plan de estudios | SP `usp_crear_asignatura` | `POST /api/v1/coordinador/planes-estudio/{id}/asignaturas` | Modal de alta de materia con créditos y código | `[CERTIFICADA]` |
 | **HU086** | Filtros de materias por área y componente | Filtro en frontend con Signals | Query params en endpoint de asignaturas | Filtros combinados de búsqueda en frontend | `[CERTIFICADA]` |
@@ -156,9 +156,9 @@
 | **HU093** | Inactivar o reactivar vinculación docente | SP `usp_cambiar_estado_docente_programa` | `PATCH /api/v1/coordinador/docentes/{id}/estado` | Switch de estado con confirmación modal | `[CERTIFICADA]` |
 | **HU094** | Ficha docente con historial de grupos dictados | SP pendiente en DB | Endpoint no existe en backend | Ficha con tarjeta resumen de carga académica | `[PENDIENTE]` |
 | **HU095** | Directorio consolidado con estado de vinculación | SP pendiente en DB | Endpoint no existe en backend | Directorio en cuadrícula con tarjetas tipadas | `[PENDIENTE]` |
-| **HU096** | Crear nuevo período académico | SP `usp_crear_periodo_academico` | `POST /api/v1/coordinador/periodos-academicos` (arroja 501)| Formulario de creación de semestre lectivo | `[BLOQUEADO 501]` |
-| **HU097** | Modificar fechas de inicio y cierre de período | SP pendiente en DB | `PUT /api/v1/coordinador/periodos-academicos/{id}` (arroja 501)| Selector de fechas con validación de traslape | `[BLOQUEADO 501]` |
-| **HU098** | Cierre de período académico y consolidación | SP `usp_ejecutar_cierre_masivo_periodo` | `PATCH .../periodos-academicos/{id}/estado` (arroja 501)| Botón de cierre de período con auditoría | `[BLOQUEADO 501]` |
+| **HU096** | Crear nuevo período académico (solo Administrador institucional) | SP `usp_crear_periodo_academico` (reescrito) | `POST /api/v1/admin/periodos-academicos` | `AdminPeriodosComponent` (`/app/admin/periodos`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
+| **HU097** | Modificar fechas de inicio y cierre de período (solo Administrador) | SP `usp_actualizar_periodo_academico` | `PUT /api/v1/admin/periodos-academicos/{id}` | `AdminPeriodosComponent` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
+| **HU098** | Eliminar período académico sin grupos (decisión de producto 2026-10-25; el cierre masivo queda aparte) | SP `usp_eliminar_periodo_academico` | `DELETE /api/v1/admin/periodos-academicos/{id}` | `AdminPeriodosComponent` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 
 ---
 
@@ -171,12 +171,12 @@
 | **HU078** | Alternar estado activo/inactivo de programa | SP `usp_cambiar_estado_programa_academico` | `PATCH /api/v1/decano/programas/{id}/estado` | Modal de estado en `DeanProgramasComponent` | `[CERTIFICADA]` |
 | **HU102** | Tablero analítico de ausentismo por facultad | SP `usp_consultar_kpis_decano` | `GET /api/v1/decano/indicadores` | `DeanIndicatorsComponent` (`/app/decano/indicadores`) y tarjeta de `overview-dean` sin el 94% quemado | `[CERTIFICADA]` |
 | **HU103** | Comparativa gráfica de inasistencias entre programas | SP `usp_consultar_comparativa_programas_facultad` | `GET /api/v1/decano/comparativa-programas` | Barras de ausentismo por programa en `/app/decano/indicadores` | `[CERTIFICADA]` |
-| **HU104** | Directorio consolidado de estudiantes de facultad | SP no existe en DB | Endpoint no existe en backend | No implementado | `[PENDIENTE]` |
-| **HU105** | Búsqueda transversal de estudiantes en facultad | SP no existe en DB | Endpoint no existe en backend | Buscador transversal no implementado | `[PENDIENTE]` |
-| **HU106** | Indicador macro de retención estudiantil | `usp_consultar_kpis_decano` (`tasaRetencion`) | `GET /api/v1/decano/indicadores` | Tarjeta «Retención por asistencia (período vigente)» | `[CERTIFICADA]` |
+| **HU104** | Directorio consolidado de estudiantes de facultad | SP `usp_consultar_estudiantes_facultad_paginado` (ámbito por facultad) | `GET /api/v1/decano/estudiantes` | `DeanEstudiantesComponent` (`/app/decano/estudiantes`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
+| **HU105** | Búsqueda transversal de estudiantes en facultad | SP `usp_consultar_estudiantes_facultad_paginado` (@busqueda) y `usp_consultar_estudiante_facultad_detalle` | `GET /api/v1/decano/estudiantes?busqueda=`, `/decano/estudiantes/{id}` | Buscador y ficha en `DeanEstudiantesComponent` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
+| **HU106** | Indicador macro de retención estudiantil | `usp_consultar_kpis_decano` (`tasaRetencion`) | `GET /api/v1/decano/indicadores` | Tarjeta «Retención por asistencia (período vigente)» | `[CERTIFICADA]`
 | **HU107** | Consultar estructura institucional de facultades | Vista `uv_facultad` | `GET /api/v1/admin/facultades` | Estructura de facultades en `DeanFaculty` | `[CERTIFICADA]` |
-| **HU108** | Consultar programas vigentes y planes de estudio | SP no existe en DB | Endpoint no existe en backend | Lista de programas no implementada | `[PENDIENTE]` |
-| **HU109** | Organigrama jerárquico de dependencias | SP no existe en DB | Endpoint no existe en backend | Componente en árbol no implementado | `[PENDIENTE]` |
+| **HU108** | Consultar programas vigentes y planes de estudio | SP `usp_consultar_programas_academicos` + `usp_consultar_estructura_facultad`; malla con la consulta existente de asignaturas del plan | `GET /api/v1/decano/programas`, `/decano/estructura`, `/decano/planes-estudio/{id}/asignaturas` (rama `feature/HU108-malla-plan-decano`, PR por integrar) | `DeanProgramasComponent` y `DeanPlanMallaComponent` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
+| **HU109** | Organigrama jerárquico de dependencias | SP `usp_consultar_estructura_facultad` | `GET /api/v1/decano/estructura` | `DeanEstructuraComponent` (`/app/decano/estructura`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU110** | Modificar denominación y atributos de la facultad | SP `usp_actualizar_facultad` (nombre único 3–50) | `PUT /api/v1/admin/facultades/{id}` | Edición en `AdminFacultadesComponent` (`/app/admin/facultades`) | `[CERTIFICADA]` |
 | **HU111** | Alternar estado operativo de la facultad | SP `usp_cambiar_estado_facultad` (estado deseado, idempotente, sin cascada) | `PATCH /api/v1/admin/facultades/{id}/estado` | Switch de estado en `AdminFacultadesComponent` | `[CERTIFICADA]` |
 | **HU112** | Consultar tabla unificada de programas y créditos | SP no existe en DB | Endpoint no existe en backend | Tabla no implementada | `[PENDIENTE]` |
@@ -187,7 +187,7 @@
 | **HU117** | Reasignar decano responsable de la facultad (la sede no existe en el modelo; deuda técnica) | SP `usp_actualizar_facultad` (decano único por facultad activa) | `PUT /api/v1/admin/facultades/{id}` | Modal "Cambiar Decano(a)" en `AdminFacultadesComponent` | `[CERTIFICADA]` |
 | **HU117-B** | Registrar Decano titular y sincronizar cuenta IAM | SP `usp_crear_decano` | `POST /api/v1/admin/decanos` | Formulario de alta institucional en `/app/admin/decanos` | `[CERTIFICADA]` |
 | **HU118** | Bloqueo temporal de operaciones de facultad | SP pendiente en DB | Endpoint arroja 501 | Confirmación con credencial de administrador | `[BLOQUEADO 501]` |
-| **HU119** | Árbol departamental (Facultad ➔ Programa ➔ Plan)| SP no existe en DB | Endpoint no existe en backend | Visualizador jerárquico multinivel en UI | `[PENDIENTE]` |
+| **HU119** | Árbol departamental (Facultad ➔ Programa ➔ Plan) | SP `usp_consultar_estructura_facultad` | `GET /api/v1/decano/estructura` | Árbol plegable en `DeanEstructuraComponent` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU120** | Crear y asignar Coordinador a Programa | SP `usp_crear_coordinador` | `POST /api/v1/decano/coordinadores` | Modal de alta y asignación de coordinación | `[CERTIFICADA]` |
 | **HU121** | Actualizar información del Coordinador | SP `usp_actualizar_coordinador` (fachada + `_interno`) | `PUT /api/v1/decano/coordinadores/{id}` (sincroniza correo y nombres con Keycloak) | Modal de edición en `DeanCoordinadores` | `[CERTIFICADA]` |
 | **HU122** | Alternar estado activo/inactivo de Coordinador | SP `usp_cambiar_estado_coordinador` (fachada + `_interno`; rechaza con `COO_001` si tiene programa activo) | `PATCH /api/v1/decano/coordinadores/{id}/estado` (deshabilita o habilita la cuenta en Keycloak) | Switch de activación/suspensión con confirmación modal | `[CERTIFICADA]` |
@@ -210,7 +210,7 @@
 | **HU142** | Consulta histórica de períodos académicos | Vista `uv_periodo_academico` | `GET /api/v1/coordinador/periodos-academicos` | Selector de períodos anteriores en reportes | `[CERTIFICADA]` |
 | **HU143** | Búsqueda transversal de asignaturas en toda la UCO| SP no existe en DB | Endpoint no existe en backend | Buscador transversal no implementado | `[PENDIENTE]` |
 | **HU144** | Censo de grupos activos y tasa de aforo de facultad | SP `usp_consultar_aforo_grupos_facultad` y aforo en `usp_consultar_kpis_decano` | `GET /api/v1/decano/aforo-grupos` | Tabla paginada de aforo con filtro por programa | `[CERTIFICADA]` |
-| **HU145** | Cronograma de sesiones en sedes de la facultad | SP no existe en DB | Endpoint no existe en backend | Calendario institucional no implementado | `[PENDIENTE]` |
+| **HU145** | Cronograma de sesiones en sedes de la facultad | SP `usp_consultar_sesiones_facultad_paginado` (la sesión no modela sede) | `GET /api/v1/decano/sesiones` | `DeanCronogramaComponent` (`/app/decano/cronograma`), sin sede · E2E en pantalla pendiente | `Fase 3 (FRONTEND)`
 | **HU146** | Notificación de controversias en justificaciones (Trámite externo)| Trámite externo universitario | Notificación informativa de rechazo docente | Aviso informativo de trámite fuera del sistema | `[CERTIFICADA]` |
 
 ---
@@ -261,11 +261,11 @@
 
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
-| **`[CERTIFICADA]`** | **96** | **56.1%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
-| **`Fase 3 (FRONTEND)`** | **7** | **4.1%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **19** | **11.1%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
-| **`[PARCIAL]`** | **12** | **7.0%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
-| **`[PENDIENTE]`** | **37** | **21.6%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
+| **`[CERTIFICADA]`** | **99** | **57.9%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
+| **`Fase 3 (FRONTEND)`** | **18** | **10.5%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
+| **`[BLOQUEADO 501]`** | **13** | **7.6%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[PARCIAL]`** | **11** | **6.4%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
+| **`[PENDIENTE]`** | **30** | **17.5%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
 | **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
