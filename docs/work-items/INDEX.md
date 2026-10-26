@@ -2,7 +2,7 @@
 > **Ecosistema:** Sistema de Gestion de Asistencia UCO  
 > **Proposito:** Registro centralizado y trazabilidad de ciclo de vida SDD/TDD para Backend, Frontend y Base de Datos.  
 > **Generacion:** Automatizada via AsistenciasUCO-Infra/scripts/quality/sync-work-items.ps1  
-> **Ultima Actualizacion:** 2026-10-19 19:41:43  
+> **Ultima Actualizacion:** 2026-10-26 (filas HU081-HU083, HU096-HU098, HU060-HU064, HU104-HU145 y HU108 agregadas manualmente con el formato del script)  
 
 ---
 
@@ -10,10 +10,10 @@
 
 | Capa Tecnologica | Work Items / Fases | Archivos Sincronizados |
 | :--- | :---: | :---: |
-| **Backend API (Spring Boot)** | 27 | 142 |
-| **Frontend Web (Angular 19)** | 8 | 25 |
-| **Base de Datos (SQL Server)** | 6 | 10 |
-| **TOTAL CONSOLIDADO** | **41** | **288** |
+| **Backend API (Spring Boot)** | 32 | 172 |
+| **Frontend Web (Angular 19)** | 13 | 45 |
+| **Base de Datos (SQL Server)** | 10 | 22 |
+| **TOTAL CONSOLIDADO** | **55** | **239** |
 
 ---
 
@@ -50,6 +50,11 @@
 | SEC-001-trivy-archunit | 4 | active | [Ver carpeta](backend/SEC-001-trivy-archunit/) |
 | SEC-002-runtime-dependency-remediation | 2 | active | [Ver carpeta](backend/SEC-002-runtime-dependency-remediation/) |
 | TECH-001-restaurar-gate-arquitectura | 4 | active | [Ver carpeta](backend/TECH-001-restaurar-gate-arquitectura/) |
+| HU064-HU060-HU061-consultas-coordinador | 6 | active | [Ver carpeta](backend/HU064-HU060-HU061-consultas-coordinador/) |
+| HU081-HU082-HU083-plan-estudio-estado-semestres | 6 | active | [Ver carpeta](backend/HU081-HU082-HU083-plan-estudio-estado-semestres/) |
+| HU096-HU097-HU098-periodos-academicos | 6 | active | [Ver carpeta](backend/HU096-HU097-HU098-periodos-academicos/) |
+| HU104-HU105-HU109-HU119-HU145-lecturas-decano | 6 | active | [Ver carpeta](backend/HU104-HU105-HU109-HU119-HU145-lecturas-decano/) |
+| HU108-malla-plan-decano | 6 | active | [Ver carpeta](backend/HU108-malla-plan-decano/) |
 
 ### 2.2 Frontend Web (Angular 19) (frontend/)
 
@@ -63,6 +68,11 @@
 | MAINT-004-frontend-backend-db-alignment | 7 | N/A | [Ver carpeta](frontend/MAINT-004-frontend-backend-db-alignment/) |
 | MV-001-golden-path-real-e2e | 2 | N/A | [Ver carpeta](frontend/MV-001-golden-path-real-e2e/) |
 | UX-006-dean-coordinator-view-split | 4 | N/A | [Ver carpeta](frontend/UX-006-dean-coordinator-view-split/) |
+| HU064-HU060-HU061-consultas-coordinador | 4 | N/A | [Ver carpeta](frontend/HU064-HU060-HU061-consultas-coordinador/) |
+| HU081-HU082-HU083-plan-estudio-estado-semestres | 4 | N/A | [Ver carpeta](frontend/HU081-HU082-HU083-plan-estudio-estado-semestres/) |
+| HU096-HU097-HU098-periodos-academicos | 4 | N/A | [Ver carpeta](frontend/HU096-HU097-HU098-periodos-academicos/) |
+| HU104-HU105-HU109-HU119-HU145-lecturas-decano | 4 | N/A | [Ver carpeta](frontend/HU104-HU105-HU109-HU119-HU145-lecturas-decano/) |
+| HU108-malla-plan-decano | 4 | N/A | [Ver carpeta](frontend/HU108-malla-plan-decano/) |
 
 ### 2.3 Base de Datos (SQL Server) (database/)
 
@@ -74,6 +84,10 @@
 | LB-002.1C-A-db-contract-baseline-recovery | 1 | N/A | [Ver carpeta](database/LB-002.1C-A-db-contract-baseline-recovery/) |
 | MAINT-003K-DB-DEV-CONSOLIDATION | 4 | VALIDATED_LOCAL_DEV | [Ver carpeta](database/MAINT-003K-DB-DEV-CONSOLIDATION/) |
 | UTC-D06-POST-FREEZE | 3 | active | [Ver carpeta](database/UTC-D06-POST-FREEZE/) |
+| HU064-HU060-HU061-consultas-coordinador | 3 | active | [Ver carpeta](database/HU064-HU060-HU061-consultas-coordinador/) |
+| HU081-HU082-HU083-plan-estudio-estado-semestres | 3 | active | [Ver carpeta](database/HU081-HU082-HU083-plan-estudio-estado-semestres/) |
+| HU096-HU097-HU098-periodos-academicos | 3 | active | [Ver carpeta](database/HU096-HU097-HU098-periodos-academicos/) |
+| HU104-HU105-HU109-HU119-HU145-lecturas-decano | 3 | active | [Ver carpeta](database/HU104-HU105-HU109-HU119-HU145-lecturas-decano/) |
 
 ---
 
