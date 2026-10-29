@@ -272,7 +272,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 
 ## TD-019
 
-- **Descripción:** Contratos DB ausentes o limitados. Histórico: sin command público Horario; usp_crear_grupo no persiste aula; usp_actualizar_grupo no persiste cupoMaximo/aula; uv_grupo usa cantidadEstudiantes como capacidadMaximaPermitida aunque inicia en 0. Falta definir SolicitudMatricula, PrerrequisitoAsignatura, Sede/EspacioFisico, DELETE físico Asignatura y DTO/alcance de reclamos sobre uv_solicitud_revision_asistencia.
+- **Descripción:** Contratos DB ausentes o limitados. Histórico: sin command público Horario; usp_crear_grupo no persiste aula; usp_actualizar_grupo no persiste cupoMaximo/aula; uv_grupo usa cantidadEstudiantes como capacidadMaximaPermitida aunque inicia en 0. Falta definir SolicitudMatricula, Sede/EspacioFisico, DELETE físico Asignatura y DTO/alcance de reclamos sobre uv_solicitud_revision_asistencia.
 - **Impacto:** Alto en verticales afectadas.
 - **Evidencia:** Matriz original backend-baseline-contract; archive/pendientes-arquitectura.md; controllers con [FeatureUnavailableException](../../src/main/java/co/edu/uco/asistenciasuco/application/exception/business/FeatureUnavailableException.java).
 - **Motivo:** Son hallazgos previos DB, no DDL probado en LB-000; algunos endpoints siguen bloqueados.
