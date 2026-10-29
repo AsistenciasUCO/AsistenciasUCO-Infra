@@ -41,6 +41,7 @@
 * **`[BLOQUEADO 501]`**: Acción o pantalla implementada en el Frontend, pero el endpoint en Backend es un *stub* que lanza `FeatureUnavailableException` (HTTP 501) por falta de SP mutacional o contrato DB público.
 * **`[PARCIAL]`**: Soporte preliminar en refinamiento técnico con persistencia base o funcionalidad solo de lectura.
 * **`[PENDIENTE]`**: Catalogada lista para inicio en pipeline (pendiente diseño o creación de SP y Controller).
+* **`[DESCARTADA]`**: Historia retirada del alcance por decisión del responsable; no se implementa y su código asociado se eliminó.
 
 ---
 
@@ -72,7 +73,7 @@
 | **HU022** | Consumo transversal de tipos de identificación | Vista `uv_tipo_identificacion` | `GET /api/v1/tipos-identificacion` | `FormFieldComponent` en perfil | `[CERTIFICADA]` |
 | **HU023** | Consumo transversal de tipos de programa | Vista `uv_tipo_programa` (solo activos) | `GET /api/v1/tipos-programa` (`CatalogoProgramaController`, HU076-HU078) | Selector de tipo en formulario de programa | `[CERTIFICADA]` |
 | **HU024** | Consumo transversal de estados de asistencia | Dominio de asistencia (`AN`, `SJC`, `EX`) | Mapeo en DTOs de asistencia | Leyenda de estados (Presente, Falta, Justificada) | `[CERTIFICADA]` |
-| **HU025** | Consultar prerrequisitos y correquisitos | SP no modelado en DB | `GET .../materias/{id}/prerrequisitos` (arroja 501) | Modal de prerrequisitos de asignatura | `[BLOQUEADO 501]` |
+| **HU025** | ~~Consultar prerrequisitos y correquisitos~~ | Descartada (decisión de John, 2026-10-29): los prerrequisitos y correquisitos no existen en la aplicación | Endpoint `GET .../materias/{id}/prerrequisitos` eliminado | Modal de prerrequisitos eliminado | `[DESCARTADA]` |
 | **HU026** | Solicitud de inscripción o matrícula por QR | SP no modelado en DB | `POST .../solicitudes-matricula` (arroja 501) | Escaneo de QR / PIN de curso | `[BLOQUEADO 501]` |
 | **HU026B**| Validación de plazo perentorio (5 días) para excusas | SP `usp_radicar_solicitud_revision_asistencia` | Regla en `SolicitarRevisionAsistenciaUseCase` | Bloqueo automático de formulario extemporáneo | `[PENDIENTE]` |
 | **HU026C**| Notificaciones proactivas de ausentismo (15% y 20%) | SP `usp_consultar_estudiantes_en_riesgo` | Job batch + SSE (`SseRealtimeAdapter`) + Email | Toast de notificación y panel de alertas en vivo | `[PENDIENTE]` |
@@ -263,9 +264,10 @@
 | :--- | :---: | :---: | :--- |
 | **`[CERTIFICADA]`** | **99** | **57.9%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
 | **`Fase 3 (FRONTEND)`** | **18** | **10.5%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **13** | **7.6%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[BLOQUEADO 501]`** | **12** | **7.0%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
 | **`[PARCIAL]`** | **11** | **6.4%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
 | **`[PENDIENTE]`** | **30** | **17.5%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
+| **`[DESCARTADA]`** | **1** | **0.6%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29). |
 | **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
