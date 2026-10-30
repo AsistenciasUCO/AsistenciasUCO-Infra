@@ -84,13 +84,13 @@
 
 | Código | Historia de Usuario (Requerimiento) | Base de Datos (SQL Server 2022+) | Backend API (Spring Boot / Hexagonal) | Frontend Web (Angular 19 OnPush) | Fase SDD / Estado |
 | :---: | :--- | :--- | :--- | :--- | :---: |
-| **HU027** | Registrar asistencia individual de estudiante | SP `usp_registrar_asistencia_estudiante` (exclusivo docente)| `POST /api/v1/asistencias` (Golden Path) | `AttendanceControlComponent` (`/app/asistencia`) | `[CERTIFICADA]` |
+| **HU027** | Registrar asistencia individual de estudiante | SP `usp_registrar_asistencias_sesion` (exclusivo docente; `usp_registrar_asistencia_estudiante` se eliminó el 2026-10-29 por no tener uso)| `POST /api/v1/asistencias` (Golden Path) | `AttendanceControlComponent` (`/app/asistencia`) | `[CERTIFICADA]` |
 | **HU028** | Abrir/iniciar sesión de clase | SP `usp_crear_sesion` (valida titularidad en SP) | `POST /api/v1/sesiones` (Golden Path) | Botón "Iniciar Clase" en `AttendanceControlComponent` | `[CERTIFICADA]` |
 | **HU029** | Consultar planilla completa de asistencia | Vista `uv_detalle_asistencia` / SP | `GET /api/v1/grupos/{id}/asistencias` (Golden Path) | Tabla de planilla en `AttendanceControlComponent` | `[CERTIFICADA]` |
 | **HU030** | Programar sesión ordinaria o extraordinaria | SP `usp_crear_sesion` con tipo de clase | `POST /api/v1/sesiones` (Golden Path) | Modal de nueva sesión en `TeacherGruposComponent` | `[CERTIFICADA]` |
 | **HU031** | Consultar grupos asignados (Aislamiento de titularidad)| Scope docente y asignaciones académicas | `GET /api/v1/grupos` o `GET .../asignaciones` | `TeacherGruposComponent` (`/app/docente/grupos`) | `[CERTIFICADA]` |
 | **HU032** | Consultar padrón de estudiantes de su grupo | Vista `uv_estudiante_grupo` | `GET /api/v1/grupos/{id}/estudiantes` (Golden Path) | Pestaña "Padrón" en `TeacherGruposComponent` | `[CERTIFICADA]` |
-| **HU033** | Modificar estado de asistencia registrada | SP `usp_registrar_asistencia_estudiante` | `POST /api/v1/asistencias` (Golden Path) | Selector interactivo de estado por estudiante | `[CERTIFICADA]` |
+| **HU033** | Modificar estado de asistencia registrada | SP `usp_registrar_asistencias_sesion` | `POST /api/v1/asistencias` (Golden Path) | Selector interactivo de estado por estudiante | `[CERTIFICADA]` |
 | **HU034** | Validación preventiva de solapamiento de horarios | SP `usp_validar_cruce_horario_docente_interno` | Validación en `CrearSesionUseCase` | Mensaje de advertencia ante conflicto horario | `[CERTIFICADA]` |
 | **HU035** | Consultar solicitudes de revisión pendientes | SP `usp_consultar_solicitudes_revision_docente` (paginado, titularidad en SP; LB-004D) | `GET /api/v1/docente/reclamos?estado&pagina&tamano` | `TeacherClaimsComponent` con `PaginationComponent`, filtro y contador desde servidor (Signals) | `[CERTIFICADA]` |
 | **HU036** | Consultar detalle y causal de una solicitud | SP `usp_consultar_detalle_solicitud_revision_docente` (causal `RazonCausa` + `asistio`, titularidad en SP) | `GET /api/v1/docente/reclamos/{id}` | Vista de resolución con detalle y causal desde backend en `TeacherClaimsComponent` | `[CERTIFICADA]` |
