@@ -116,7 +116,7 @@ flowchart TD
     %% BASE DE DATOS
     subgraph DB_ASISTENCIA["SQL Server: Persistencia y Reglas"]
         SP_REG_MASIVO["usp_registrar_asistencias_sesion.sql"]
-        SP_REG_INDIV["usp_registrar_asistencia_estudiante.sql"]
+        SP_REG_INDIV["usp_sincronizar_asistencia_estudiante_interno.sql"]
         SP_CREAR_SESION["usp_crear_sesion.sql"]
         
         T_ASISTENCIA["Tabla: Asistencia"]
