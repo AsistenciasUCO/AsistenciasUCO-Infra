@@ -12,8 +12,10 @@
     7. Inicia Backend y Frontend en consolas independientes salvo si se pasa -ContainersOnly.
 
 .PARAMETER Profile
-    Perfil de Docker Compose a levantar: 'core' (default: solo SQL Server + Keycloak),
-    'observability' (OTel + Prometheus + Grafana), 'azure', 'proxy', o 'full'.
+    Perfil de Docker Compose a levantar: 'core' (default: SQL Server + Security Baseline del equipo de seguridad),
+    'observability' (OTel + Prometheus + Grafana), 'azure', 'proxy', 'legacy' (ademas, el Keycloak propio en 8081,
+    solo si se necesita explicitamente el modo legacy) o 'full'.
+    El Keycloak propio y su Postgres ya NO forman parte de 'core' ni de 'full'.
 
 .PARAMETER SkipSeed
     Omitir el restablecimiento de datos de prueba en BD y Keycloak.
@@ -30,7 +32,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Position = 0, Mandatory = $false)]
-    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'full')]
+    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'legacy', 'full')]
     [string]$Profile = 'core',
 
     [Parameter(Mandatory = $false)]
@@ -109,10 +111,11 @@ if ($sqlExisting) {
     }
 }
 
-# Comprobar y levantar contenedor Keycloak si ya existe
+# Keycloak PROPIO (8081): solo con -Profile legacy. La identidad la provee Security Baseline.
 $kcCandidateContainers = @("keycloak_asistencias", "asistencias-uco-security-keycloak-1")
 $kcFound = $false
-foreach ($kcName in $kcCandidateContainers) {
+$isLegacy = ($Profile -eq 'legacy')
+foreach ($kcName in $(if ($isLegacy) { $kcCandidateContainers } else { @() })) {
     $kcStatus = (docker ps -a --filter "name=^/${kcName}$" --format "{{.Status}}" 2>$null)
     if ($kcStatus) {
         $kcFound = $true
@@ -137,9 +140,9 @@ foreach ($kcName in $kcCandidateContainers) {
     }
 }
 
-if (-not $kcFound -and ($Profile -eq 'core' -or $Profile -eq 'full')) {
-    Write-Host "  -> Levantando Keycloak con Docker Compose..." -ForegroundColor Gray
-    docker compose -f "$composeFile" up -d keycloak 2>$null
+if (-not $kcFound -and $isLegacy) {
+    Write-Host "  -> [LEGACY] Levantando Keycloak propio con Docker Compose..." -ForegroundColor Gray
+    docker compose -f "$composeFile" --profile legacy up -d keycloak 2>$null
 }
 
 # Comprobar y levantar contenedor MinIO si existe
@@ -175,11 +178,11 @@ if ($Profile -eq 'storage' -or $Profile -eq 'observability' -or $Profile -eq 'fu
     docker compose -f "$composeFile" --profile "$Profile" up -d 2>$null
 }
 
-# Levantar plataforma de seguridad si se especifica el perfil 'security' o 'full'
-if ($Profile -eq 'security' -or $Profile -eq 'full') {
+# Plataforma de seguridad del otro equipo (Security Baseline): parte del perfil 'core' (identidad predeterminada).
+if ($Profile -in @('core', 'security', 'full')) {
     $secScript = Join-Path $infraDir "components\security\start-security.ps1"
     if (Test-Path $secScript) {
-        Write-Host "`n  -> [PERFIL SEGURIDAD] Iniciando plataforma de seguridad (PDP, PEP, SurrealDB, OPA)..." -ForegroundColor Yellow
+        Write-Host "`n  -> [SEGURIDAD] Iniciando Security Baseline (Keycloak 19090, PDP 18080, PEP 18081)..." -ForegroundColor Yellow
         & $secScript
     }
 }
@@ -210,11 +213,11 @@ if (-not $sqlReady) {
     throw "SQL Server no respondio a tiempo. Revisa los logs con: docker logs $sqlContainer"
 }
 
-# 5. Esperar Healthcheck de Keycloak
+# 5. Esperar Healthcheck de Keycloak PROPIO (solo perfil legacy)
 $kcContainer = if ($env:KEYCLOAK_CONTAINER_NAME) { $env:KEYCLOAK_CONTAINER_NAME } else { "keycloak_asistencias" }
-Write-Host "  -> Esperando que Keycloak ($kcContainer) este listo..." -NoNewline -ForegroundColor Gray
+if ($isLegacy) { Write-Host "  -> Esperando que Keycloak ($kcContainer) este listo..." -NoNewline -ForegroundColor Gray }
 $tries = 0
-$kcReady = $false
+$kcReady = -not $isLegacy
 while (-not $kcReady -and $tries -lt 20) {
     $eap = $ErrorActionPreference
     $ErrorActionPreference = 'SilentlyContinue'
@@ -231,7 +234,7 @@ while (-not $kcReady -and $tries -lt 20) {
         $tries++
     }
 }
-if (-not $kcReady) {
+if ($isLegacy -and -not $kcReady) {
     Write-Host "`n  -> [AVISO] Keycloak listo o continuando aprovisionamiento..." -ForegroundColor DarkYellow
 }
 
@@ -265,9 +268,9 @@ if (-not $SkipSeed) {
     }
 }
 
-# 7. Bootstrap y Siembra en Keycloak
+# 7. Bootstrap y Siembra en Keycloak PROPIO (solo perfil legacy; Security Baseline no se reconcilia desde aqui)
 $bootstrapKcScript = Join-Path $infraDir "components\keycloak\scripts\bootstrap.ps1"
-if (Test-Path $bootstrapKcScript) {
+if ($isLegacy -and (Test-Path $bootstrapKcScript)) {
     Write-Host "  -> Ejecutando bootstrap de Keycloak..." -ForegroundColor Gray
     try {
         & $bootstrapKcScript
@@ -276,7 +279,7 @@ if (Test-Path $bootstrapKcScript) {
     }
 }
 
-if (-not $SkipSeed) {
+if ($isLegacy -and -not $SkipSeed) {
     $seedKcScript = Join-Path $infraDir "components\keycloak\scripts\seed-users.ps1"
     if (Test-Path $seedKcScript) {
         Write-Host "  -> Sembrando usuarios institucionales en Keycloak..." -ForegroundColor Gray

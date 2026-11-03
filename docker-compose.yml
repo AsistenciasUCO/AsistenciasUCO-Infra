@@ -83,7 +83,7 @@ services:
   # 2. CORE: Base de Datos Dedicada para Keycloak (PostgreSQL 17)
   # ----------------------------------------------------------------------------
   keycloak-db:
-    profiles: ["core", "full"]
+    profiles: ["legacy"]
     image: postgres:17.11-alpine3.24
     container_name: ${KC_DB_CONTAINER_NAME:-keycloak_db_asistencias}
     restart: unless-stopped
@@ -108,10 +108,11 @@ services:
       - asistencias_network
 
   # ----------------------------------------------------------------------------
-  # 3. CORE: Gestor de Identidad Institucional (Keycloak 26.0.0+)
+  # 3. LEGACY (opcional): Keycloak PROPIO. La identidad vigente es Security Baseline (otro equipo).
+  #    Solo arranca con --profile legacy; ya no forma parte de core ni de full.
   # ----------------------------------------------------------------------------
   keycloak:
-    profiles: ["core", "full"]
+    profiles: ["legacy"]
     image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION:-26.7.1}
     container_name: ${KEYCLOAK_CONTAINER_NAME:-keycloak_asistencias}
     restart: unless-stopped

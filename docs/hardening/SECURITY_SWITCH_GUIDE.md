@@ -7,6 +7,8 @@
 
 ---
 
+> **Actualización (noviembre 2026):** el modo `baseline` ya es el único que se levanta por defecto; el Keycloak propio es opcional (`-Profile legacy`) y Security Baseline se ejecuta desde el compose del Backend en versión 0.1.9. Ver [`SECURITY_BASELINE_UPGRADE_GUIDE.md`](SECURITY_BASELINE_UPGRADE_GUIDE.md).
+
 ## 1. Propósito y Contexto
 
 El sistema cuenta con dos arquitecturas de seguridad plenamente implementadas:
