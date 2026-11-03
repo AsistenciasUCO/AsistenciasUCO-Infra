@@ -34,7 +34,7 @@ param(
     [string]$Command = "help",
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'full')]
+    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'legacy', 'full')]
     [string]$Profile,
 
     [Parameter(Mandatory = $false)]
@@ -60,6 +60,12 @@ param(
 
     [Parameter(Mandatory = $false)]
     [string]$Mode,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ApplicationId,
+
+    [Parameter(Mandatory = $false)]
+    [string]$EnvironmentId,
 
     [Parameter(Mandatory = $false)]
     [switch]$Fix,
@@ -137,6 +143,15 @@ function Show-Help {
     Write-Host "  security-switch  Alterna el switch de seguridad entre Keycloak propio y Security Baseline." -ForegroundColor White
     Write-Host "                   Opciones: -Mode own | baseline" -ForegroundColor Gray
     Write-Host "  security-status  Consulta el estado activo del switch de seguridad en Backend y Frontend." -ForegroundColor White
+    Write-Host ""
+    Write-Host "5b. CATALOGO DE MENSAJES (MESSAGEUCOLAB - EQUIPO DE MENSAJERIA):" -ForegroundColor Yellow
+    Write-Host "  messages-up      Levanta MessageUcoLab (Docker + secretos por Doppler)." -ForegroundColor White
+    Write-Host "  messages-up-light Modo ligero: sin Ollama/traduccion ni observabilidad (poca RAM)." -ForegroundColor White
+    Write-Host "  messages-down    Detiene MessageUcoLab (conserva volumenes; nunca down -v)." -ForegroundColor White
+    Write-Host "  messages-status  Contenedores y salud de MessageUcoLab (http://localhost:8000)." -ForegroundColor White
+    Write-Host "  messages-ui      Levanta MessageUcoLab y lanza su pantalla (puerto 5174)." -ForegroundColor White
+    Write-Host "  messages-switch  Alterna el catalogo de mensajes del Backend entre Azure y MessageUcoLab." -ForegroundColor White
+    Write-Host "                   Opciones: -Mode azure | messageucolab | status [-ApplicationId <uuid> -EnvironmentId <uuid>]" -ForegroundColor Gray
     Write-Host ""
     Write-Host "6. CALIDAD, GOBERNANZA Y SEGURIDAD (DEVSECOPS):" -ForegroundColor Yellow
     Write-Host "  verify           Pre-Flight Check integral: Auditoria de Secretos + Contratos WORM." -ForegroundColor White
@@ -408,6 +423,45 @@ switch ($Command.ToLowerInvariant()) {
     "security-status" {
         $switchScript = Join-Path $infraRoot "scripts\orchestration\switch-security-mode.ps1"
         & $switchScript -Mode status
+        exit $LASTEXITCODE
+    }
+
+    "messages-up" {
+        & (Join-Path $infraRoot "components\messages\start-messages.ps1")
+        exit $LASTEXITCODE
+    }
+
+    "messages-up-light" {
+        & (Join-Path $infraRoot "components\messages\start-messages.ps1") -Light
+        exit $LASTEXITCODE
+    }
+
+    "messages-down" {
+        & (Join-Path $infraRoot "components\messages\start-messages.ps1") -Down
+        exit $LASTEXITCODE
+    }
+
+    "messages-status" {
+        & (Join-Path $infraRoot "components\messages\start-messages.ps1") -Status
+        exit $LASTEXITCODE
+    }
+
+    "messages-ui" {
+        & (Join-Path $infraRoot "components\messages\start-messages.ps1") -WithUi
+        exit $LASTEXITCODE
+    }
+
+    "messages-switch" {
+        $switchScript = Join-Path $infraRoot "scripts\orchestration\switch-message-catalog.ps1"
+        $targetMode = if ($PSBoundParameters.ContainsKey('Mode')) { $Mode } else { 'status' }
+        $msgSplat = @{ Mode = $targetMode }
+        if ($PSBoundParameters.ContainsKey('ApplicationId')) { $msgSplat['ApplicationId'] = $ApplicationId }
+        if ($PSBoundParameters.ContainsKey('EnvironmentId')) { $msgSplat['EnvironmentId'] = $EnvironmentId }
+        if ($RemainingArgs -and $RemainingArgs.Length -gt 0) {
+            & $switchScript @msgSplat @RemainingArgs
+        } else {
+            & $switchScript @msgSplat
+        }
         exit $LASTEXITCODE
     }
 
