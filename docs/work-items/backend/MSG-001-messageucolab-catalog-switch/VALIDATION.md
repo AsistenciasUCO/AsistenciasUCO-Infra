@@ -27,6 +27,8 @@
 | V-16 | **Backend real arrancado con el switch:** log `Catalogo de mensajes activo: MessageUcoLab (timeout=PT3S, cacheTtl=PT5M, contingencia=AZURE, alias=0)` y `health=200` | `start-backend-baseline.ps1` | **PASS** |
 | V-17 | Seguridad: rutas protegidas de MessageUcoLab sin token → 401; rol "Gestor de mensajes" con **28/28** recursos (inicialmente 26/28: ver H-28) | `curl` + API del PDP | **PASS** |
 | V-18 | `verify` completo con el código final (suite + gate de cobertura) | `.\mvnw.cmd verify` | **PASS** — 3039 pruebas, 0 fallos, `All coverage checks have been met`. Adaptador 62/62 líneas y 43/44 ramas; mapeador 12/12 y 12/12; configuración 16/16 y 2/2; properties 11/11 y 15/16. `MessageUcoLabLiveIT` no entra en este comando (es opt-in) |
+| V-19 | **Importación masiva desde Excel (plantilla oficial):** 42 mensajes migrables validados en Develop con 0 errores y confirmados (`count=42`). Excluidos: `GEN001/GEN003/VAL001/GEN004/VAL002/VAL006` (ya existían, la validación los rechazó con "Ya existe un mensaje con el mismo código") y `VAL005` (la prueba viva exige que no exista). Títulos provisionales `Mensaje <CODIGO>` | UI-API `/messages/imports/{validate,confirm}` | **PASS** |
+| V-20 | Prueba viva ampliada con mensajes importados (`VAL_003`, `CORR_001`) | `MessageUcoLabLiveIT` | **PASS** — 6/6, 0 omitidas |
 
 ## 2. Defectos propios hallados y corregidos durante la validación
 
