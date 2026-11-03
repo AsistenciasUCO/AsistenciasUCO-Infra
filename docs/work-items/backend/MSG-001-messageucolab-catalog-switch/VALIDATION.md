@@ -30,6 +30,11 @@
 | V-19 | **Importación masiva desde Excel (plantilla oficial):** 42 mensajes migrables validados en Develop con 0 errores y confirmados (`count=42`). Excluidos: `GEN001/GEN003/VAL001/GEN004/VAL002/VAL006` (ya existían, la validación los rechazó con "Ya existe un mensaje con el mismo código") y `VAL005` (la prueba viva exige que no exista). Títulos provisionales `Mensaje <CODIGO>` | UI-API `/messages/imports/{validate,confirm}` | **PASS** |
 | V-20 | Prueba viva ampliada con mensajes importados (`VAL_003`, `CORR_001`) | `MessageUcoLabLiveIT` | **PASS** — 6/6, 0 omitidas |
 | V-21 | **Error HTTP real del Backend con texto de MessageUcoLab (cierra N-D):** `PUT /api/v1/admin/areas/{id inexistente}` con token PKCE real de `uco-administrador` → `404`, `code=ARE_001`, `message="El área de conocimiento especificada no existe en el sistema."` (con tilde: el texto por defecto del código Java va sin tilde, así que proviene del catálogo). Kong registra `GET /public/messages/MSG_ARE001 → 200` desde `ReactorNetty` en el mismo instante. Un primer intento dio `503 ACCESS_DECISION_UNAVAILABLE` (intermitencia PEP→PDP, H-31) y el reintento respondió | `err_real.py` (scratchpad) + log de Kong | **PASS** |
+| V-22 | **Origen real de los 48 mensajes cortos, sin contingencia:** el adaptador de la prueba viva se construye sin Azure, por lo que un acierto solo puede venir de MessageUcoLab. Compara los 48 códigos con el texto exacto del seed (`src/test/resources/messageucolab/mensajes-cortos-cargados.psv`) | `MessageUcoLabLiveIT` | **PASS** — 7/7, 0 discrepancias |
+| V-23 | **Errores HTTP reales del Backend con `contingencia=NONE`** (arranque con `-Dapp.providers.messageucolab.fallback=none`, log `contingencia=NONE`): `PUT /admin/areas/{inexistente}` → `404 ARE_001` y `PUT /admin/tipos-programa/{inexistente}` → `404 TPR_001`, ambos con el texto con tilde de MessageUcoLab (idéntico al fixture; el texto por defecto del código Java no lleva tilde) | `probe.py` (scratchpad) con token PKCE real de `uco-administrador` | **PASS** |
+| V-24 | **Contingencia Azure inalcanzable:** con `contingencia=AZURE` y sin acceso a Azure (`az appconfig` → `Unauthorized`), un código largo (`ERR_TIPO_IDENTIFICACION_REQUERIDA`) responde `400` con el mensaje propio de la excepción, sin error ni demora; los códigos cortos siguen saliendo de MessageUcoLab | `probe2.py` + log | **PASS** (degradación); Azure real sigue `NOT_RUN` (N-E) |
+| V-25 | **`develop` integrado** (`0d4db159`, +HU112/HU157, APP-01/02/04) sin conflictos y suite completa verde | `git merge` + `mvnw clean verify` | ver §1 de cierre |
+| V-26 | **Ráfaga de 150 peticiones concurrentes (20 hilos) a la ruta pública:** 85 × `200` y 65 × timeout de 30 s, **0 × `429`**; después una petición suelta vuelve a responder en ~0,1 s | `rate.py` (scratchpad) | **PASS** con hallazgo (H-33): bajo ráfaga el gateway se cuelga en vez de limitar; el Backend lo absorbe con timeout 3 s + caché |
 
 ## 2. Defectos propios hallados y corregidos durante la validación
 
@@ -47,10 +52,11 @@
 | :-- | :-- | :-- |
 | N-A | Traducción por IA (`?language=en`) y conservación de `{}` al traducir | Se levantó en **modo ligero** (sin Ollama) |
 | N-B | Respuesta del servicio ante `409` por ids cruzados de aplicación/ambiente | Requiere una segunda aplicación; el cliente degrada ante cualquier error (probado con ambiente inexistente) |
-| N-C | Límite de 120 peticiones/min del gateway | No se saturó; la caché local (TTL 5 min) lo mitiga |
+| N-C | ~~Límite de 120 peticiones/min del gateway~~ **Probado: ver V-26** (no devuelve `429`; se cuelga bajo ráfaga) | La caché local (TTL 5 min) lo mitiga |
 | N-D | ~~Un `mensajeUsuario` de MessageUcoLab visto dentro de una respuesta HTTP de error del Backend~~ **Resuelto: ver V-21** | Los códigos de error del Backend son largos (`ERR_DOCENTE_NO_EXISTE`) y requieren alias o un cambio de límites (H-01); el adaptador y el proveedor activo sí están verificados (V-15, V-16) |
 | N-E | Contingencia a Azure App Configuration real | Sin credencial de Azure en la sesión; se prueba con dobles |
-| N-F | Frontend Angular en navegador contra el Backend en `baseline` | Solo se verificó por API (login PKCE por rol, 15/15 decisiones) |
+| N-F | Frontend Angular en navegador contra el Backend en `baseline` | El login en el navegador exige la contraseña de un usuario, que no se introduce desde la automatización. El contrato de respuesta (`message`/`mensajeUsuario`) no cambió, y el Frontend no se modificó; solo se verificó por API (login PKCE por rol) |
+| N-G | Fallo de despliegue: el CI debe poder descargar el starter | Los 4 workflows ahora generan el `settings.xml` desde los secretos `MESSAGEUCOLAB_PACKAGES_USER` / `MESSAGEUCOLAB_PACKAGES_TOKEN`; **los secretos deben crearse en el repositorio** (token con `read:packages` sobre el paquete) antes de que el CI pueda pasar |
 
 ## 4. Limitaciones
 

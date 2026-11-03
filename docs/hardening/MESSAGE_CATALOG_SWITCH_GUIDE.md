@@ -104,6 +104,9 @@ Contingencia (Azure App Configuration) → si tampoco existe → Optional.empty(
   Backend sigue arrancando en modo `azure` sin configurar nada (probado en `MessageUcoLabMessageCatalogWiringTest`).
 * La dependencia se descarga de GitHub Packages con el `<server id="github">` de `~/.m2/settings.xml`
   (token con `read:packages`, el mismo del componente de seguridad).
+* **CI (GitHub Actions):** los workflows del Backend generan ese `settings.xml` con `actions/setup-java`
+  (`server-id: github`) a partir de los secretos del repositorio `MESSAGEUCOLAB_PACKAGES_USER` y
+  `MESSAGEUCOLAB_PACKAGES_TOKEN`. Sin ellos, la resolución del starter falla en el CI.
 
 ---
 
