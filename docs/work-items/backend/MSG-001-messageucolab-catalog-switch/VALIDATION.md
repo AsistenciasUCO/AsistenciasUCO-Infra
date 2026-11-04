@@ -39,6 +39,7 @@
 | V-28 | **Importación del Excel generado en MessageUcoLab real:** las 28 filas nuevas (27 alias + `VAL_005`) validan con 0 problemas y se confirman; el Excel completo (78) solo marca los 48 ya existentes y `COO_001`/`SES_005` ("El contenido no puede superar los 100 caracteres") | UI-API `/messages/imports/{validate,confirm}` | **PASS** |
 | V-29 | **Los 76 mensajes que caben se sirven desde MessageUcoLab con el texto exacto del seed usando los códigos canónicos y los alias reales, sin contingencia** | `MessageUcoLabLiveIT` | **PASS** — 7/7 |
 | V-30 | **Plantilla de otra aplicación:** un Excel con el id de aplicación cambiado se rechaza con `422 "La plantilla corresponde a otra aplicación"` | UI-API | **PASS** (hallazgo H-35: el Excel no es portable entre instalaciones) |
+| V-31 | **Catálogo completo de 144 mensajes contra el componente real, sin contingencia:** importación de los 64 nuevos (`count=64`) y comprobación del texto exacto de los 140 que caben en el límite de contenido, con códigos canónicos y los 27 alias. Un primer intento falló con 28 mensajes "vacíos" porque el gateway respondió **429** al superar 120 peticiones/min; la prueba se espació a ~100/min (600 ms entre peticiones) sin relajar ninguna aserción | `MessageUcoLabLiveIT` | **PASS** — 7/7 |
 
 ## 2. Defectos propios hallados y corregidos durante la validación
 
