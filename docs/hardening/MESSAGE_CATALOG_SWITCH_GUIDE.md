@@ -124,7 +124,8 @@ Contingencia (Azure App Configuration) → si tampoco existe → Optional.empty(
 
 ## 7. Cargar el catálogo de mensajes de usuario en MessageUcoLab
 
-El catálogo (78 mensajes de usuario) sale del seed `GestioAsistenciaDB/schema/seed/04_mensaje.sql` y se carga **una vez por
+El catálogo (144 mensajes de usuario) sale de **todos** los seeds de `GestioAsistenciaDB/schema/seed` (cada `MERGE` hacia
+`CatalogoMensajeUsuario`) y se carga **una vez por
 ambiente** con la importación masiva de MessageUcoLab (solo crea mensajes nuevos; los existentes se rechazan).
 
 **Convención de códigos y títulos (límites vigentes: código 1–10 alfanumérico, título 10–50):**
@@ -138,7 +139,8 @@ ambiente** con la importación masiva de MessageUcoLab (solo crea mensajes nuevo
 
 **Pasos:**
 
-1. En MessageUcoLab cree la organización y la aplicación "Asistencias UCO", cree en esa aplicación la funcionalidad
+1. En MessageUcoLab cree la organización y la aplicación "Asistencias UCO" **con la misma cuenta que administrará los mensajes desde la pantalla
+   de Asistencias** (cada aplicación pertenece a quien la crea y no se comparte: H-36), cree en esa aplicación la funcionalidad
    **"Mensajes institucionales"** (el Excel la usa en todas las filas y la importación **no crea funcionalidades**) y
    descargue **su** plantilla de importación
    (la plantilla lleva el id de la aplicación y se rechaza con *"La plantilla corresponde a otra aplicación"* si es de otra).
@@ -146,14 +148,15 @@ ambiente** con la importación masiva de MessageUcoLab (solo crea mensajes nuevo
 
    ```powershell
    python AsistenciasUCO-Infra\components\messages\build-message-catalog.py `
-     --seed GestioAsistenciaDB\schema\seed\04_mensaje.sql `
+     --seed GestioAsistenciaDB\schema\seed `
      --template <su-plantilla-descargada>.xlsx --xlsx mensajes-asistencias.xlsx
    ```
 
-   (Si prefiere, copie las filas 2–79 de `Complementos\CatalogoMensajes\plantilla-mensajes.xlsx` a su plantilla.)
+   (Si prefiere, copie las filas 2–145 de `Complementos\CatalogoMensajes\plantilla-mensajes.xlsx` a su plantilla.)
 3. En la pantalla de MessageUcoLab: **Importar** → seleccione los ambientes → validar → confirmar.
 4. Configure el Backend (`MESSAGEUCOLAB_APPLICATION_ID` / `MESSAGEUCOLAB_ENVIRONMENT_ID`) y `messages-switch messageucolab`.
 
 La coherencia seed ↔ alias ↔ límites la verifica `MessageUcoLabCatalogoTest`; la prueba viva `MessageUcoLabLiveIT`
 comprueba contra el componente real, sin contingencia, que cada mensaje cargado devuelve el texto exacto del seed.
 Si se añade un código largo al seed, regenere el fixture y los alias con el mismo script (`--psv`, `--yaml`).
+Para comprobar que el fixture del Backend sigue al seed: `build-message-catalog.py --seed GestioAsistenciaDB\schema\seed --check <catalogo-mensajes-usuario.psv>` (termina con error si hay desfase).

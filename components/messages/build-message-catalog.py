@@ -1,6 +1,7 @@
 """Genera, desde el seed de BD, el catalogo de mensajes de usuario listo para MessageUcoLab.
 
-Fuente unica: GestioAsistenciaDB/schema/seed/04_mensaje.sql (primer MERGE = mensajes de usuario).
+Fuente unica: los seeds de GestioAsistenciaDB/schema/seed (todos los MERGE hacia CatalogoMensajeUsuario; `--seed` acepta la
+carpeta o un archivo). El catalogo de MessageUcoLab debe cubrir todos los mensajes de usuario del seed (144 a la fecha).
 
 Salidas:
   * --psv   catalogo canonico|codigo remoto|tipo|categoria|titulo|contenido (fixture de pruebas del Backend)
@@ -19,6 +20,8 @@ Uso:
       --psv <salida.psv> --yaml <salida.yml> --xlsx <salida.xlsx> [--application-id <uuid>] [--limite 100]
 """
 import argparse
+import glob
+import os
 import re
 import sys
 import zipfile
@@ -34,10 +37,27 @@ TYPE_MAP = {  # tipoMensaje del seed -> (Tipo, Categoria) de la plantilla
 PREFIX_FOR_LONG = {"ERR_": "ERR", "SUC_": "SUC"}
 
 
+ROW_RE = re.compile(r"\(\s*N?'([A-Za-z0-9_]+)'\s*,\s*N?'([A-Z_]+)'\s*,\s*N?'([A-Z]+)'\s*,\s*N?'((?:[^']|'')*)'\s*\)")
+TARGET_RE = re.compile(r"MERGE\s+INTO\s+\[?dbo\]?\.\[?(\w+)\]?")
+
+
 def read_seed(path):
-    sql = open(path, encoding="utf-8-sig").read().split("MERGE INTO")[1]
-    rows = re.findall(r"\('([A-Z0-9_]+)',\s*'([A-Z_]+)',\s*'([A-Z]+)',\s*'((?:[^']|'')*)'\)", sql)
-    return [(c, t, s, x.replace("''", "'")) for c, t, s, x in rows]
+    """Mensajes de usuario de TODOS los seeds (un archivo o la carpeta schema/seed).
+
+    Cada MERGE hacia CatalogoMensajeUsuario aporta filas; si un codigo se repite gana el ultimo (como el MERGE MATCHED al
+    desplegar en orden), conservando la posicion de su primera aparicion para que la numeracion de alias sea estable.
+    """
+    files = sorted(glob.glob(os.path.join(path, "*.sql"))) if os.path.isdir(path) else [path]
+    messages = {}
+    for file in files:
+        sql = open(file, encoding="utf-8-sig").read()
+        for block in re.split(r"(?=MERGE\s+INTO)", sql):
+            target = TARGET_RE.match(block)
+            if not target or target.group(1) != "CatalogoMensajeUsuario":
+                continue
+            for code, kind, severity, content in ROW_RE.findall(block):
+                messages[code] = (code, kind, severity, content.replace("''", "'"))
+    return list(messages.values())
 
 
 def remote_codes(rows):
@@ -100,6 +120,7 @@ def main():
     p.add_argument("--seed", required=True)
     p.add_argument("--template")
     p.add_argument("--psv")
+    p.add_argument("--check", help="fixture .psv a comparar contra los seeds; termina con error si no coinciden")
     p.add_argument("--yaml")
     p.add_argument("--xlsx")
     p.add_argument("--application-id")
@@ -124,10 +145,16 @@ def main():
         if len(content) > a.limite:
             over.append((code, len(content)))
 
+    header = ("# canonico|codigo remoto|tipo|categoria|titulo|contenido -- generado por "
+              "AsistenciasUCO-Infra/components/messages/build-message-catalog.py desde los seeds de mensajes de usuario\n")
+    if a.check:
+        actual = open(a.check, encoding="utf-8").read()
+        if actual != header + "\n".join(psv) + "\n":
+            sys.exit(f"DESFASE: {a.check} no coincide con los seeds. Regenere con --psv (y --yaml / --xlsx).")
+        print(f"OK: {a.check} coincide con los seeds ({len(rows)} mensajes)")
     if a.psv:
         with open(a.psv, "w", encoding="utf-8", newline="\n") as f:
-            f.write("# canonico|codigo remoto|tipo|categoria|titulo|contenido -- generado por "
-                    "AsistenciasUCO-Infra/components/messages/build-message-catalog.py desde 04_mensaje.sql\n")
+            f.write(header)
             f.write("\n".join(psv) + "\n")
     if a.yaml:
         with open(a.yaml, "w", encoding="utf-8", newline="\n") as f:
