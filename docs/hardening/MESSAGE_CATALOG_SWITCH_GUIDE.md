@@ -139,7 +139,8 @@ ambiente** con la importación masiva de MessageUcoLab (solo crea mensajes nuevo
 
 **Pasos:**
 
-1. En MessageUcoLab cree la organización y la aplicación "Asistencias UCO", cree en esa aplicación la funcionalidad
+1. En MessageUcoLab cree la organización y la aplicación "Asistencias UCO" **con la misma cuenta que administrará los mensajes desde la pantalla
+   de Asistencias** (cada aplicación pertenece a quien la crea y no se comparte: H-36), cree en esa aplicación la funcionalidad
    **"Mensajes institucionales"** (el Excel la usa en todas las filas y la importación **no crea funcionalidades**) y
    descargue **su** plantilla de importación
    (la plantilla lleva el id de la aplicación y se rechaza con *"La plantilla corresponde a otra aplicación"* si es de otra).
