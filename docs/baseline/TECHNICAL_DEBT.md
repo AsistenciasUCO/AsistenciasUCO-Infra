@@ -68,6 +68,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-052](#td-052) | Webhook Azure acepta credencial por URL/query | RESUELTA (LB-001D.2) | no |
 | [TD-053](#td-053) | Cloud Integration Azure corre como test normal | RESUELTA (LB-001D.2) | no |
 | [TD-054](#td-054) | Semántica Azure→realtime sin decisión explícita | DECISION_REQUIRED | no para documentación; sí para cambio realtime futuro |
+| [TD-055](#td-055) | MessageUcoLab: validación operacional extremo a extremo pendiente | ABIERTA / NON_BLOCKING | no |
+| [TD-056](#td-056) | MessageUcoLab: límites de código (10) y contenido (100) incompatibles con el catálogo canónico | DECISION_REQUIRED | no mientras `azure` sea el provider por defecto |
 
 ## TD-001
 
@@ -724,3 +726,23 @@ GOLDEN PATH EFFECT:         NONE
 - **Resolución esperada:** decisión explícita A/B/C, contrato/consumidores y tests antes de cualquier cambio realtime.
 - **Bloquea línea base:** no para LB-001D.1; sí para un cambio realtime relacionado.
 - **Estado:** DECISION_REQUIRED. **Work item:** [LB-001D.1](../work-items/LB-001D-governance-hardening/LB-001D.1-PLAN.md).
+
+## TD-055
+
+- **Fecha / responsable:** 2026-11-02 / backend-team + infra.
+- **Clasificación:** `NON_BLOCKING`.
+- **Descripción:** el switch `app.adapters.message-catalog.provider=messageucolab` está probado con `MessageReader` simulado y `ApplicationContextRunner`, pero no contra el componente real levantado (requiere Doppler, registro en Security Baseline y carga de mensajes).
+- **Impacto:** un mock no certifica el provider externo; comportamiento real de `{}`, 409 y traducción sin evidencia.
+- **Evidencia:** [MSG-001 VALIDATION](../work-items/backend/MSG-001-messageucolab-catalog-switch/VALIDATION.md).
+- **Resolución esperada:** ejecutar los pasos de [MESSAGEUCOLAB_INTEGRATION §3](../governance/MESSAGEUCOLAB_INTEGRATION.md) y registrar resultados.
+- **Bloquea línea base:** no. **Estado:** ABIERTA. **Work item:** MSG-001.
+
+## TD-056
+
+- **Fecha / responsable:** 2026-11-02 / backend-team + equipo de mensajería.
+- **Clasificación:** `DECISION_REQUIRED`.
+- **Descripción:** MessageUcoLab limita el código a 10 caracteres tras `MSG_` y el contenido a 100; 54 de 150 códigos y 9 mensajes de Asistencias exceden esos límites.
+- **Impacto:** esos mensajes solo se resuelven vía alias o contingencia Azure; la migración total a MessageUcoLab no es viable sin cambio del componente o de los códigos canónicos (contrato público).
+- **Evidencia:** análisis de `GestioAsistenciaDB/schema/seed/04_mensaje.sql`; hallazgos H-01/H-02 en [FINDINGS_FOR_MESSAGES_TEAM](../work-items/backend/MSG-001-messageucolab-catalog-switch/FINDINGS_FOR_MESSAGES_TEAM.md).
+- **Resolución esperada:** respuesta del equipo de mensajería (ampliar límites) o decisión contractual sobre alias.
+- **Bloquea línea base:** no. **Estado:** DECISION_REQUIRED. **Work item:** MSG-001.
