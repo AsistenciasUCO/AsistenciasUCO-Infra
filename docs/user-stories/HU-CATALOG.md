@@ -223,12 +223,12 @@
 | **HU147** | Consultar componentes de formación académica | SP `usp_consultar_componentes_formacion` (BAS, INS, ESP; `uv_componente` con código) | `GET /api/v1/coordinador/componentes-formacion` | Selector de componente real en el formulario de asignaturas del coordinador (área real y créditos obligatorios) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU148** | ~~Crear nuevo componente de formación académica~~ | Descartada (decisión de John, 2026-11-04): los componentes son fijos BAS, INS y ESP por regla de negocio; un estudiante entra a un programa solo por una ESP | No se implementa | No se implementa | `[DESCARTADA]` |
 | **HU149** | Actualizar competencias asociadas a un componente | SP pendiente en DB | Endpoint no existe en backend | Edición de competencias curriculares | `[PENDIENTE]` |
-| **HU150** | Consultar catálogo de áreas de conocimiento UCO | Vista `uv_area` | `GET /api/v1/admin/areas` | Tabla de áreas en `DeanFacultyComponent` | `[CERTIFICADA]` |
-| **HU151** | Crear nueva área de conocimiento institucional | SP `usp_crear_area` (código 3 caracteres inmutable, nombre único) | `POST /api/v1/admin/areas` | Formulario de alta en `AdminAreasComponent` | `[CERTIFICADA]` |
-| **HU152** | Modificar datos y estado de un área de conocimiento| SP `usp_actualizar_area`, `usp_cambiar_estado_area` (columna `Area.estado`) | `PUT /api/v1/admin/areas/{id}`, `PATCH /api/v1/admin/areas/{id}/estado` | Edición y switch de estado en `AdminAreasComponent` | `[CERTIFICADA]` |
-| **HU153** | Administración de Catálogo: Tipos de Documento | SP `usp_guardar_tipo_identificacion` (alta con código de 1 a 5 letras y edición del nombre; sin estado ni DDL, decisión de John 2026-11-04) | `GET /api/v1/tipos-identificacion`, `POST /api/v1/admin/tipos-identificacion`, `PUT /api/v1/admin/tipos-identificacion/{id}` | Sección "Tipos de Documento" en `AdminCatalogsComponent` (`/app/admin/catalogos`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
-| **HU154** | Administración de Catálogo: Tipos de Programa | SP `usp_crear_tipo_programa`, `usp_actualizar_tipo_programa`, `usp_cambiar_estado_tipo_programa` | `GET/POST /api/v1/admin/tipos-programa`, `PUT /{id}`, `PATCH /{id}/estado` | `AdminCatalogsComponent` (`/app/admin/catalogos`; la ruta redirigía a facultades y se restauró el 2026-11-04) | `[CERTIFICADA]` |
-| **HU155** | Administración de Catálogo: Estados del Sistema | Vista `uv_estado` | Sin endpoint REST de administración | Configuración en UI | `[PARCIAL]` |
+| **HU150** | Consultar catálogo de áreas de conocimiento UCO | Vista `uv_area` | `GET /api/v1/admin/areas` | `AdminAreasComponent` (`/app/admin/areas`, solo consulta) | `[CERTIFICADA]` |
+| **HU151** | ~~Crear nueva área de conocimiento institucional~~ | Descartada: catálogos base sin CRUD (regla de John, 2026-11-04); `usp_crear_area` eliminado (migración 11) | `POST /api/v1/admin/areas` eliminado | Formulario de alta eliminado | `[DESCARTADA]` |
+| **HU152** | ~~Modificar datos y estado de un área de conocimiento~~ | Descartada: catálogos base sin CRUD (regla de John, 2026-11-04); `usp_actualizar_area` y `usp_cambiar_estado_area` eliminados (la columna `Area.estado` se conserva, fijada por el seed) | `PUT /api/v1/admin/areas/{id}` y `PATCH /{id}/estado` eliminados | Edición y cambio de estado eliminados | `[DESCARTADA]` |
+| **HU153** | Administración de Catálogo: Tipos de Documento | Vista `uv_tipo_identificacion` (carga por seed); alcance reducido a consulta por regla de John 2026-11-04: catálogos base sin CRUD (`usp_guardar_tipo_identificacion` eliminado) | `GET /api/v1/tipos-identificacion` (consulta) | Selectores de tipo de documento en registro y formularios · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
+| **HU154** | Administración de Catálogo: Tipos de Programa | Vista `uv_tipo_programa` (carga por seed); alcance reducido a consulta por regla de John 2026-11-04: catálogos base sin CRUD (SP de crear, actualizar y cambiar estado eliminados) | `GET /api/v1/admin/tipos-programa`, `GET /api/v1/tipos-programa` | `AdminCatalogsComponent` (`/app/admin/catalogos`) en solo consulta · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
+| **HU155** | Administración de Catálogo: Estados del Sistema | Vista `uv_estado` (carga por seed); alcance reducido a consulta por regla de John 2026-11-04: catálogos base sin CRUD | Sin endpoint REST de consulta dedicado | Estados tipados en DTOs; sin pantalla de consulta | `[PARCIAL]` |
 | **HU156** | Admisión demográfica y creación de usuario estudiante| SP `usp_sincronizar_estudiante_interno` | Endpoint `/admin/estudiantes/admision` no existe | Formulario de admisión en `CoordinatorStudents` | `[PENDIENTE]` |
 | **HU157** | Ficha unificada del estudiante con historial completo| SP `usp_buscar_estudiantes_institucion_paginado` y `usp_consultar_historial_estudiante` (administrador: institución; decano: su facultad) | `GET /api/v1/admin/estudiantes`, `GET /api/v1/{admin,decano}/estudiantes/{id}/historial` | `AdminEstudiantesComponent` (`/app/admin/estudiantes`) y la ficha de `DeanEstudiantesComponent` (`HistorialEstudianteComponent`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU158** | Consultar padrón unificado de estudiantes de la UCO | Vista `uv_auth_estudiante` | `GET /api/v1/coordinador/estudiantes` | Tabla con filtros y paginación en `Coordinator` | `[CERTIFICADA]` |
@@ -262,12 +262,12 @@
 
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
-| **`[CERTIFICADA]`** | **99** | **57.9%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
-| **`Fase 3 (FRONTEND)`** | **35** | **20.5%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
+| **`[CERTIFICADA]`** | **96** | **56.1%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
+| **`Fase 3 (FRONTEND)`** | **36** | **21.1%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
 | **`[BLOQUEADO 501]`** | **9** | **5.3%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
 | **`[PARCIAL]`** | **9** | **5.3%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
 | **`[PENDIENTE]`** | **17** | **9.9%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
-| **`[DESCARTADA]`** | **2** | **1.2%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, 2026-11-04). |
+| **`[DESCARTADA]`** | **4** | **2.3%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04). |
 | **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
