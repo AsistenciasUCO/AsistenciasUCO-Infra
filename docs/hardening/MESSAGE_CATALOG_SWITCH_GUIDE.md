@@ -68,7 +68,7 @@ Después de cualquier cambio **reinicia el Backend** (el provider se elige al co
 | `MESSAGEUCOLAB_CACHE_TTL` | `5m` | Caché local de aciertos; `0` la desactiva. El gateway limita a 120 peticiones/min por IP |
 | `MESSAGEUCOLAB_FALLBACK` | `azure` | Contingencia si MessageUcoLab falla o no tiene el código: `azure` \| `none` |
 | `MESSAGEUCOLAB_CODE_PREFIX` | `MSG_` | Prefijo que MessageUcoLab antepone a todo código |
-| `app.providers.messageucolab.code-aliases.<CODIGO>` | *(vacío)* | Alias corto (≤10) para códigos canónicos más largos (solo `application.yml`/propiedades) |
+| `app.providers.messageucolab.code-aliases."[<CODIGO>]"` | 27 alias `ERR###`/`SUC###` ya declarados en `application.yml` | Alias corto (≤10) para los códigos canónicos más largos; ver §7 |
 
 Ninguna de estas variables es un secreto. Los secretos del componente (`SURREALDBPASSWORD`, `REDISPASSWORD`,
 `GF_SECURITY_ADMIN_PASSWORD`, `SURREALDBUSER`, `PEP_REGISTRATION_TOKEN`) viven **solo en Doppler**.
@@ -81,9 +81,9 @@ Ninguna de estas variables es un secreto. Los secretos del componente (`SURREALD
 findUserMessage("VAL_001")
    │ caché local (5 min, solo aciertos)
    ▼
-MessageUcoLabCodeMapper:  VAL_001 → MSG_VAL_001     (código >10 sin alias → no se consulta)
-   ▼
-MessageReader.getDetails("MSG_VAL_001").block(3s)  → GET /messageucolab/v1/public/messages/{code}
+MessageUcoLabCodeMapper:  VAL_001 → MSG_VAL001      (sin "_"; ERR_CUPO_SUPERADO → alias ERR013 → MSG_ERR013;
+   ▼                                                    código >10 sin alias → no se consulta)
+MessageReader.getDetails("MSG_VAL001").block(3s)  → GET /messageucolab/v1/public/messages/{code}
    │  200 con content           → se entrega el content (el title no tiene equivalente en el puerto)
    │  404 / vacío / 4xx / 5xx / timeout / transporte
    ▼
@@ -119,3 +119,39 @@ Contingencia (Azure App Configuration) → si tampoco existe → Optional.empty(
 | `409` en la consulta pública | `applicationId`/`environmentId` de botones distintos | Volver a copiar ambos del mismo botón |
 | `Doppler sin sesión` al hacer `messages-up` | No se hizo `doppler login` / `doppler setup` | Ver [`MESSAGEUCOLAB_INTEGRATION.md`](../governance/MESSAGEUCOLAB_INTEGRATION.md) §3 |
 | El Backend no arranca en el 8080 | Pulsar de MessageUcoLab publica el 8080 del host | `messages-up` ya lo reubica a 18082; si lo levantas a mano exporta `PULSAR_GENERALPORT=18082` |
+
+---
+
+## 7. Cargar el catálogo de mensajes de usuario en MessageUcoLab
+
+El catálogo (78 mensajes de usuario) sale del seed `GestioAsistenciaDB/schema/seed/04_mensaje.sql` y se carga **una vez por
+ambiente** con la importación masiva de MessageUcoLab (solo crea mensajes nuevos; los existentes se rechazan).
+
+**Convención de códigos y títulos (límites vigentes: código 1–10 alfanumérico, título 10–50):**
+
+* El código remoto es el canónico sin `_` (`VAL_001` → `VAL001`). Los 27 que no caben (`ERR_*`, `SUC_*`) usan
+  `ERR001…ERR024` y `SUC001…SUC003`, en el orden del seed, declarados en `code-aliases` de `application.yml`.
+* El **título** lleva el nombre canónico para buscarlo en la pantalla: `VAL_001 - El número de identificación es…`
+  (si el canónico mide más de 30, el título es solo el canónico).
+* El **contenido** es el del seed. Hoy el componente admite 100 caracteres; `COO_001` (122) y `SES_005` (108) lo superan y
+  la validación los marcará hasta que el equipo de mensajes suba el límite a 150–200.
+
+**Pasos:**
+
+1. En MessageUcoLab cree la organización y la aplicación "Asistencias UCO" y descargue **su** plantilla de importación
+   (la plantilla lleva el id de la aplicación y se rechaza con *"La plantilla corresponde a otra aplicación"* si es de otra).
+2. Genere el Excel sobre su plantilla:
+
+   ```powershell
+   python AsistenciasUCO-Infra\components\messages\build-message-catalog.py `
+     --seed GestioAsistenciaDB\schema\seed\04_mensaje.sql `
+     --template <su-plantilla-descargada>.xlsx --xlsx mensajes-asistencias.xlsx
+   ```
+
+   (Si prefiere, copie las filas 2–79 de `Complementos\CatalogoMensajes\plantilla-mensajes.xlsx` a su plantilla.)
+3. En la pantalla de MessageUcoLab: **Importar** → seleccione los ambientes → validar → confirmar.
+4. Configure el Backend (`MESSAGEUCOLAB_APPLICATION_ID` / `MESSAGEUCOLAB_ENVIRONMENT_ID`) y `messages-switch messageucolab`.
+
+La coherencia seed ↔ alias ↔ límites la verifica `MessageUcoLabCatalogoTest`; la prueba viva `MessageUcoLabLiveIT`
+comprueba contra el componente real, sin contingencia, que cada mensaje cargado devuelve el texto exacto del seed.
+Si se añade un código largo al seed, regenere el fixture y los alias con el mismo script (`--psv`, `--yaml`).
