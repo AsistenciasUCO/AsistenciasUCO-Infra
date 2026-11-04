@@ -115,7 +115,7 @@
 | **HU055** | Control de cupo máximo al aceptar postulaciones | `usp_resolver_solicitud_ingreso_grupo` con bloqueo de cupo (`UPDLOCK, HOLDLOCK`); sin cupo ⇒ lista de espera | `PATCH /api/v1/docente/solicitudes-ingreso/{id}` (`ACEPTADA` o `EN_ESPERA`) | Cupo disponible y posición en espera en la lista · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU056** | Registrar marcación masiva ("Todos Presentes") | SP `usp_registrar_asistencias_sesion` | `POST /api/v1/asistencias/lote` + SSE (Golden Path) | Botón de marcación batch en `AttendanceControl` | `[CERTIFICADA]` |
 | **HU057** | Consumo transversal de tipos de identificación | Vista `uv_tipo_identificacion` | `GET /api/v1/tipos-identificacion` | Selector en modales de alta docente | `[CERTIFICADA]` |
-| **HU058** | Consumo transversal de tipos de programa | Vista `uv_tipo_programa` | Mapeo en frontend | Filtros por nivel formativo en cursos | `[PARCIAL]` |
+| **HU058** | Consumo transversal de tipos de programa | Vista `uv_tipo_programa` y tipo de programa del grupo desde `uv_programa` | `GET /api/v1/tipos-programa`; `GET /api/v1/docente/asignaturas` con `idTipoPrograma` y `nombreTipoPrograma` | Filtro "Nivel formativo" con el catálogo real en los grupos del docente (`TeacherGruposListComponent`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU059** | Consumo transversal de estados de grupo y sesión | Catálogo de estados de sesión | Estados tipados en DTOs de sesión | Badges de estado (Abierto, En Curso, Cerrado) | `[CERTIFICADA]` |
 
 ---
@@ -228,7 +228,7 @@
 | **HU152** | ~~Modificar datos y estado de un área de conocimiento~~ | Descartada: catálogos base sin CRUD (regla de John, 2026-11-04); `usp_actualizar_area` y `usp_cambiar_estado_area` eliminados (la columna `Area.estado` se conserva, fijada por el seed) | `PUT /api/v1/admin/areas/{id}` y `PATCH /{id}/estado` eliminados | Edición y cambio de estado eliminados | `[DESCARTADA]` |
 | **HU153** | Administración de Catálogo: Tipos de Documento | Vista `uv_tipo_identificacion` (carga por seed); alcance reducido a consulta por regla de John 2026-11-04: catálogos base sin CRUD (`usp_guardar_tipo_identificacion` eliminado) | `GET /api/v1/tipos-identificacion` (consulta) | Selectores de tipo de documento en registro y formularios · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU154** | Administración de Catálogo: Tipos de Programa | Vista `uv_tipo_programa` (carga por seed); alcance reducido a consulta por regla de John 2026-11-04: catálogos base sin CRUD (SP de crear, actualizar y cambiar estado eliminados) | `GET /api/v1/admin/tipos-programa`, `GET /api/v1/tipos-programa` | `AdminCatalogsComponent` (`/app/admin/catalogos`) en solo consulta · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
-| **HU155** | Administración de Catálogo: Estados del Sistema | Vista `uv_estado` (carga por seed); alcance reducido a consulta por regla de John 2026-11-04: catálogos base sin CRUD | Sin endpoint REST de consulta dedicado | Estados tipados en DTOs; sin pantalla de consulta | `[PARCIAL]` |
+| **HU155** | Administración de Catálogo: Estados del Sistema | Vistas `uv_estado` (con código) y `uv_estado_estudiante_grupo` (carga por seed); alcance reducido a consulta por regla de John 2026-11-04: catálogos base sin CRUD. Cubre también la HU167 del plan de trabajo de la BD (mismo texto: "Ver los diferentes tipos de estados que se usan") | `GET /api/v1/admin/estados` (solo ADMINISTRADOR; estados de solicitudes y del estudiante en el grupo, sin los técnicos de notificaciones) | `AdminEstadosComponent` (`/app/admin/estados`), solo consulta · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU156** | Admisión demográfica y creación de usuario estudiante| SP `usp_sincronizar_estudiante_interno` | Endpoint `/admin/estudiantes/admision` no existe | Formulario de admisión en `CoordinatorStudents` | `[PENDIENTE]` |
 | **HU157** | Ficha unificada del estudiante con historial completo| SP `usp_buscar_estudiantes_institucion_paginado` y `usp_consultar_historial_estudiante` (administrador: institución; decano: su facultad) | `GET /api/v1/admin/estudiantes`, `GET /api/v1/{admin,decano}/estudiantes/{id}/historial` | `AdminEstudiantesComponent` (`/app/admin/estudiantes`) y la ficha de `DeanEstudiantesComponent` (`HistorialEstudianteComponent`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU158** | Consultar padrón unificado de estudiantes de la UCO | Vista `uv_auth_estudiante` | `GET /api/v1/coordinador/estudiantes` | Tabla con filtros y paginación en `Coordinator` | `[CERTIFICADA]` |
@@ -263,9 +263,9 @@
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
 | **`[CERTIFICADA]`** | **96** | **56.1%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
-| **`Fase 3 (FRONTEND)`** | **36** | **21.1%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
+| **`Fase 3 (FRONTEND)`** | **38** | **22.2%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
 | **`[BLOQUEADO 501]`** | **9** | **5.3%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
-| **`[PARCIAL]`** | **9** | **5.3%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
+| **`[PARCIAL]`** | **7** | **4.1%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
 | **`[PENDIENTE]`** | **17** | **9.9%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
 | **`[DESCARTADA]`** | **4** | **2.3%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04). |
 | **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
