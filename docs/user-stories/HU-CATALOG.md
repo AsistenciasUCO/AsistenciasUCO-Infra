@@ -201,8 +201,8 @@
 | **HU129** | Reporte tabular de horas contratadas por docente | SP no existe en DB | Endpoint no existe en backend | Tabla de seguimiento de carga académica | `[PENDIENTE]` |
 | **HU133** | Indicador KPI global de asistencia en la universidad| SP `usp_consultar_kpis_institucion` | `GET /api/v1/admin/indicadores` | `AdminIndicatorsComponent` (`/app/admin/indicadores`) | `[CERTIFICADA]` |
 | **HU134** | Tendencias temporales de ausentismo en reportería | SP `usp_consultar_tendencia_ausentismo` | `GET /api/v1/admin/tendencia-ausentismo` | Gráfica de línea SVG con selector semana/mes | `[CERTIFICADA]` |
-| **HU135** | Contador en tiempo real de censo estudiantil | `usp_consultar_kpis_institucion` (censo) | `GET /api/v1/admin/indicadores` | Contador de estudiantes con matrícula activa y registrados; sin actualización push (no hay canal SSE institucional ni eventos de matrícula) | `[PARCIAL]` |
-| **HU136** | Contador en tiempo real de censo docente | `usp_consultar_kpis_institucion` (censo) | `GET /api/v1/admin/indicadores` | Contador de docentes con grupo activo y registrados; sin actualización push (no hay canal SSE institucional ni eventos de alta) | `[PARCIAL]` |
+| **HU135** | Ver la lista de todos los estudiantes de la universidad (texto original del plan de la BD; redefinida por John, 2026-11-05: se descarta el "contador en tiempo real") | `usp_buscar_estudiantes_institucion_paginado` (HU157) | `GET /api/v1/admin/estudiantes` (HU157) | Pantalla "Estudiantes" del administrador (HU157). Los contadores del tablero (`GET /admin/indicadores`) siguen igual | `Fase 3 (FRONTEND)` |
+| **HU136** | Ver la lista de todos los profesores de la universidad (texto original del plan de la BD; redefinida por John, 2026-11-05: se descarta el "contador en tiempo real") | `usp_consultar_docentes_facultad_paginado` (HU128) con ámbito de ADMINISTRADOR (su institución) y filtro `@idFacultad` | `GET /api/v1/admin/docentes` | `/app/admin/docentes` (menú "Docentes"): búsqueda, facultad, programa, estado y vínculo (incluye los docentes retirados de todos sus programas); MV-017 pendiente | `Fase 3 (FRONTEND)` |
 | **HU137** | Directorio administrativo institucional (Decanos) | Vista `uv_decano` | `GET /api/v1/admin/decanos` | Directorio de decanos en `/app/admin/decanos` | `[CERTIFICADA]` |
 | **HU138** | Ratio de sesiones dictadas con asistencia registrada| `usp_consultar_kpis_institucion` (cumplimiento) | `GET /api/v1/admin/indicadores` | Tarjeta de cumplimiento con sus conteos | `[CERTIFICADA]` |
 | **HU139** | Tarjetas comparativas de inasistencia por facultad | SP `usp_consultar_comparativa_facultades` | `GET /api/v1/admin/comparativa-facultades` | Tarjetas por facultad en `/app/admin/indicadores` | `[CERTIFICADA]` |
@@ -234,10 +234,10 @@
 | **HU158** | Consultar padrón unificado de estudiantes de la UCO | Vista `uv_auth_estudiante` | `GET /api/v1/coordinador/estudiantes` | Tabla con filtros y paginación en `Coordinator` | `[CERTIFICADA]` |
 | **HU159** | Corregir datos de identidad por jerarquía (redefinida por John, 2026-11-05: antes "datos personales y contacto del estudiante") | `usp_corregir_identidad_usuario` (estudiante: coordinador de su programa; decano: administrador), interno común `usp_corregir_documento_usuario_interno` (apagable con `IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO`) y auditoría antes/después | `PUT /api/v1/coordinador/estudiantes/{idEstudiante}/identidad`, `PUT /api/v1/admin/decanos/{id}/identidad`, `GET /api/v1/configuracion/identidad`; el documento es el username de Keycloak (sincronizado y verificado) | "Corregir datos" en la ficha del estudiante del coordinador y en Decanos del administrador; MV-016 pendiente | `Fase 3 (FRONTEND)` |
 | **HU160** | ~~Modificar estado institucional (Matriculado, Retiro)~~ | Descartada (decisión de John, 2026-11-05): el administrador no cambia el estado de un estudiante (`HOJA_DE_RUTA_JERARQUIA_ROLES.md`); el estado en el grupo cambia por procesos del docente (retiro HU051) y por inasistencia | No se implementa | No se implementa | `[DESCARTADA]` |
-| **HU161** | Registrar nueva institución de convenio o práctica | SP pendiente en DB | `POST /api/v1/admin/instituciones` (arroja 501) | `AdminCatalogsComponent` (`/app/admin/catalogos`)| `[BLOQUEADO 501]` |
-| **HU162** | Modificar datos de institución colaboradora | SP pendiente en DB | `PUT /api/v1/admin/instituciones/{id}` (arroja 501) | Formulario de modificación de convenio | `[BLOQUEADO 501]` |
+| **HU161** | ~~Registrar nueva institución de convenio o práctica~~ | Descartada (decisión de John, 2026-11-05): `Institucion` es un catálogo de solo consulta (CAT-01) | Se retiró `POST /api/v1/admin/instituciones` (respondía 501) | Sin acción en la UI | `[DESCARTADA]` |
+| **HU162** | ~~Modificar datos de institución colaboradora~~ | Descartada (decisión de John, 2026-11-05): catálogo de solo consulta | Se retiró `PUT /api/v1/admin/instituciones/{id}` (respondía 501) | Sin acción en la UI | `[DESCARTADA]` |
 | **HU163** | Consultar listado de instituciones de convenio | Vista `uv_institucion` | `GET /api/v1/admin/instituciones` | Tabla de entidades externas en convenio | `[CERTIFICADA]` |
-| **HU164** | Alternar estado activo/inactivo de institución | SP pendiente en DB | `PATCH .../instituciones/{id}/toggle-estado` (501) | Switch de activación de convenios | `[BLOQUEADO 501]` |
+| **HU164** | ~~Alternar estado activo/inactivo de institución~~ | Descartada (decisión de John, 2026-11-05): catálogo de solo consulta | Se retiró `PATCH /api/v1/admin/instituciones/{id}/toggle-estado` (respondía 501) | Sin acción en la UI | `[DESCARTADA]` |
 | **HU168** | Configurar parámetros generales (Límite 20%, Días) | Vista `uv_parametro` | `GET /api/v1/admin/parametros` (Lectura OK; PUT 501)| `AdminSystemComponent` (`/app/admin/sistema`) | `[PARCIAL]` |
 | **HU169** | Configurar catálogo centralizado de mensajes | SP `usp_obtener_mensaje_catalogo` | Endpoint de modificación no expuesto | Consola de mensajes técnicos | `[PENDIENTE]` |
 | **HU170** | Sincronización batch de usuarios Keycloak a BD | SP `usp_sincronizar_usuario_interno` | Endpoint no expuesto en backend | Consola batch en UI | `[PENDIENTE]` |
@@ -264,11 +264,11 @@
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
 | **`[CERTIFICADA]`** | **96** | **55.8%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
-| **`Fase 3 (FRONTEND)`** | **41** | **23.8%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **9** | **5.2%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
-| **`[PARCIAL]`** | **5** | **2.9%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
+| **`Fase 3 (FRONTEND)`** | **43** | **25.0%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
+| **`[BLOQUEADO 501]`** | **6** | **3.5%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[PARCIAL]`** | **3** | **1.7%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
 | **`[PENDIENTE]`** | **15** | **8.7%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
-| **`[DESCARTADA]`** | **6** | **3.5%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04; HU149 y HU160, 2026-11-05). |
+| **`[DESCARTADA]`** | **9** | **5.2%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04; HU149, HU160, HU161, HU162 y HU164, 2026-11-05). |
 | **TOTAL** | **172** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---

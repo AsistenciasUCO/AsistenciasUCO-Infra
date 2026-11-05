@@ -67,6 +67,8 @@ A continuación se presenta el catálogo consolidado de HUs vinculadas al regist
 | **1** | **Administrador** | **Decano** (Corrección de identidad) | **HU159** | Corregir nombres, apellidos y documento del decano (`PUT /admin/decanos/{id}/identidad`) | `Fase 3 (FRONTEND)` |
 | **3** | **Coordinador** | **Estudiante** (Corrección de identidad) | **HU159** | Corregir nombres, apellidos y documento de un estudiante de su programa (`PUT /coordinador/estudiantes/{id}/identidad`) | `Fase 3 (FRONTEND)` |
 | **1** | **Administrador** | **Estudiante** (Estado institucional) | **HU160** | ~~Modificar el estado institucional del estudiante~~ | `[DESCARTADA]` |
+| **1** | **Administrador** | **Docentes y Estudiantes** (Directorios de solo consulta) | **HU136 / HU135 (HU157)** | Ver los profesores y los estudiantes de toda la institución | `Fase 3 (FRONTEND)` |
+| **0** | *Sistema* | Institución (catálogo de solo consulta) | **HU161 / HU162 / HU164** | ~~Crear, modificar y activar instituciones~~ | `[DESCARTADA]` |
 
 ---
 
