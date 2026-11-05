@@ -153,7 +153,7 @@
 | **HU089** | Consultar listado de docentes adscritos al programa| SP `usp_consultar_docentes_programa` | `GET /api/v1/coordinador/docentes` | Tabla de cuerpo docente con estado de vinculación | `[CERTIFICADA]` |
 | **HU090** | Selector controlado de tipo de vinculación | Catálogo `TipoVinculacion` (PLA/MTI/CAT/OCA) y vista `uv_tipo_vinculacion` | `GET /api/v1/coordinador/tipos-vinculacion` | Desplegable controlado por tipo de vinculación | `[CERTIFICADA]` |
 | **HU091** | Vincular docente al programa y sincronizar IAM | SP `usp_vincular_docente_programa` (fachada + `_interno`) | `POST /api/v1/coordinador/docentes` (aprovisiona Keycloak tras el commit en DB) | Modal de vinculación docente (persona nueva o existente) | `[CERTIFICADA]` |
-| **HU092** | Modificar datos profesionales de docente | SP `usp_actualizar_docente_programa` | `PUT /api/v1/coordinador/docentes/{id}` | Formulario de edición docente | `[CERTIFICADA]` |
+| **HU092** | Modificar datos profesionales de docente | SP `usp_actualizar_docente_programa` | `PUT /api/v1/coordinador/docentes/{id}` | Formulario de edición docente. HU159 (2026-11-05): también corrige el tipo y número de documento con motivo (aditivo); re-prueba manual pendiente (MV-016) | `[CERTIFICADA]` |
 | **HU093** | Inactivar o reactivar vinculación docente | SP `usp_cambiar_estado_docente_programa` | `PATCH /api/v1/coordinador/docentes/{id}/estado` | Switch de estado con confirmación modal | `[CERTIFICADA]` |
 | **HU094** | Ficha docente con historial de grupos dictados | SP `usp_consultar_historial_grupos_docente_programa` | `GET /api/v1/coordinador/docentes/{idDocente}/ficha` | Ficha con historial y resumen de carga en `coordinador/docentes` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU095** | Directorio consolidado con estado de vinculación | SP `usp_consultar_resumen_docentes_programa` | `GET /api/v1/coordinador/docentes/resumen` | Contadores por estado y tipo de vinculación con filtro en `coordinador/docentes` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
@@ -190,7 +190,7 @@
 | **HU118** | Bloqueo temporal de operaciones de facultad | SP pendiente en DB | Endpoint arroja 501 | Confirmación con credencial de administrador | `[BLOQUEADO 501]` |
 | **HU119** | Árbol departamental (Facultad ➔ Programa ➔ Plan) | SP `usp_consultar_estructura_facultad` | `GET /api/v1/decano/estructura` | Árbol plegable en `DeanEstructuraComponent` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU120** | Crear y asignar Coordinador a Programa | SP `usp_crear_coordinador` | `POST /api/v1/decano/coordinadores` | Modal de alta y asignación de coordinación | `[CERTIFICADA]` |
-| **HU121** | Actualizar información del Coordinador | SP `usp_actualizar_coordinador` (fachada + `_interno`) | `PUT /api/v1/decano/coordinadores/{id}` (sincroniza correo y nombres con Keycloak) | Modal de edición en `DeanCoordinadores` | `[CERTIFICADA]` |
+| **HU121** | Actualizar información del Coordinador | SP `usp_actualizar_coordinador` (fachada + `_interno`) | `PUT /api/v1/decano/coordinadores/{id}` (sincroniza correo y nombres con Keycloak) | Modal de edición en `DeanCoordinadores`. HU159 (2026-11-05): también corrige el tipo y número de documento con motivo (aditivo); re-prueba manual pendiente (MV-016) | `[CERTIFICADA]` |
 | **HU122** | Alternar estado activo/inactivo de Coordinador | SP `usp_cambiar_estado_coordinador` (fachada + `_interno`; rechaza con `COO_001` si tiene programa activo) | `PATCH /api/v1/decano/coordinadores/{id}/estado` (deshabilita o habilita la cuenta en Keycloak) | Switch de activación/suspensión con confirmación modal | `[CERTIFICADA]` |
 | **HU123** | Búsqueda predictiva de coordinadores de facultad | Búsqueda reactiva en cliente | Búsqueda sobre `GET /api/v1/decano/coordinadores` | Buscador predictivo en cabecera de tabla | `[CERTIFICADA]` |
 | **HU124** | Directorio consolidado de coordinadores | Vista `uv_coordinador` | `GET /api/v1/decano/coordinadores` | Tabla con estado y programa adscrito | `[CERTIFICADA]` |
@@ -232,8 +232,8 @@
 | **HU156** | Admisión demográfica y creación de usuario estudiante| SP `usp_sincronizar_estudiante_interno` | Endpoint `/admin/estudiantes/admision` no existe | Formulario de admisión en `CoordinatorStudents` | `[PENDIENTE]` |
 | **HU157** | Ficha unificada del estudiante con historial completo| SP `usp_buscar_estudiantes_institucion_paginado` y `usp_consultar_historial_estudiante` (administrador: institución; decano: su facultad) | `GET /api/v1/admin/estudiantes`, `GET /api/v1/{admin,decano}/estudiantes/{id}/historial` | `AdminEstudiantesComponent` (`/app/admin/estudiantes`) y la ficha de `DeanEstudiantesComponent` (`HistorialEstudianteComponent`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU158** | Consultar padrón unificado de estudiantes de la UCO | Vista `uv_auth_estudiante` | `GET /api/v1/coordinador/estudiantes` | Tabla con filtros y paginación en `Coordinator` | `[CERTIFICADA]` |
-| **HU159** | Actualizar datos personales y contacto de estudiante | SP pendiente en DB | Endpoint no existe en backend | Modal de edición de contacto | `[PENDIENTE]` |
-| **HU160** | Modificar estado institucional (Matriculado, Retiro)| SP pendiente en DB | Endpoint no existe en backend | Selector de estado institucional con auditoría | `[PENDIENTE]` |
+| **HU159** | Corregir datos de identidad por jerarquía (redefinida por John, 2026-11-05: antes "datos personales y contacto del estudiante") | `usp_corregir_identidad_usuario` (estudiante: coordinador de su programa; decano: administrador), interno común `usp_corregir_documento_usuario_interno` (apagable con `IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO`) y auditoría antes/después | `PUT /api/v1/coordinador/estudiantes/{idEstudiante}/identidad`, `PUT /api/v1/admin/decanos/{id}/identidad`, `GET /api/v1/configuracion/identidad`; el documento es el username de Keycloak (sincronizado y verificado) | "Corregir datos" en la ficha del estudiante del coordinador y en Decanos del administrador; MV-016 pendiente | `Fase 3 (FRONTEND)` |
+| **HU160** | ~~Modificar estado institucional (Matriculado, Retiro)~~ | Descartada (decisión de John, 2026-11-05): el administrador no cambia el estado de un estudiante (`HOJA_DE_RUTA_JERARQUIA_ROLES.md`); el estado en el grupo cambia por procesos del docente (retiro HU051) y por inasistencia | No se implementa | No se implementa | `[DESCARTADA]` |
 | **HU161** | Registrar nueva institución de convenio o práctica | SP pendiente en DB | `POST /api/v1/admin/instituciones` (arroja 501) | `AdminCatalogsComponent` (`/app/admin/catalogos`)| `[BLOQUEADO 501]` |
 | **HU162** | Modificar datos de institución colaboradora | SP pendiente en DB | `PUT /api/v1/admin/instituciones/{id}` (arroja 501) | Formulario de modificación de convenio | `[BLOQUEADO 501]` |
 | **HU163** | Consultar listado de instituciones de convenio | Vista `uv_institucion` | `GET /api/v1/admin/instituciones` | Tabla de entidades externas en convenio | `[CERTIFICADA]` |
@@ -255,6 +255,7 @@
 | **HU175** | Proyección en pantalla de QR dinámico y PIN (TTL 60s)| SP pendiente en DB | `GET /api/v1/sesiones/{sesionId}/qr-token` (arroja 501)| Modal de proyección (flag `sessionQrEnabled: false`)| `[BLOQUEADO 501]` |
 | **HU176** | Auto-registro de asistencia con validación WI-FI CAMPUS| SP `usp_registrar_asistencia_estudiante_autonomo`| `POST /api/v1/estudiante/asistencia-qr` | Lector QR móvil con verificación de IP Wi-Fi UCO| `Fase 3 (FRONTEND)` |
 | **HU176B**| Matrícula autónoma por QR de curso proyectado por docente| SP pendiente en DB | `POST /api/v1/estudiante/matricular-grupo` (arroja 501)| Escaneo móvil de QR de matrícula del curso | `[BLOQUEADO 501]` |
+| **HU177** | Recuperar contraseña olvidada (registrada el 2026-11-05) | Sin cambios en la BD: la contraseña la gestiona el proveedor de identidad | Ninguno en el backend. Requiere activar `resetPasswordAllowed` y SMTP en Keycloak (configuración de identidad, José Alejandro). Alternativa complementaria: enlace "Cambiar contraseña" en el perfil hacia la consola de cuenta de Keycloak | Enlace "¿Olvidaste tu contraseña?" en el login propio de la app, con envío al correo institucional | `[PENDIENTE]` |
 
 ---
 
@@ -262,13 +263,13 @@
 
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
-| **`[CERTIFICADA]`** | **96** | **56.1%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
-| **`Fase 3 (FRONTEND)`** | **40** | **23.4%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **9** | **5.3%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[CERTIFICADA]`** | **96** | **55.8%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
+| **`Fase 3 (FRONTEND)`** | **41** | **23.8%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
+| **`[BLOQUEADO 501]`** | **9** | **5.2%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
 | **`[PARCIAL]`** | **5** | **2.9%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
-| **`[PENDIENTE]`** | **16** | **9.4%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
-| **`[DESCARTADA]`** | **5** | **2.9%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04; HU149, 2026-11-05). |
-| **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
+| **`[PENDIENTE]`** | **15** | **8.7%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
+| **`[DESCARTADA]`** | **6** | **3.5%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04; HU149 y HU160, 2026-11-05). |
+| **TOTAL** | **172** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
 

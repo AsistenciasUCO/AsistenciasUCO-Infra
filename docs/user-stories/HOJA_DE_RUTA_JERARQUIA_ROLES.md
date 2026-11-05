@@ -28,11 +28,12 @@ flowchart TD
 ```
 
 ### Reglas de Delimitación Inviolables:
-1. **Administrador:** Aprovisiona Decanos titulares y registra Facultades vinculando obligatoriamente a su Decano responsable (conforme a la restricción `[decano] NOT NULL` e integridad referencial en base de datos). No gestiona materias, grupos ni docentes individuales.
+1. **Administrador:** Aprovisiona Decanos titulares y registra Facultades vinculando obligatoriamente a su Decano responsable (conforme a la restricción `[decano] NOT NULL` e integridad referencial en base de datos). Gestiona los periodos académicos (HU096-HU098). No gestiona materias, grupos, docentes individuales ni estudiantes: no cambia el estado de un estudiante (HU160 descartada, 2026-11-05).
 2. **Decano:** Solo opera dentro de su **Facultad** asignada (`UserScopeService.resolveFacultadId()`). Da de alta Programas y designa a sus Coordinadores.
 3. **Coordinador:** Solo opera dentro de su **Programa Académico** (`UserScopeService.resolveProgramaId()`). Crea asignaturas, vincula docentes y abre grupos académicos asignando docentes titulares.
-4. **Docente:** Solo opera sobre los **Grupos donde es titular**. Es el **único** que puede registrar asistencias, justificaciones y matricular/retirar alumnos de su curso.
-5. **Estudiante:** Accede exclusivamente en modo consulta a sus asignaturas matriculadas y radica solicitudes de justificación.
+4. **Docente:** Solo opera sobre los **Grupos donde es titular**. Es el **único** que registra asistencias y resuelve justificaciones; matricula y retira alumnos de su curso (el coordinador también puede inscribir estudiantes en los grupos de su programa) y resuelve las solicitudes de ingreso de los estudiantes (HU053-HU055).
+5. **Estudiante:** Accede en modo consulta a sus asignaturas matriculadas, radica solicitudes de justificación y solicita el ingreso a grupos de la oferta (HU008/HU053).
+6. **Corrección de identidad (HU159, decisión de John 2026-11-05):** cada nivel corrige al de abajo los nombres, apellidos y el tipo y número de documento, con motivo y auditoría: el Administrador al Decano, el Decano al Coordinador de su facultad (HU121), el Coordinador al Docente vinculado (HU092) y al Estudiante de su programa. Nadie corrige su propio documento por la app y el administrador no se corrige por la app. La corrección del documento se apaga con el parámetro `IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO`.
 
 ---
 
@@ -43,7 +44,7 @@ A continuación se presenta el catálogo consolidado de HUs vinculadas al regist
 | Nivel | Rol Gestor | Entidad / Rol Registrado | Código HU | Título de la Historia de Usuario | Estado Actual |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **0** | *Sistema* | Catálogos Base (Tipos ID, Programas, Áreas) | **HU022 / HU153** | Catálogo: Tipos de Identificación | `[CERTIFICADA]` |
-| **0** | *Sistema* | Tipos de Programa Académico | **HU023 / HU154** | Catálogo: Modalidades y Tipos de Programa | `[PARCIAL]` |
+| **0** | *Sistema* | Tipos de Programa Académico | **HU023 / HU154** | Catálogo: Modalidades y Tipos de Programa (solo consulta, regla de John 2026-11-04) | `[CERTIFICADA]` |
 | **0** | *Sistema* | Institución Universitaria (UCO) | **HU163** | Consulta de Institución | `[CERTIFICADA]` |
 | **1** | **Administrador** | **Decano** (Directorio institucional) | **HU137 / Portal** | Directorio administrativo y consulta de Decanos (`GET /admin/decanos`) | `[CERTIFICADA]` |
 | **1** | **Administrador** | **Decano** (Alta y aprovisionamiento IAM) | **HU117-B (Nueva)** | Registrar Decano titular y sincronizar cuenta IAM (`POST /admin/decanos` / `usp_crear_decano`) | `[CERTIFICADA]` |
@@ -51,18 +52,21 @@ A continuación se presenta el catálogo consolidado de HUs vinculadas al regist
 | **1** | **Administrador** | **Facultad** (Alta con Decano asignado) | **HU116** | Alta institucional de nueva facultad (`usp_crear_facultad`, requiere Decano titular) | `[CERTIFICADA]` |
 | **1** | **Administrador** | **Facultad** (Modificación y estado) | **HU110 / HU111** | Modificar denominación y alternar estado de facultad | `[CERTIFICADA]` |
 | **1** | **Administrador** | **Decano** (Reasignación de titularidad) | **HU117** | Reasignar decano responsable de facultad (sede fuera de alcance: no está modelada) | `[CERTIFICADA]` |
-| **2** | **Decano** | **Programa Académico** (Apertura) | **HU076** | Agregar nuevo programa académico a la facultad | `[PENDIENTE]` |
-| **2** | **Decano** | **Programa Académico** (Modificación) | **HU077 / HU078** | Modificar datos y alternar estado de programa | `[PENDIENTE]` |
+| **2** | **Decano** | **Programa Académico** (Apertura) | **HU076** | Agregar nuevo programa académico a la facultad | `[CERTIFICADA]` |
+| **2** | **Decano** | **Programa Académico** (Modificación) | **HU077 / HU078** | Modificar datos y alternar estado de programa | `[CERTIFICADA]` |
 | **2** | **Decano** | **Coordinador** (Directorio y Búsqueda) | **HU124 / HU123** | Directorio y búsqueda predictiva de coordinadores | `[CERTIFICADA]` |
 | **2** | **Decano** | **Coordinador** (Creación y Asignación) | **HU120** | Crear y asignar Coordinador a Programa | `[CERTIFICADA]` |
-| **2** | **Decano** | **Coordinador** (Modificación y Estado) | **HU121 / HU122** | Actualizar información y alternar estado activo/inactivo | `[PENDIENTE / 501]` |
+| **2** | **Decano** | **Coordinador** (Modificación y Estado) | **HU121 / HU122** | Actualizar información (incluye corregir el documento desde HU159) y alternar estado activo/inactivo | `[CERTIFICADA]` (re-prueba MV-016) |
 | **3** | **Coordinador** | **Planes de Estudio y Asignaturas** | **HU079 / HU085** | Crear plan de estudio y crear asignaturas del programa | `[CERTIFICADA]` |
-| **3** | **Coordinador** | **Docente** (Directorio de profesores) | **HU062 / HU089** | Directorio de profesores adscritos al programa | `[BLOQUEADO 501]` |
-| **3** | **Coordinador** | **Docente** (Alta y Vinculación) | **HU091** | Vincular docente al programa y sincronizar IAM | `[BLOQUEADO 501]` |
-| **3** | **Coordinador** | **Docente** (Edición y Estado) | **HU092 / HU093** | Modificar datos profesionales y alternar estado docente | `[BLOQUEADO 501]` |
+| **3** | **Coordinador** | **Docente** (Directorio de profesores) | **HU062 / HU089** | Directorio de profesores adscritos al programa | `[CERTIFICADA]` |
+| **3** | **Coordinador** | **Docente** (Alta y Vinculación) | **HU091** | Vincular docente al programa y sincronizar IAM | `[CERTIFICADA]` |
+| **3** | **Coordinador** | **Docente** (Edición y Estado) | **HU092 / HU093** | Modificar datos profesionales (incluye corregir el documento desde HU159) y alternar estado docente | `[CERTIFICADA]` (re-prueba MV-016) |
 | **3** | **Coordinador** | **Grupo Académico** (Apertura y Asignación Docente) | **HU076B** | Creación de grupo académico con docente titular asignado | `[CERTIFICADA]` |
 | **4** | **Docente** | **Estudiante** (Matrícula en Grupo) | **HU050** | Matrícula manual de estudiante por docente en grupo titular | `[CERTIFICADA]` |
 | **4** | **Docente** | **Asistencia** (Control de Sesiones) | **HU027 – HU040** | Registro en vivo de asistencia y justificaciones | `[CERTIFICADA]` |
+| **1** | **Administrador** | **Decano** (Corrección de identidad) | **HU159** | Corregir nombres, apellidos y documento del decano (`PUT /admin/decanos/{id}/identidad`) | `Fase 3 (FRONTEND)` |
+| **3** | **Coordinador** | **Estudiante** (Corrección de identidad) | **HU159** | Corregir nombres, apellidos y documento de un estudiante de su programa (`PUT /coordinador/estudiantes/{id}/identidad`) | `Fase 3 (FRONTEND)` |
+| **1** | **Administrador** | **Estudiante** (Estado institucional) | **HU160** | ~~Modificar el estado institucional del estudiante~~ | `[DESCARTADA]` |
 
 ---
 
