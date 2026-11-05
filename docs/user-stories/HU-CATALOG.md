@@ -53,7 +53,7 @@
 | **HU002** | Consultar registros históricos de asistencia | Vistas `uv_sesion` y `uv_asistencia` (JPA) | `GET /api/v1/estudiante/materias/{id}/sesiones` | `StudentCoursesComponent` (`/app/estudiante/materias`) | `[CERTIFICADA]` |
 | **HU003** | Ver lista de compañeros matriculados en grupo | Vista `uv_estudiante_grupo` / Port | `GET /api/v1/grupos/{grupoId}/estudiantes` | Modal en `StudentCoursesComponent` | `[CERTIFICADA]` |
 | **HU004** | Consultar estado de permanencia (Regla 20%) | Cálculo reactivo de inasistencias en dominio | Cálculo en Signals sobre sesiones y fallas | Badge dinámico en `StudentCoursesComponent` | `[CERTIFICADA]` |
-| **HU005** | Consultar causales normativas de justificación | Catálogo de razones en dominio/enums | Sin endpoint REST dedicado (en memoria/cliente) | Modal de reclamos en `StudentCoursesComponent` | `[PARCIAL]` |
+| **HU005** | Consultar causales normativas de justificación | Tabla `CategoriaJustificacion` (6 categorías por seed, solo consulta) y vista `uv_categoria_justificacion`; la FK en el reclamo (TD-060) va en el cambio coordinado de LB-004D | `GET /api/v1/categorias-justificacion` (autenticado) | El formulario de reclamo de `StudentCoursesComponent` lista las categorías del catálogo con su descripción (antes, lista fija) | `Fase 3 (FRONTEND)` |
 | **HU006** | Consultar perfil y ficha de información personal | SP `usp_consultar_perfil_usuario` (datos personales y vínculos por rol) | `GET /api/v1/usuarios/perfil`; solo consulta por decisión de John (2026-11-04): los datos de identidad los corrige el administrador o el coordinador y el cambio de correo sería una HU aparte | `ProfileComponent` (`/app/perfil`), sección "Expediente y vínculos" · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU007** | Búsqueda y filtrado de materias matriculadas | Filtro reactivo en Signals de materias cargadas | `GET /api/v1/estudiante/materias` | Filtros con Signals en `StudentCoursesComponent` | `[CERTIFICADA]` |
 | **HU008** | Consultar información de grupos y cupos | SP `usp_consultar_oferta_grupos_estudiante` (específicas de su programa y transversales con cupos) | `GET /api/v1/estudiante/oferta-academica` | `/app/estudiante/oferta` (oferta con "Solicitar ingreso") · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
@@ -64,7 +64,7 @@
 | **HU013** | Alerta visual de riesgo de pérdida (15% - 20%) | Cálculo reactivo de porcentaje acumulado | Cálculo en Signals sobre sesiones cursadas | Resaltado semafórico en tarjetas de materia | `[CERTIFICADA]` |
 | **HU014** | Formulario especializado para justificación médica | Validación de causal médica en SP | Validación en `SolicitarRevisionAsistenciaInputPort` | Formulario específico de justificación médica | `Fase 3 (FRONTEND)` |
 | **HU015** | Carga y almacenamiento seguro de múltiples soportes | Tabla `SolicitudRevisionSoporte` | `POST /api/v1/archivos/subir` | Drag-and-drop en `StudentCoursesComponent` | `[PARCIAL]` |
-| **HU016** | Visualización de causales y reglamento estudiantil | Parámetros UCO | Sin endpoint REST específico | Tooltip y modal informativo de causales UCO | `[PARCIAL]` |
+| **HU016** | Visualización de causales y reglamento estudiantil | Mismo catálogo `CategoriaJustificacion` (HU005) | `GET /api/v1/categorias-justificacion` | Bloque desplegable "¿Por qué motivos puedo justificar una inasistencia?" en el detalle del curso del estudiante | `Fase 3 (FRONTEND)` |
 | **HU017** | Consultar sesiones de clase programadas | Vistas de horario estudiante | `GET /api/v1/estudiante/horarios` | `StudentScheduleComponent` (`/app/estudiante/horarios`)| `[CERTIFICADA]` |
 | **HU018** | Consultar estructura curricular de semestres | Agrupación curricular por nivel | `GET /api/v1/estudiante/materias` | Vista en acordeón de semestres cursados | `[CERTIFICADA]` |
 | **HU019** | Consultar créditos y plan de estudios | Sumatoria de créditos de asignaturas | Derivado de materias matriculadas | Barra de créditos aprobados vs totales | `[CERTIFICADA]` |
@@ -222,7 +222,7 @@
 | :---: | :--- | :--- | :--- | :--- | :---: |
 | **HU147** | Consultar componentes de formación académica | SP `usp_consultar_componentes_formacion` (BAS, INS, ESP; `uv_componente` con código) | `GET /api/v1/coordinador/componentes-formacion` | Selector de componente real en el formulario de asignaturas del coordinador (área real y créditos obligatorios) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU148** | ~~Crear nuevo componente de formación académica~~ | Descartada (decisión de John, 2026-11-04): los componentes son fijos BAS, INS y ESP por regla de negocio; un estudiante entra a un programa solo por una ESP | No se implementa | No se implementa | `[DESCARTADA]` |
-| **HU149** | Actualizar competencias asociadas a un componente | SP pendiente en DB | Endpoint no existe en backend | Edición de competencias curriculares | `[PENDIENTE]` |
+| **HU149** | ~~Actualizar competencias asociadas a un componente~~ | Descartada (decisión de John, 2026-11-05) | No se implementa | No se implementa | `[DESCARTADA]` |
 | **HU150** | Consultar catálogo de áreas de conocimiento UCO | Vista `uv_area` | `GET /api/v1/admin/areas` | `AdminAreasComponent` (`/app/admin/areas`, solo consulta) | `[CERTIFICADA]` |
 | **HU151** | ~~Crear nueva área de conocimiento institucional~~ | Descartada: catálogos base sin CRUD (regla de John, 2026-11-04); `usp_crear_area` eliminado (migración 11) | `POST /api/v1/admin/areas` eliminado | Formulario de alta eliminado | `[DESCARTADA]` |
 | **HU152** | ~~Modificar datos y estado de un área de conocimiento~~ | Descartada: catálogos base sin CRUD (regla de John, 2026-11-04); `usp_actualizar_area` y `usp_cambiar_estado_area` eliminados (la columna `Area.estado` se conserva, fijada por el seed) | `PUT /api/v1/admin/areas/{id}` y `PATCH /{id}/estado` eliminados | Edición y cambio de estado eliminados | `[DESCARTADA]` |
@@ -263,11 +263,11 @@
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
 | **`[CERTIFICADA]`** | **96** | **56.1%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
-| **`Fase 3 (FRONTEND)`** | **38** | **22.2%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
+| **`Fase 3 (FRONTEND)`** | **40** | **23.4%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
 | **`[BLOQUEADO 501]`** | **9** | **5.3%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
-| **`[PARCIAL]`** | **7** | **4.1%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
-| **`[PENDIENTE]`** | **17** | **9.9%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
-| **`[DESCARTADA]`** | **4** | **2.3%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04). |
+| **`[PARCIAL]`** | **5** | **2.9%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
+| **`[PENDIENTE]`** | **16** | **9.4%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
+| **`[DESCARTADA]`** | **5** | **2.9%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04; HU149, 2026-11-05). |
 | **TOTAL** | **171** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
