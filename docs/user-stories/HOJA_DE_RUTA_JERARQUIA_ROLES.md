@@ -56,18 +56,18 @@ A continuación se presenta el catálogo consolidado de HUs vinculadas al regist
 | **2** | **Decano** | **Programa Académico** (Modificación) | **HU077 / HU078** | Modificar datos y alternar estado de programa | `[CERTIFICADA]` |
 | **2** | **Decano** | **Coordinador** (Directorio y Búsqueda) | **HU124 / HU123** | Directorio y búsqueda predictiva de coordinadores | `[CERTIFICADA]` |
 | **2** | **Decano** | **Coordinador** (Creación y Asignación) | **HU120** | Crear y asignar Coordinador a Programa | `[CERTIFICADA]` |
-| **2** | **Decano** | **Coordinador** (Modificación y Estado) | **HU121 / HU122** | Actualizar información (incluye corregir el documento desde HU159) y alternar estado activo/inactivo | `[CERTIFICADA]` (re-prueba MV-016) |
+| **2** | **Decano** | **Coordinador** (Modificación y Estado) | **HU121 / HU122** | Actualizar información (incluye corregir el documento desde HU159) y alternar estado activo/inactivo | `[CERTIFICADA]` (edición re-probada en pantalla el 2026-11-06, MV-016; el cambio de estado no se re-probó) |
 | **3** | **Coordinador** | **Planes de Estudio y Asignaturas** | **HU079 / HU085** | Crear plan de estudio y crear asignaturas del programa | `[CERTIFICADA]` |
 | **3** | **Coordinador** | **Docente** (Directorio de profesores) | **HU062 / HU089** | Directorio de profesores adscritos al programa | `[CERTIFICADA]` |
 | **3** | **Coordinador** | **Docente** (Alta y Vinculación) | **HU091** | Vincular docente al programa y sincronizar IAM | `[CERTIFICADA]` |
-| **3** | **Coordinador** | **Docente** (Edición y Estado) | **HU092 / HU093** | Modificar datos profesionales (incluye corregir el documento desde HU159) y alternar estado docente | `[CERTIFICADA]` (re-prueba MV-016) |
+| **3** | **Coordinador** | **Docente** (Edición y Estado) | **HU092 / HU093** | Modificar datos profesionales (incluye corregir el documento desde HU159) y alternar estado docente | `[CERTIFICADA]` (edición re-probada en pantalla el 2026-11-06, MV-016; el cambio de estado no se re-probó) |
 | **3** | **Coordinador** | **Grupo Académico** (Apertura y Asignación Docente) | **HU076B** | Creación de grupo académico con docente titular asignado | `[CERTIFICADA]` |
 | **4** | **Docente** | **Estudiante** (Matrícula en Grupo) | **HU050** | Matrícula manual de estudiante por docente en grupo titular | `[CERTIFICADA]` |
 | **4** | **Docente** | **Asistencia** (Control de Sesiones) | **HU027 – HU040** | Registro en vivo de asistencia y justificaciones | `[CERTIFICADA]` |
-| **1** | **Administrador** | **Decano** (Corrección de identidad) | **HU159** | Corregir nombres, apellidos y documento del decano (`PUT /admin/decanos/{id}/identidad`) | `Fase 3 (FRONTEND)` |
-| **3** | **Coordinador** | **Estudiante** (Corrección de identidad) | **HU159** | Corregir nombres, apellidos y documento de un estudiante de su programa (`PUT /coordinador/estudiantes/{id}/identidad`) | `Fase 3 (FRONTEND)` |
+| **1** | **Administrador** | **Decano** (Corrección de identidad) | **HU159** | Corregir nombres, apellidos y documento del decano (`PUT /admin/decanos/{id}/identidad`) | `[CERTIFICADA]` (2026-11-06; el cambio del username en Keycloak queda pendiente de `editUsernameAllowed` en el realm, José Alejandro) |
+| **3** | **Coordinador** | **Estudiante** (Corrección de identidad) | **HU159** | Corregir nombres, apellidos y documento de un estudiante de su programa (`PUT /coordinador/estudiantes/{id}/identidad`) | `[CERTIFICADA]` (2026-11-06) |
 | **1** | **Administrador** | **Estudiante** (Estado institucional) | **HU160** | ~~Modificar el estado institucional del estudiante~~ | `[DESCARTADA]` |
-| **1** | **Administrador** | **Docentes y Estudiantes** (Directorios de solo consulta) | **HU136 / HU135 (HU157)** | Ver los profesores y los estudiantes de toda la institución | `Fase 3 (FRONTEND)` |
+| **1** | **Administrador** | **Docentes y Estudiantes** (Directorios de solo consulta) | **HU136 / HU135 (HU157)** | Ver los profesores y los estudiantes de toda la institución | `[CERTIFICADA]` (2026-11-06) |
 | **0** | *Sistema* | Institución (catálogo de solo consulta) | **HU161 / HU162 / HU164** | ~~Crear, modificar y activar instituciones~~ | `[DESCARTADA]` |
 
 ---
