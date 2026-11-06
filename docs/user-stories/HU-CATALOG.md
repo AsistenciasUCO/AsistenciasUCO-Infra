@@ -2,7 +2,7 @@
 > **Ecosistema:** Plataforma Institucional de Gestión y Control de Asistencia UCO  
 > **Versión de Matriz:** 4.0.0 (Sinceramiento de Línea Base, Auditoría de Extremo a Extremo y Detección de Stubs HTTP 501)  
 > **Ámbito:** Matriz de trazabilidad técnica por capas y estado verídico de ciclo de vida del pipeline SDD.  
-> **Fecha de Actualización:** Noviembre 2026 (sincronizado con `develop` el 2026-11-03)
+> **Fecha de Actualización:** Noviembre 2026 (sincronizado con `develop` el 2026-11-06)
 
 ---
 
@@ -68,7 +68,7 @@
 | **HU017** | Consultar sesiones de clase programadas | Vistas de horario estudiante | `GET /api/v1/estudiante/horarios` | `StudentScheduleComponent` (`/app/estudiante/horarios`)| `[CERTIFICADA]` |
 | **HU018** | Consultar estructura curricular de semestres | Agrupación curricular por nivel | `GET /api/v1/estudiante/materias` | Vista en acordeón de semestres cursados | `[CERTIFICADA]` |
 | **HU019** | Consultar créditos y plan de estudios | Sumatoria de créditos de asignaturas | Derivado de materias matriculadas | Barra de créditos aprobados vs totales | `[CERTIFICADA]` |
-| **HU020** | Consultar sede, aula y bloque por sesión | Sin campo de aula en contrato Golden Path | DTO sin aula (`HorarioEstudianteDTO`) | Tarjeta de sesión con datos horarios | `[PARCIAL]` |
+| **HU020** | ~~Consultar sede, aula y bloque por sesión~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Ver los horarios de las clases") ya lo cubren HU017 y HU021. Sedes, bloques y aulas no se piden | Se retiraron los stubs 501 de `/admin/sedes` y `/admin/espacios-fisicos` | Se retiró la pantalla `/app/admin/sedes`; el decano ya no ve sedes | `[DESCARTADA]` |
 | **HU021** | Filtro de horario semanal por días lectivos | Filtro por día en cliente/horario | `GET /api/v1/estudiante/horarios` | Selector reactivo de días (Lunes a Sábado) | `[CERTIFICADA]` |
 | **HU022** | Consumo transversal de tipos de identificación | Vista `uv_tipo_identificacion` | `GET /api/v1/tipos-identificacion` | `FormFieldComponent` en perfil | `[CERTIFICADA]` |
 | **HU023** | Consumo transversal de tipos de programa | Vista `uv_tipo_programa` (solo activos) | `GET /api/v1/tipos-programa` (`CatalogoProgramaController`, HU076-HU078) | Selector de tipo en formulario de programa | `[CERTIFICADA]` |
@@ -181,24 +181,24 @@
 | **HU110** | Modificar denominación y atributos de la facultad | SP `usp_actualizar_facultad` (nombre único 3–50) | `PUT /api/v1/admin/facultades/{id}` | Edición en `AdminFacultadesComponent` (`/app/admin/facultades`) | `[CERTIFICADA]` |
 | **HU111** | Alternar estado operativo de la facultad | SP `usp_cambiar_estado_facultad` (estado deseado, idempotente, sin cascada) | `PATCH /api/v1/admin/facultades/{id}/estado` | Switch de estado en `AdminFacultadesComponent` | `[CERTIFICADA]` |
 | **HU112** | Consultar tabla unificada de programas y créditos | SP `usp_consultar_programas_creditos_facultad_paginado` (una fila por programa y plan; ámbito por facultad) | `GET /api/v1/decano/programas-creditos` | Tabla `DeanProgramasCreditosComponent` en `/app/decano/programas`; las tarjetas toman de ella los créditos · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
-| **HU113** | Modificar datos de registro calificado | SP no existe en DB | Endpoint no existe en backend | Edición de registro calificado | `[PENDIENTE]` |
-| **HU114** | Suspender o reactivar oferta de programa | SP no existe en DB | Endpoint no existe en backend | Switch de estado de oferta académica | `[PENDIENTE]` |
-| **HU115** | Validación de coherencia en ofertas académicas | Procedimiento no existe en DB | Endpoint no existe en backend | Validación de reglas al publicar calendario | `[PENDIENTE]` |
+| **HU113** | ~~Modificar datos de registro calificado~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Cambiar los datos de un programa académico") ya lo cubre HU077. El registro calificado no se pide | Sin cambios | Sin acción en la UI | `[DESCARTADA]` |
+| **HU114** | ~~Suspender o reactivar oferta de programa~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Marcar un programa académico como activo o inactivo") ya lo cubre HU078. La suspensión de oferta no se pide | Sin cambios | Sin acción en la UI | `[DESCARTADA]` |
+| **HU115** | ~~Validación de coherencia en ofertas académicas~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Ver los planes de estudio de las carreras") ya lo cubren HU108 y los planes de estudio existentes. La validación de coherencia no se pide | Sin cambios | Sin acción en la UI | `[DESCARTADA]` |
 | **HU116** | Alta institucional de nueva facultad | SP `usp_crear_facultad` | `POST /api/v1/admin/facultades` | Formulario de creación de facultad en UCO | `[CERTIFICADA]` |
 | **HU117** | Reasignar decano responsable de la facultad (la sede no existe en el modelo; deuda técnica) | SP `usp_actualizar_facultad` (decano único por facultad activa) | `PUT /api/v1/admin/facultades/{id}` | Modal "Cambiar Decano(a)" en `AdminFacultadesComponent` | `[CERTIFICADA]` |
 | **HU117-B** | Registrar Decano titular y sincronizar cuenta IAM | SP `usp_crear_decano` | `POST /api/v1/admin/decanos` | Formulario de alta institucional en `/app/admin/decanos` | `[CERTIFICADA]` |
-| **HU118** | Bloqueo temporal de operaciones de facultad | SP pendiente en DB | Endpoint arroja 501 | Confirmación con credencial de administrador | `[BLOQUEADO 501]` |
+| **HU118** | ~~Bloqueo temporal de operaciones de facultad~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Marcar una facultad como activa o inactiva") ya lo cubre HU111. El bloqueo temporal no se pide | No había endpoint propio; sin cambios | Sin acción en la UI | `[DESCARTADA]` |
 | **HU119** | Árbol departamental (Facultad ➔ Programa ➔ Plan) | SP `usp_consultar_estructura_facultad` | `GET /api/v1/decano/estructura` | Árbol plegable en `DeanEstructuraComponent` · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU120** | Crear y asignar Coordinador a Programa | SP `usp_crear_coordinador` | `POST /api/v1/decano/coordinadores` | Modal de alta y asignación de coordinación | `[CERTIFICADA]` |
 | **HU121** | Actualizar información del Coordinador | SP `usp_actualizar_coordinador` (fachada + `_interno`) | `PUT /api/v1/decano/coordinadores/{id}` (sincroniza correo y nombres con Keycloak) | Modal de edición en `DeanCoordinadores`. HU159 (2026-11-05): también corrige el tipo y número de documento con motivo (aditivo); re-prueba manual pendiente (MV-016) | `[CERTIFICADA]` |
 | **HU122** | Alternar estado activo/inactivo de Coordinador | SP `usp_cambiar_estado_coordinador` (fachada + `_interno`; rechaza con `COO_001` si tiene programa activo) | `PATCH /api/v1/decano/coordinadores/{id}/estado` (deshabilita o habilita la cuenta en Keycloak) | Switch de activación/suspensión con confirmación modal | `[CERTIFICADA]` |
 | **HU123** | Búsqueda predictiva de coordinadores de facultad | Búsqueda reactiva en cliente | Búsqueda sobre `GET /api/v1/decano/coordinadores` | Buscador predictivo en cabecera de tabla | `[CERTIFICADA]` |
 | **HU124** | Directorio consolidado de coordinadores | Vista `uv_coordinador` | `GET /api/v1/decano/coordinadores` | Tabla con estado y programa adscrito | `[CERTIFICADA]` |
-| **HU125** | Alta de docentes interdepartamentales | SP no existe en DB | Endpoint no existe en backend | Formulario de asignación de doble programa | `[PENDIENTE]` |
-| **HU126** | Reasignación de adscripción departamental docente | SP no existe en DB | Endpoint no existe en backend | Modal de transferencia entre programas | `[PENDIENTE]` |
-| **HU127** | Gestión de estado y contratos en facultad | SP no existe en DB | Endpoint no existe en backend | Gestión de altas/bajas contractuales | `[PENDIENTE]` |
+| **HU125** | ~~Alta de docentes interdepartamentales~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Agregar un nuevo profesor a la universidad") ya lo cubre HU091. Los departamentos no se piden | Sin cambios | Sin acción en la UI | `[DESCARTADA]` |
+| **HU126** | ~~Reasignación de adscripción departamental docente~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Cambiar los datos de un profesor") ya lo cubre HU092. Los departamentos no se piden | Sin cambios | Sin acción en la UI | `[DESCARTADA]` |
+| **HU127** | ~~Gestión de estado y contratos en facultad~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Marcar a un profesor como activo o inactivo") ya lo cubre HU093. Los contratos no se piden | Sin cambios | Sin acción en la UI | `[DESCARTADA]` |
 | **HU128** | Filtro de profesores por programa asignado | SP `usp_consultar_docentes_facultad_paginado` (@idPrograma; vínculo activo) | `GET /api/v1/decano/docentes?idPrograma=` | `DeanDocentesComponent` (`/app/decano/docentes`) con selector de programa · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
-| **HU129** | Reporte tabular de horas contratadas por docente | SP no existe en DB | Endpoint no existe en backend | Tabla de seguimiento de carga académica | `[PENDIENTE]` |
+| **HU129** | ~~Reporte tabular de horas contratadas por docente~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Ver la lista de todos los profesores de la universidad") ya lo cubren HU136 y HU128. Las horas contratadas no se piden | Sin cambios | Sin acción en la UI | `[DESCARTADA]` |
 | **HU133** | Indicador KPI global de asistencia en la universidad| SP `usp_consultar_kpis_institucion` | `GET /api/v1/admin/indicadores` | `AdminIndicatorsComponent` (`/app/admin/indicadores`) | `[CERTIFICADA]` |
 | **HU134** | Tendencias temporales de ausentismo en reportería | SP `usp_consultar_tendencia_ausentismo` | `GET /api/v1/admin/tendencia-ausentismo` | Gráfica de línea SVG con selector semana/mes | `[CERTIFICADA]` |
 | **HU135** | Ver la lista de todos los estudiantes de la universidad (texto original del plan de la BD; redefinida por John, 2026-11-05: se descarta el "contador en tiempo real") | `usp_buscar_estudiantes_institucion_paginado` (HU157) | `GET /api/v1/admin/estudiantes` (HU157) | Pantalla "Estudiantes" del administrador (HU157). Los contadores del tablero (`GET /admin/indicadores`) siguen igual | `Fase 3 (FRONTEND)` |
@@ -206,8 +206,8 @@
 | **HU137** | Directorio administrativo institucional (Decanos) | Vista `uv_decano` | `GET /api/v1/admin/decanos` | Directorio de decanos en `/app/admin/decanos` | `[CERTIFICADA]` |
 | **HU138** | Ratio de sesiones dictadas con asistencia registrada| `usp_consultar_kpis_institucion` (cumplimiento) | `GET /api/v1/admin/indicadores` | Tarjeta de cumplimiento con sus conteos | `[CERTIFICADA]` |
 | **HU139** | Tarjetas comparativas de inasistencia por facultad | SP `usp_consultar_comparativa_facultades` | `GET /api/v1/admin/comparativa-facultades` | Tarjetas por facultad en `/app/admin/indicadores` | `[CERTIFICADA]` |
-| **HU140** | Censo de estudiantes agrupado por sedes | Sin tabla de sedes en DB (`/admin/sedes` responde 501) | Endpoint no existe en backend | Gráfico de distribución no implementado | `[BLOQUEADO 501]` |
-| **HU141** | Censo de docentes clasificado por escalafón | SP no existe en DB | Endpoint no existe en backend | Gráfica de escalafón no implementada | `[PENDIENTE]` |
+| **HU140** | ~~Censo de estudiantes agrupado por sedes~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Ver la lista de todos los estudiantes de la universidad") ya lo cubren HU135 y HU157. Las sedes no se piden | Se retiraron los stubs 501 de `/admin/sedes` | Sin acción en la UI | `[DESCARTADA]` |
+| **HU141** | ~~Censo de docentes clasificado por escalafón~~ | Descartada (decisión de John, 2026-11-06): el texto original ("Ver la lista de todos los profesores de la universidad") ya lo cubre HU136. El escalafón no se pide | Sin cambios | Sin acción en la UI | `[DESCARTADA]` |
 | **HU142** | Consulta histórica de períodos académicos | Vista `uv_periodo_academico` | `GET /api/v1/coordinador/periodos-academicos` | Selector de períodos anteriores en reportes | `[CERTIFICADA]` |
 | **HU143** | Búsqueda transversal de asignaturas en toda la UCO| SP `usp_buscar_asignaturas_paginado` (decano: su facultad; administrador: su institución) | `GET /api/v1/decano/asignaturas`, `GET /api/v1/admin/asignaturas` | `DeanAsignaturasComponent` (`/app/decano/asignaturas` y `/app/admin/asignaturas`) · E2E en pantalla pendiente | `Fase 3 (FRONTEND)` |
 | **HU144** | Censo de grupos activos y tasa de aforo de facultad | SP `usp_consultar_aforo_grupos_facultad` y aforo en `usp_consultar_kpis_decano` | `GET /api/v1/decano/aforo-grupos` | Tabla paginada de aforo con filtro por programa | `[CERTIFICADA]` |
@@ -265,10 +265,10 @@
 | :--- | :---: | :---: | :--- |
 | **`[CERTIFICADA]`** | **96** | **55.8%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
 | **`Fase 3 (FRONTEND)`** | **43** | **25.0%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **6** | **3.5%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
-| **`[PARCIAL]`** | **3** | **1.7%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
-| **`[PENDIENTE]`** | **15** | **8.7%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
-| **`[DESCARTADA]`** | **9** | **5.2%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04; HU149, HU160, HU161, HU162 y HU164, 2026-11-05). |
+| **`[BLOQUEADO 501]`** | **4** | **2.3%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`[PARCIAL]`** | **2** | **1.2%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
+| **`[PENDIENTE]`** | **7** | **4.1%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
+| **`[DESCARTADA]`** | **20** | **11.6%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04; HU149, HU160, HU161, HU162 y HU164, 2026-11-05; HU020, HU113, HU114, HU115, HU118, HU125, HU126, HU127, HU129, HU140 y HU141, 2026-11-06). |
 | **TOTAL** | **172** | **100%** | **Catálogo maestro sincronizado con la realidad del código.** |
 
 ---
