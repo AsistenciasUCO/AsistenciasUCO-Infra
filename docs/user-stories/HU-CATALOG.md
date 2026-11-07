@@ -254,7 +254,7 @@
 | :---: | :--- | :--- | :--- | :--- | :---: |
 | **HU175** | Proyección en pantalla de QR dinámico y PIN (TTL 60s)| SP pendiente en DB | `GET /api/v1/sesiones/{sesionId}/qr-token` (arroja 501)| Modal de proyección (flag `sessionQrEnabled: false`)| `[BLOQUEADO 501]` |
 | **HU176** | Auto-registro de asistencia con validación WI-FI CAMPUS| SP `usp_registrar_asistencia_estudiante_autonomo`| `POST /api/v1/estudiante/asistencia-qr` | Lector QR móvil con verificación de IP Wi-Fi UCO · Certificación 2026-11-06: BLOQUEADA, la trabaja Sergio (QR y PIN) | `Fase 3 (FRONTEND)` |
-| **HU176B**| Matrícula autónoma por QR de curso proyectado por docente| SP pendiente en DB | `POST /api/v1/estudiante/matricular-grupo` (arroja 501)| Escaneo móvil de QR de matrícula del curso | `[BLOQUEADO 501]` |
+| **HU176B**| Matrícula autónoma por QR de curso proyectado por docente| Tabla `TokenMatriculaGrupo` (token solo como hash) y vista `uv_token_matricula_grupo`; SP `usp_abrir_ventana_matricula_grupo`, `usp_cerrar_ventana_matricula_grupo`, `usp_rotar_token_matricula_grupo`, `usp_rotar_token_matricula_automatico`, `usp_validar_token_matricula_publico`, `usp_registrar_estudiante_por_token_publico` y `usp_matricular_estudiante_por_token` (se retiró `usp_registrar_estudiante_en_grupo_autonomo`) | Docente: `POST`/`DELETE /api/v1/grupos/{grupoId}/matricula-qr` y `POST .../rotacion`; público: `POST /api/v1/public/matricula-qr/validar` y `/registro` (red del campus y límite por IP); estudiante: `POST /api/v1/estudiante/matricular-grupo` (ya no responde 501). Contrato congelado el 2026-11-04; aprobación de seguridad pendiente | Modal del docente con QR y PIN rotativos por SSE (`MATRICULA_QR_ROTADO`, sin timers); páginas públicas `/matricula/qr` y `/matricula/pin` · E2E en pantalla pendiente: la cuenta nueva recibe 403 del PDP en su primer login (propuesta en `DISENO_ACCESO_PRIMER_LOGIN.md`, sin implementar) | `Fase 3 (FRONTEND)` |
 | **HU177** | Recuperar contraseña olvidada (registrada el 2026-11-05) | Sin cambios en la BD: la contraseña la gestiona el proveedor de identidad | Ninguno en el backend. Requiere activar `resetPasswordAllowed` y SMTP en Keycloak (configuración de identidad, José Alejandro). Alternativa complementaria: enlace "Cambiar contraseña" en el perfil hacia la consola de cuenta de Keycloak | Enlace "¿Olvidaste tu contraseña?" en el login propio de la app, con envío al correo institucional | `[PENDIENTE]` |
 
 ---
@@ -264,8 +264,8 @@
 | Estado Técnico | Cantidad | % Catálogo | Descripción |
 | :--- | :---: | :---: | :--- |
 | **`[CERTIFICADA]`** | **137** | **79.7%** | Totalmente funcional y verificada en DB, Backend y Frontend sin errores ni mocks. |
-| **`Fase 3 (FRONTEND)`** | **2** | **1.2%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
-| **`[BLOQUEADO 501]`** | **4** | **2.3%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
+| **`Fase 3 (FRONTEND)`** | **3** | **1.7%** | DB y Backend con endpoints reales listos; interfaz en proceso de ajuste o conexión. |
+| **`[BLOQUEADO 501]`** | **3** | **1.7%** | Interfaz presente en Angular, pero el Backend lanza `FeatureUnavailableException` (HTTP 501). |
 | **`[PARCIAL]`** | **2** | **1.2%** | Soporte parcial en refinamiento técnico o funcionalidad exclusiva de lectura/catálogo. |
 | **`[PENDIENTE]`** | **7** | **4.1%** | Catalogadas en pipeline, pendientes de diseño DDL/SP en SQL Server y endpoints en Spring Boot. |
 | **`[DESCARTADA]`** | **20** | **11.6%** | Retirada del alcance por decisión del responsable (HU025, 2026-10-29; HU148, HU151 y HU152, 2026-11-04; HU149, HU160, HU161, HU162 y HU164, 2026-11-05; HU020, HU113, HU114, HU115, HU118, HU125, HU126, HU127, HU129, HU140 y HU141, 2026-11-06). |
