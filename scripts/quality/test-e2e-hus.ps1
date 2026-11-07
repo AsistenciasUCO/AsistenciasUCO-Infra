@@ -245,16 +245,6 @@ try {
             return "Solicitudes radicadas por el estudiante: $($res.datos.Count)"
         }
 
-        Run-TestItem "HU026" "Registrar solicitud de matrícula / cupo para inscripción de materia" {
-            $body = @{
-                cursoId = "C1A2B3C4-0000-0000-0000-000000000001"
-                motivo = "Solicitud de inscripción extemporánea por cruce horario."
-            } | ConvertTo-Json
-            $res = Invoke-RestMethod "$BASE/estudiante/solicitudes-matricula" -Headers $hEst -Method POST -Body $body -ContentType "application/json"
-            if (-not $res.exitoso) { throw "Respuesta no exitosa al crear solicitud de matrícula" }
-            return "Solicitud de matrícula creada id=$($res.datos.id), estado: $($res.datos.estado)"
-        }
-
         Run-TestItem "HU010-Anular" "Anulación formal de solicitud de revisión por desistimiento del estudiante" {
             if (-not $script:globalReclamoId) { throw "No hay reclamo para anular" }
             $res = Invoke-RestMethod "$BASE/estudiante/reclamos/$($script:globalReclamoId)" -Headers $hEst -Method DELETE
@@ -361,7 +351,7 @@ try {
             return "Total reclamos pendientes del docente: $($res.datos.Count)"
         }
 
-        Run-TestItem "HU043,HU055" "Crear nuevo grupo académico validando cupos y aforo (usp_crear_grupo)" {
+        Run-TestItem "HU043" "Crear nuevo grupo académico validando cupos y aforo (usp_crear_grupo)" {
             $randGrp = [string](Get-Random -Minimum 1000 -Maximum 9999)
             $body = @{
                 name = "Grupo Electiva Suite $randGrp"

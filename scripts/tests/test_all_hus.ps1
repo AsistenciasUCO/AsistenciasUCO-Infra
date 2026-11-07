@@ -221,16 +221,6 @@ Run-Test "HU012,HU015" "Consultar historial de solicitudes de revision de asiste
     return "Solicitudes radicadas por el estudiante: $($res.datos.Count)"
 }
 
-Run-Test "HU026" "Registrar solicitud de matricula / cupo para inscripcion de materia" {
-    $body = @{
-        cursoId = "C1A2B3C4-0000-0000-0000-000000000001"
-        motivo = "Solicitud de inscripcion extemporanea por cruce horario."
-    } | ConvertTo-Json
-    $res = Invoke-RestMethod "$BASE/estudiante/solicitudes-matricula" -Headers $hEst -Method POST -Body $body -ContentType "application/json"
-    if (-not $res.exitoso) { throw "Respuesta no exitosa al crear solicitud de matricula" }
-    return "Solicitud de matricula creada id=$($res.datos.id), estado: $($res.datos.estado)"
-}
-
 Run-Test "HU010-Anular" "Anulacion formal de solicitud de revision por desistimiento del estudiante" {
     if (-not $script:globalReclamoId) { throw "No hay reclamo para anular" }
     $res = Invoke-RestMethod "$BASE/estudiante/reclamos/$($script:globalReclamoId)" -Headers $hEst -Method DELETE
@@ -378,7 +368,7 @@ Run-Test "HU037,HU038,HU042" "Resolver justificacion de inasistencia con retroal
     return "No hay reclamos pendientes para resolver en esta prueba"
 }
 
-Run-Test "HU043,HU055" "Crear nuevo grupo academico validando cupos y aforo (usp_crear_grupo)" {
+Run-Test "HU043" "Crear nuevo grupo academico validando cupos y aforo (usp_crear_grupo)" {
     $randGrp = [string](Get-Random -Minimum 1000 -Maximum 9999)
     $body = @{
         name = "Grupo Electiva Suite $randGrp"
@@ -416,9 +406,24 @@ Run-Test "HU050" "Inscribir / matricular manualmente a estudiante en el grupo ac
     return "Estudiante matriculado con exito en grupo"
 }
 
+Run-Test "F-COO-004" "El coordinador no puede matricular manualmente (solo el docente titular)" {
+    if (-not $script:tempGrupoDocId) { throw "No hay grupo" }
+    $body = @{ estudianteId = "F1A2B3C4-0000-0000-0000-000000000005" } | ConvertTo-Json
+    $status = 0
+    try {
+        Invoke-RestMethod "$BASE/grupos/$($script:tempGrupoDocId)/estudiantes" -Headers $hCoord -Method POST -Body $body -ContentType "application/json" | Out-Null
+        $status = 200
+    } catch {
+        if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+    }
+    if ($status -ne 403) { throw "Se esperaba 403 para el coordinador y se obtuvo $status" }
+    return "Coordinador rechazado con 403 al matricular manualmente"
+}
+
 Run-Test "HU051" "Retirar estudiante de grupo academico por el docente" {
     if (-not $script:tempGrupoDocId) { throw "No hay grupo" }
-    $res = Invoke-RestMethod "$BASE/grupos/$($script:tempGrupoDocId)/estudiantes/F1A2B3C4-0000-0000-0000-000000000005" -Headers $hDoc -Method DELETE
+    $bodyRetiro = @{ motivo = "Retiro E2E CULM-001 A" } | ConvertTo-Json
+    $res = Invoke-RestMethod "$BASE/docente/grupos/$($script:tempGrupoDocId)/estudiantes/F1A2B3C4-0000-0000-0000-000000000005/retiro" -Headers $hDoc -Method POST -Body $bodyRetiro -ContentType "application/json"
     if (-not $res.exitoso) { throw "Respuesta no exitosa al retirar estudiante" }
     return "Estudiante retirado con exito del grupo"
 }
@@ -624,20 +629,6 @@ Run-Test "HU098" "Alternar estado/vigencia activo o inactivo de periodo academic
     $res = Invoke-RestMethod "$BASE/coordinador/periodos-academicos/$($script:tempPeriodoId)/estado" -Headers $hCoord -Method PATCH
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
     return "Estado del periodo conmutado a: $($res.datos.estado)"
-}
-
-Run-Test "HU053,HU054" "Consultar y resolver solicitud de matricula por el coordinador (con inscripcion automatica)" {
-    $resGet = Invoke-RestMethod "$BASE/coordinador/solicitudes-matricula" -Headers $hCoord
-    if ($resGet.datos.Count -gt 0) {
-        $solId = $resGet.datos[0].id
-        $body = @{
-            accion = "APROBADA"
-            respuesta = "Aprobado por disponibilidad de cupo en la seccion."
-        } | ConvertTo-Json
-        $res = Invoke-RestMethod "$BASE/coordinador/solicitudes-matricula/$solId" -Headers $hCoord -Method PATCH -Body $body -ContentType "application/json"
-        return "Solicitud $solId resuelta como APROBADA con inscripcion automatica"
-    }
-    return "No hay solicitudes de matricula pendientes para resolver"
 }
 
 # ==============================================================================
