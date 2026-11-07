@@ -1,6 +1,6 @@
 # CULM-001 · Paquete D — PLAN
 
-> Alcance y diseño en [`CONTRACT.md`](CONTRACT.md) (v1, pendiente de la revisión 9.2). Decisiones: DEC-040 (alcance), DEC-022 §4/§8, DEC-028 (numeración), DEC-036 (precedente de manifiestos), DEC-037/DEC-038 (PDP, bloqueo B-01). Fecha: 2026-11-07.
+> Alcance y diseño en [`CONTRACT.md`](CONTRACT.md) (v2, aprobado en REVIEW-2 con los residuos R-1..R-4 aplicados). Decisiones: DEC-040 (alcance), DEC-042 y DEC-044 (REVIEW-1), DEC-022 §4/§8, DEC-028 (numeración), DEC-036 (precedente de manifiestos), DEC-037/DEC-038 (PDP, bloqueo B-01). Fecha: 2026-11-07.
 > Fases SDD por subpaquete: PLAN → CONTRACT (revisión 9.2 y congelación) → RED → GREEN → AUDIT → CLOSURE.
 > Numeración (DEC-044): migración `19 + x`, semilla `50 + x`, prefijo `culm001_d<x>` (D.1 = `20`/`51` … D.9 = `28`/`59`). Golden path de D: **1.6.0** (tras el 1.5.0 de C).
 
@@ -11,9 +11,9 @@
 | 1 | **D.1** `D1-plazo-excusas` | D.3+D.6, D.4 | ya (A y B.1 en integración) | Plazo HU026B en el SP (v1/v2), fecha límite visible, fecha local de radicación |
 | 1 | **D.3 + D.6** `D36-parametros-auditoria` | D.1, D.4 | ya | Parámetros editables (lista blanca, rango, motivo, concurrencia, historial, invalidación) + auditoría de `/admin/**` con metadatos y prueba de arquitectura |
 | 1 | **D.4** `D4-admision-estudiantes` | D.1, D.3+D.6 | ya | Admisión HU156, `GET /admin/programas`, `AsegurarCuentaIdentidadService` |
-| 2 | **D.7** `D7-retiro-registro-individual` | D.2, D.8 | B.2 mezclado (backend y BD) | Retiro de `POST /asistencias`, `REVOKE`/`DROP` del SP autónomo, TD-009 |
-| 2 | **D.8** `D8-kpis-horas` | D.2, D.7 | B.2 (BD) y B2 mezclados (D.8 escribe sobre la vista por programa de B2) | Comparativas, tendencia y consolidado por horas (F-COO-007) |
-| 2 | **D.2** `D2-soportes-categoria` | D.7, D.8 | D.1 mezclado (va antes que D.8: HU015 está en §3.6) | Varios soportes, FK de categoría, soporte obligatorio, TD-060/061, comprobación de TD-059 |
+| 2 | **D.7** `D7-retiro-registro-individual` | D.2 | B.2 mezclado (backend y BD) | Retiro de `POST /asistencias`, `REVOKE`/`DROP` del SP autónomo, TD-009 |
+| 2 | **D.2** `D2-soportes-categoria` | D.7 | D.1 mezclado (va antes que D.8: HU015 está en §3.6) | Varios soportes, FK de categoría, soporte obligatorio, TD-060/061, comprobación de TD-059 |
+| 3 | **D.8** `D8-kpis-horas` | D.5, D.9-a/b/d | B.2 (BD) y B2 mezclados (D.8 escribe sobre la vista por programa de B2) | Comparativas, tendencia y consolidado por horas (F-COO-007) |
 | 3 | **D.5** `D5-carga-masiva` | D.9-a/b/d | D.4 y D.6 mezclados | Carga CSV por jerarquía: plantilla, validación previa, creación idempotente |
 | 3 | **D.9-a/b/d** `D9-hallazgos-medios` | D.5 | D.6 y B2 mezclados (D.9-a toca `usp_consultar_sesiones_facultad_paginado` que B2 reescribe) | Hallazgos de BD/backend (4xx, 404, seguridad), frontend y docs/infra |
 | 4 | **D.9-c** (misma rama, segundo PR) | — | C mezclado | SSE: `status`/`emit`, 406, confirmación al abrir |
@@ -45,4 +45,12 @@ Worktrees propios `C:\Proyectos\GestionAsistencia-CULM001-D<x>\<repo>` para las 
 
 ## Si falta tiempo
 
-**D.1, D.3, D.4, D.6, D.7 > D.2, D.8 > D.5 > D.9** (dentro de D.9: a > b > d > c). Las partes diferibles de cada D.x están en CONTRACT §1.2.
+Prioridad (DEC-044): **D.1, D.3, D.4, D.6, D.7 > D.2 > D.8 > D.5, D.9**.
+
+Solo se difieren, en este orden (CONTRACT §1.2):
+1. D.9-c (SSE).
+2. D.9-d (docs e infra).
+3. La parte diferible de D.3: evento `PARAMETER_UPDATED` e historial `GET /admin/parametros/{id}/cambios`.
+4. D.8.
+
+**D.5 (HU171) no es diferible** (§3.6), tampoco el resto de D.1–D.7 ni D.9-a/b. Si algo de eso no llega, CLOSURE lo declara como incumplimiento, no como propuesta.
