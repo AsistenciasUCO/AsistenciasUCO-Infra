@@ -1,7 +1,7 @@
 ﻿# ==============================================================================
 # SUITE DE PRUEBAS INTEGRALES DE HISTORIAS DE USUARIO (HU001 - HU174)
 # Plataforma de Gestion de Asistencia - Universidad Catolica de Oriente (UCO)
-# Autenticacion: Security Baseline (realm security-baseline, cliente admin-cli).
+# Autenticacion: Security Baseline (realm security-baseline, cliente publico asistencias-uco-spa, Authorization Code + PKCE).
 # Las claves NO se guardan en este script: se leen de -Password* o de la variable
 # de entorno E2E_PASSWORD. Documentadas en docs/CREDENCIALES_PRUEBAS_LOCAL.md.
 # Compatible con Windows PowerShell 5.1.
@@ -10,7 +10,8 @@ param(
     [string]$BaseUrl = "http://localhost:8080/api/v1",
     [string]$KeycloakUrl = "http://keycloak.localhost:19090",
     [string]$Realm = "security-baseline",
-    [string]$ClientId = "admin-cli",
+    [string]$ClientId = "asistencias-uco-spa",
+    [string]$RedirectUri = "http://localhost:4200/",
     [string]$UserEstudiante = "uco-estudiante",
     [string]$UserDocente = "uco-docente",
     [string]$UserCoordinador = "uco-coordinador",
@@ -25,7 +26,8 @@ param(
 )
 $ErrorActionPreference = "Continue"
 $BASE = $BaseUrl.TrimEnd('/')
-$KC = "{0}/realms/{1}/protocol/openid-connect/token" -f $KeycloakUrl.TrimEnd('/'), $Realm
+$KC = "{0}/realms/{1}" -f $KeycloakUrl.TrimEnd('/'), $Realm
+. (Join-Path $PSScriptRoot "Get-SpaToken.ps1")
 
 function Resolve-Clave($especifica) {
     if ($especifica) { return $especifica }
@@ -50,11 +52,9 @@ $global:TestResults = @()
 
 function Get-Token($user, $pass) {
     try {
-        $body = @{ username = $user; password = $pass; grant_type = "password"; client_id = $ClientId }
-        $res = Invoke-RestMethod -Uri $KC -Method POST -Body $body -ContentType "application/x-www-form-urlencoded" -TimeoutSec 10
-        return $res.access_token
+        return Get-SpaToken -Username $user -Password $pass -Issuer $KC -ClientId $ClientId -RedirectUri $RedirectUri
     } catch {
-        Write-Host " [ERROR] No se pudo obtener token para '$user' en $KC. Verifique el laboratorio Security Baseline (puerto 19090) y la clave." -ForegroundColor Red
+        Write-Host " [ERROR] No se pudo obtener token PKCE para '$user' en $KC ($($_.Exception.Message)). Verifique el laboratorio Security Baseline (puerto 19090) y la clave." -ForegroundColor Red
         return $null
     }
 }
