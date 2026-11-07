@@ -1,0 +1,86 @@
+# SCREEN-RESULTS administrador (CULM-001 Fase 1)
+
+Guion: `SCREEN-TESTS-administrador.md`. Usuario `uco-administrador`. Fecha de ejecución: 2026-11-06. Segunda ejecución completa (la primera se interrumpió por la sesión de decano previa).
+Leyenda: OK / FALLO / NO APLICA / NO EJECUTADO (motivo) / NO CONCLUYENTE (motivo).
+
+## 1. Tabla de pasos
+
+| Paso | Vista | Resultado | Observación |
+| :--- | :--- | :--- | :--- |
+| 1 | Ingreso (Keycloak security-baseline) | OK | Login con uco-administrador. Tras entrar la app abre `/app/admin/decanos` (no el panel principal). Llamadas `/api/v1` con 200, sin 401. |
+| 2 | Menú lateral (escritorio) | OK | Ítems: Gestión de Facultades, Indicadores, Gestión de Decanos, Tipos de Programa, Estados del Sistema, Áreas de Conocimiento, Períodos Académicos, Docentes, Estudiantes, Búsqueda de Asignaturas, Sistema & Auditoría, Seguridad UCO, Mensajes, Gestión de Correos. No hay Sedes, Espacios físicos ni Instituciones. Móvil no ejecutado. |
+| 3 | `/app/admin/sedes` por URL | FALLO | Navegación directa cae en `/login?code=...` (fallo conocido de recarga/ruta profunda, F-ADM-S10). `/app/admin/espacios-fisicos` NO EJECUTADO (evitar ruta profunda tras el fallo). |
+| 4 | Áreas (escritorio) | OK | Tabla Código/Nombre/Estado, solo consulta, sin botones de crear/editar. `GET /admin/areas` 200. Móvil y prueba en Slow 3G NO EJECUTADOS. |
+| 5 | Tipos de Programa (escritorio) | OK | Solo consulta: POS Postgrado, PRE Pregrado, activos. Estado de carga "Cargando…" visible antes de los datos. Móvil NO EJECUTADO. |
+| 6 | Estados del Sistema (escritorio) | OK | Dos tablas (Estados de solicitudes; Estado del estudiante en el grupo), sin acciones de edición. Ambas tablas vacías ("No hay ... registrados"): ver F-ADM-S16. Móvil NO EJECUTADO. |
+| 7 | Facultades (escritorio) | FALLO | Primera carga: "0 facultades / No se encontraron facultades" pese a `GET /admin/facultades` 200 con `datos` de 2 elementos (`total: 2`). Tras crear una facultad la lista aparece con 3 (F-ADM-S04). Paginación no verificada. Móvil NO EJECUTADO. |
+| 8 | Crear facultad `CULM1-Facultad Prueba` | OK | `POST /admin/facultades` 201, aparece en la lista (Titular: CULMUNO DECANOB). Mismo nombre: 409, toast con texto FIJO "Ya existe una facultad con este nombre en esta institución (Conflicto 409)"; el backend envía "La operacion genera un conflicto con el estado actual." (F-ADM-S08). |
+| 9 | Editar facultad | FALLO | Nombre a `CULM1-Facultad Prueba 2`: `PUT` 409 y el botón queda en "Guardando..." sin mensaje (F-ADM-S05). Nombre de 2 caracteres: botón "Actualizar Facultad" deshabilitado, sin mensaje de error visible (solo la pista "Obligatorio (entre 3 y 50...)") (F-ADM-S23). Nombre vacío NO EJECUTADO. |
+| 10 | Cambiar estado de facultad | NO APLICA | La tarjeta solo ofrece "Editar" y "Cambiar Decano(a)"; no hay control de activar/inactivar. No se tocaron facultades sembradas. |
+| 11 | Decanos (escritorio) | OK | Tarjetas con estado, etiqueta `DEC-<documento>` (ej. DEC-1999000123) y sin paginación visible (F-ADM-011, F-ADM-008 consistentes). Móvil NO EJECUTADO. |
+| 12 | Desactivar decano `CULM1` creado | FALLO | `PATCH /admin/decanos/{id}/toggle` 501 `FEATURE_UNAVAILABLE`, mensaje backend "La operacion de administrador no esta disponible: cambiar estado de decano."; toast en español genérico "Esta funcionalidad no está disponible por el momento." (confirma F-ADM-002). |
+| 13 | Crear decano `CULM1` | FALLO | Alta válida (CC 1088000111, correo culm1.decano@uco.edu.co) OK: `POST` 201, toast "Decano registrado exitosamente." Repetir con el mismo documento y correo: `POST` otra vez 201 "Decano creado correctamente." en vez de 409; la lista muestra una sola tarjeta (F-ADM-S06). Validación de contraseña corta / igual al documento NO EJECUTADO. |
+| 14 | Corregir identidad (HU159) | OK (parcial) | Diálogo "Corregir datos del decano": documento solo lectura ("no se puede modificar"). Nombres con dígitos: 400 con mensaje backend "Error en datos del formulario: Campo 'primerApellido'... caracteres no permitidos" (expone nombres técnicos de campo, F-ADM-S12). Con nombres sin dígitos: `PUT .../identidad` 200 y se ve el cambio. Documento duplicado/vacío NO APLICA (campo no editable en el diálogo). `GET /configuracion/identidad` 500 al abrir el diálogo (F-ADM-S11). |
+| 15 | Períodos (escritorio) | OK | Lista con "Período 2026-2" (ACTUAL, ACTIVO, sembrado) y acciones Eliminar / Editar Fechas. Móvil NO EJECUTADO. |
+| 16 | Crear período `CULM1-2027` | OK (parcial) | Creado con fechas 2027-02-01 a 2027-06-20 (estado PLANEACION); respuesta 200 (no 201, F-ADM-S20). Código repetido: 409 con mensaje backend "Existe un conflicto con el estado actual de los datos. Actualice e intente nuevamente." Fecha fin anterior a inicio NO EJECUTADO. |
+| 17 | Eliminar período | NO CONCLUYENTE | Al pulsar Eliminar en `CULM1-2027` aparece `window.confirm` ("¿Eliminar el período CULM1-2027? ...") (confirma F-ADM-007). El navegador suprime el diálogo y devuelve cancelar: no hubo `DELETE`. El período `CULM1-2027` queda creado (limpieza pendiente). El sembrado 2026-2 no se tocó. |
+| 18 | Estudiantes (escritorio) | OK | Tabla paginada (13 estudiantes), filtros de facultad y estado, buscador con Enter (`busqueda=Ana`). Al cargar muestra "0 Estudiantes" un instante (F-ADM-S15). Búsqueda por documento NO EJECUTADO. |
+| 19 | Tamaño y página | NO EJECUTADO | El selector "Por página" (5/10/20/50) existe; no se cambió. |
+| 20 | Búsqueda sin resultados | OK | "No hay estudiantes que coincidan con la búsqueda." |
+| 21 | Ficha de Ana Sofia Gomez Rios | OK (parcial) | Historial: Ingeniería de Sistemas, período 2026-2, Arquitectura de Software Grupo 1, 2/2 sesiones, 0 faltas, 0 excusas, **0 % de inasistencia**. Cruce con docente y estudiante NO EJECUTADO. |
+| 22 | `GET .../historial` con id inexistente | NO EJECUTADO | Sin token de consola disponible en esta sesión. |
+| 23 | Admitir estudiante (HU156) | OK | No existe botón ni formulario "Admitir" en la pantalla (consistente con F-ADM-004). |
+| 24 | Docentes y Asignaturas | OK (parcial) | Docentes (móvil): 1 docente, filtros, sin acciones de edición, sin scroll horizontal de página. Asignaturas NO EJECUTADO. |
+| 25 | Indicadores | OK (parcial) | KPIs (asistencia 100 %, ausentismo 0 %, 13 estudiantes, 1 docente con grupo), comparativa por facultad y tendencia. Móvil sin scroll horizontal (375 = 375). Botón Mes: sin petición nueva en la red (tendencia local). Espera de 3 minutos NO EJECUTADA. |
+| 26 | Sistema, pestaña Parámetros | OK | "Parámetros Globales (49)" en modo consulta con aviso "Edición de parámetros no disponible" (F-ADM-003). Constantes técnicas visibles (F-ADM-012). Valor de UMBRAL_ALERTA_PERDIDA no pudo extraerse en texto: NO CONCLUYENTE. |
+| 27 | `PUT /admin/parametros/{id}` | NO EJECUTADO | No se envió ningún PUT. |
+| 28 | Trazabilidad y Auditoría | FALLO | Filtros por defecto y tabla paginada (123 resultados) OK. Sin "Solo acciones de asistencia" aparecen solo las acciones de corrección de identidad (23:06). No aparecen las altas de facultad, decano ni período de esta sesión (23:04–23:05) (F-ADM-S13). Usuario mostrado como "Sistema UCO Admin Institucional", sin `correlationId` visible (F-ADM-013). |
+| 29 | Rango inválido / >90 días | NO CONCLUYENTE | Al fijar Desde 2026-11-10 y Hasta 2026-11-01 con `form_input` en los campos de fecha, la red recibió `desde=2026-10-31...&hasta=2026-11-07...` y no hubo mensaje de rango; no se pudo confirmar el valor enviado. Rango >90 días NO EJECUTADO. Móvil: la página no tiene scroll horizontal; la tabla se desplaza dentro de su contenedor. |
+| 30 | Filtro por acción y resultado | NO EJECUTADO | |
+| 31 | Cierre masivo (solo consulta) | OK (parcial) | Pestaña con rótulo "Simulador de Cierre Masivo" (F-ADM-006), periodo por defecto "Período 2026-2 (2026-2)" (existe, F-ADM-005 no aplica), historial vacío con cabeceras. "Ejecutar Cierre Masivo" NO se pulsó: el diálogo está suprimido en el navegador y no se podía garantizar la cancelación. Móvil: sin scroll horizontal de página; cabecera y pestañas apretadas (F-ADM-S14). |
+| 32 | Botón "Gestión de Correos (SMTP)" | OK | Navega a `/app/admin/correos`. |
+| 33 | Gestión de Correos | OK (parcial) | Carga: "Plantillas y Mensajes Automáticos (10)", outbox 21, canal Gmail/SMTP. Móvil sin scroll horizontal. Título con jerga "NOTIF-002B · TD-069" (F-ADM-S17). Vista previa, reintento, toasts con red cortada: NO EJECUTADO (evitar envíos). |
+| 34 | Seguridad UCO | OK | Carga el micro frontend "Administración de seguridad / Control de acceso" con resumen. Sin errores de consola `process is not defined`. En móvil, las pestañas (Resumen, Personas, Roles, Perfiles) quedan cortadas (F-ADM-S14). |
+| 35 | Mensajes (MessageUcoLab) | OK (parcial) | Cabecera "MESSAGEUCOLAB / Administración de mensajes" carga sin errores de consola. El contenido del componente no aparece en el texto de la página: NO CONCLUYENTE. |
+| 36 | Tiempo real (SSE) | NO CONCLUYENTE | No hay peticiones `realtime` en el buffer de red (el buffer conserva solo las últimas peticiones). Sin verificación de actualización en vivo. |
+| 37 | 401 / 403 | NO EJECUTADO | No se probó con otro rol ni se expiró la sesión. |
+| 38 | Cerrar sesión | OK | "Cerrar sesión" del menú lateral: `/login`, `localStorage` y `sessionStorage` vacíos. Conexión SSE no verificada (ver 36). |
+| J | Pruebas de API cruzadas por rol | NO EJECUTADO | No hay tokens de decano/coordinador en esta sesión. |
+
+Notas de consola: el buffer de consola conserva errores de la sesión de decano anterior (SessionTimeZoneError, CORS en `public/matricula-qr/validar`, 400/500/503). Errores propios de administrador: no se observaron nuevos.
+
+## 2. Hallazgos
+
+| ID | Rol | HU | Severidad | Tipo | Pasos | Esperado | Obtenido | Evidencia | Capa sospechosa | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| F-ADM-S01 | ADMINISTRADOR | — | Alta | Funcional | Precondición de la 1.ª ejecución: abrir la app con sesión de decano y pulsar "Cerrar sesión" | La sesión se cierra y se llega a `/login` | Obtenido (primera ejecución): la sesión de decano seguía activa tras dos clics. No reproducible por el orquestador: en esta ejecución el orquestador cerró la sesión de decano y el cierre de administrador funcionó (paso 38). | Snapshots de `ref_11`; paso 38 con `/login` y storage vacío | Frontend (auth/logout) | abierto |
+| F-ADM-S02 | DECANO (observado en consola) | — | Media | Técnico | Entrar a detalle de grupo del decano | Fecha formateada en zona de sesión | `SessionTimeZoneError: Instante o zona IANA inválidos` en `DeanGrupoDetalleComponent.fecha` | Consola del navegador (buffer previo, no reproducido como administrador) | Frontend (SessionTimeZoneService) | abierto |
+| F-ADM-S03 | ESTUDIANTE / público (observado en consola) | — | Media | Técnico | Navegación con sesión de decano | Petición sin error de CORS | CORS bloqueado en `http://localhost:8080/api/v1/public/matricula-qr/validar` desde `http://localhost:4200` | Consola del navegador (buffer previo) | Backend (CORS) | abierto |
+| F-ADM-S04 | ADMINISTRADOR | — | Alta | Funcional | 7 | Lista de facultades con los datos devueltos | "No se encontraron facultades", contadores en 0, con `GET /admin/facultades` 200 y `datos` con 2 elementos | Respuesta: `{"exitoso":true,"datos":[...2],"total":2}`; captura de la vista | Frontend (mapeo de respuesta de facultades) o contrato backend | abierto |
+| F-ADM-S05 | ADMINISTRADOR | HU (facultades) | Media | Funcional | 9 | Renombrar facultad y ver confirmación o error legible | `PUT /admin/facultades/{id}` 409 sin mensaje en pantalla; el botón queda en "Guardando..."; la facultad conserva el nombre anterior. Causa probable: el decano ya es titular de otra facultad (regla no explicada al usuario) | `PUT ... → 409 CONFLICT, correlationId 5d936161-...` | Backend (regla de titularidad y mensaje) y frontend (estado de carga y error) | abierto |
+| F-ADM-S06 | ADMINISTRADOR | HU (decanos) | Alta | Funcional | 13 | Repetir el mismo documento y correo: 409 con mensaje | Segundo `POST /admin/decanos` 201 "Decano creado correctamente." con mismos datos; una sola tarjeta en la lista | `POST` 201 (38312.437) y 201 (38312.441) | Backend (unicidad documento/correo) o frontend (doble envío); no determinado | abierto |
+| F-ADM-S07 | ADMINISTRADOR | HU (decanos) | Media | Técnico | 11, 13 | Estado de acceso legible sin jerga técnica | Banner "PENDIENTE DE SINCRONIZACIÓN ... credencial de servicio del PDP no esta configurada ..." y botón "Reconciliar ahora" aparecen en el listado de decanos | Captura del listado de decanos | Backend (mensaje) y frontend (presentación) | abierto |
+| F-ADM-S08 | ADMINISTRADOR | HU (facultades) | Media | Técnico | 8 | Mensaje del backend para el 409 | Toast fijo "Ya existe una facultad con este nombre en esta institución (Conflicto 409)"; el backend envía "La operacion genera un conflicto con el estado actual." (confirma F-ADM-010) | Captura del toast; respuesta 409 | Frontend (textos fijos) | abierto |
+| F-ADM-S09 | ADMINISTRADOR | HU (decanos) | Media | Funcional | 12 | Cambio de estado de decano operativo o mensaje claro | `PATCH .../toggle` 501; toast genérico sin relación con el mensaje del backend (confirma F-ADM-002) | `PATCH ... → 501 FEATURE_UNAVAILABLE`, correlationId fd2fdf10-... | Backend (operación no implementada) y frontend (toast fijo) | abierto |
+| F-ADM-S10 | ADMINISTRADOR | — | Alta | Técnico | 3, 18 | Navegar a rutas (incluidas las profundas) sin perder sesión | Navegación directa a `/app/admin/sedes` termina en `/login?state=...&code=...`; ocurrió también al entrar a Estudiantes desde el menú tras la eliminación fallida (la sesión se recupera al volver a `/login`) | URL final `http://localhost:4200/login?state=...&code=REDACTED` | Frontend (callback de autenticación / rutas profundas) | abierto |
+| F-ADM-S11 | ADMINISTRADOR | HU159 | Media | Técnico | 14 | Abrir "Corregir datos" sin error | `GET /configuracion/identidad` 500 al abrir el diálogo; el guardado funciona | Red: `GET .../configuracion/identidad → 500` | Backend (configuración de identidad) | abierto |
+| F-ADM-S12 | ADMINISTRADOR | HU159 | Baja | Técnico | 14 | Mensaje de validación para el usuario | "Error en datos del formulario: Campo 'primerApellido': ... caracteres no permitidos" con nombres técnicos de campo | Captura del diálogo | Backend (mensaje) | abierto |
+| F-ADM-S13 | ADMINISTRADOR | HU (auditoría) | Alta | Funcional | 28 | Altas y cambios del administrador aparecen en auditoría con su usuario | Tras crear facultad y decano (23:04) y el 501 de estado (23:05), en la trazabilidad solo aparece la corrección de identidad (23:06). El usuario figura como "Sistema UCO Admin Institucional" | Tabla de auditoría (filtro "Solo acciones de asistencia" desmarcado) | Backend (registro de auditoría) | abierto |
+| F-ADM-S14 | ADMINISTRADOR | — | Baja | Diseño | 31, 34 | Cabeceras y pestañas legibles a 375 px | Cabecera de Sistema apretada y pestañas cortadas; pestañas de Seguridad cortadas | Captura móvil | Frontend (layout) | abierto |
+| F-ADM-S15 | ADMINISTRADOR | — | Baja | Funcional | 18 | Estado de carga sin datos engañosos | "0 Estudiantes" y tabla vacía durante la carga, antes de mostrar 13 | Captura al entrar | Frontend (estado inicial) | abierto |
+| F-ADM-S16 | ADMINISTRADOR | HU150-155 | Baja | Datos | 6 | Catálogos de estados con datos | Dos tablas de "Estados del Sistema" sin registros | Captura de la vista | Datos semilla | abierto |
+| F-ADM-S17 | ADMINISTRADOR | — | Baja | Diseño | 33 | Títulos sin jerga interna | Título "NOTIF-002B · TD-069" visible para el administrador | Captura de la vista | Frontend (textos) | abierto |
+| F-ADM-S20 | ADMINISTRADOR | HU096 | Baja | Técnico | 16 | Creación de recurso devuelve 201 | `POST /admin/periodos-academicos` devuelve 200 | Red: 200 con `{"exitoso":true,"datos":null}` | Backend (código HTTP) | abierto |
+| F-ADM-S23 | ADMINISTRADOR | HU (facultades) | Baja | Accesibilidad | 9 | Error de validación visible y asociado al campo | Botón deshabilitado sin mensaje de error para nombre de 2 caracteres | Captura del formulario | Frontend (formulario) | abierto |
+
+Severidad: 4 altas nuevas (S04, S06, S10, S13) además de S01; medias S02, S03, S05, S07, S08, S09, S11; bajas S12, S14–S17, S20, S23.
+Hallazgos críticos: ninguno.
+
+Nota: los IDs S18 y S19 no se usaron. Los hallazgos ya listados en el guion (F-ADM-002, F-ADM-003, F-ADM-006, F-ADM-007, F-ADM-008, F-ADM-010, F-ADM-011, F-ADM-013) se confirmaron en esta ejecución (ver pasos 7, 8, 11, 12, 16, 17, 26, 28, 31).
+
+## 3. Estado final
+
+- Login y logout: OK. Pantalla final `/login`, sin tokens en `localStorage` ni `sessionStorage`.
+- Vista móvil: ejecutada en 14 pantallas. Sin scroll horizontal de página en las 14. Se restauró la vista de escritorio (`resize_window` preset desktop).
+- Datos creados con prefijo CULM1-: facultad `CULM1-Facultad Prueba` (nombre no cambiado), decano `CULM1 DECANO PRUEBA` (renombrado a `Culmo DECANO Prueba`, sin cambio de estado), período `CULM1-2027` (no eliminado). Pendiente de limpieza manual por el responsable.
+- No se ejecutó el cierre masivo, no se desactivó ningún sembrado, no se envió ningún correo de prueba.

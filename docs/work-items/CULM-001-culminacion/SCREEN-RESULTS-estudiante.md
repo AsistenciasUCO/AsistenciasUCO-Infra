@@ -1,0 +1,84 @@
+# SCREEN-RESULTS-estudiante (CULM-001 Fase 1)
+
+Guion: `SCREEN-TESTS-estudiante.md`. Rol: ESTUDIANTE (`uco-estudiante`, Carlos). Entorno: `http://localhost:4200` y `http://localhost:8080`, realm `security-baseline`. Fecha de ejecución: 2026-11-06.
+Método: navegador integrado. Los bloqueos de red y las latencias se simularon interceptando XHR desde la consola del navegador (no hay DevTools de throttling), así que los pasos 10, 11 y 28 son aproximaciones. Los adjuntos de prueba se generaron en el navegador (PDF válido, ejecutable renombrado, 6 MB, cadena EICAR de prueba antivirus). Los pasos que exigen datos o acciones del docente se marcan NO APLICA.
+
+## 1. Tabla de pasos
+
+| Paso | Vista (escritorio/móvil) | Resultado | Observación |
+| :--- | :--- | :--- | :--- |
+| 0.1 | Escritorio / Móvil | OK | Portada redirige a `/login`. 5 errores 401 en consola al cargar (ver S19). Móvil: sin scroll horizontal (375 px). |
+| 0.2 | Escritorio | OK | `/app/estudiante/materias` sin sesión redirige a `/login` sin mostrar datos. |
+| 3 | Escritorio / Móvil | OK | Tras login aterriza en `/app/estudiante/horarios`. Sin JWT en localStorage/sessionStorage ni en la URL. |
+| 4 | Escritorio | OK | Keycloak muestra "Invalid username or password."; la app no se rompe. |
+| 5 | Escritorio / Móvil | OK | `/app` redirige a `/app/dashboard`. Muestra "No disponible" en asistencia (ver S02) y dos tarjetas de materia (ver S01). |
+| 6 | Escritorio / Móvil | OK | Menú: Panel Principal, Mis Horarios, Mis Materias, Mis Reclamos, Oferta de Grupos, Solicitudes de Ingreso (las dos últimas existen hoy). Móvil: el menú hamburguesa abre el cajón con 7 enlaces. |
+| 7 | Escritorio | OK | `/app/docente/...`, `/app/coordinador/estudiantes`, `/app/admin/estudiantes` y `/app/decano/estudiantes` terminan en `/app/estudiante/horarios`. Red: ninguna llamada a endpoints de otros roles. |
+| 8 | Escritorio / Móvil | FALLO | Dos tarjetas: "Grupo 001 - Arq Software" y "Grupo 03 (prueba)" (esta última con matrícula `I`, ver S01). "Asistencia: No disponible"; "Docente: No informado"; "Horario no informado". Sin código ni créditos. |
+| 9 | Escritorio / Móvil | FALLO | "Promedio de Asistencia" y "Fallas Registradas" muestran "No disponible". Esperado según BD: 0% y 0 (ver S02). |
+| 10 | Escritorio / Móvil | PARCIAL | Retardo simulado de 3 s en `GET /estudiante/materias`: la pantalla muestra contadores en 0 y "No disponible" sin esqueleto de carga identificable. Aproximación, no es throttling real. |
+| 11 | Escritorio / Móvil | FALLO | Con la petición de materias bloqueada no aparece bloque de error ni botón "Reintentar"; la lista queda vacía sin aviso (ver S03). Al quitar el bloqueo y navegar de nuevo, la lista se recarga correctamente. |
+| 12 | Escritorio | FALLO | No existen buscador/filtro de materias, acordeón por semestre ni barra de créditos (ver S09). |
+| 13 | Escritorio | OK | Detalle del grupo 001: 5 sesiones; `GET .../materias/{id}/sesiones` 200. Estados: 4 de 5 "Estado no disponible"; sesión #3 "AUSENTE" con "Radicar Reclamo". Sin leyenda de estados ni zona horaria. Orden no cronológico (ver S17). Sin sesiones del grupo inactivo. Móvil: NO EJECUTADO. |
+| 14 | Escritorio | OK | "Ver motivos" muestra las 6 categorías de `GET /categorias-justificacion` 200 (se piden 4 veces, ver S18). |
+| 15 | Escritorio | FALLO | No hay porcentaje de inasistencia visible. BD esperada: 0.00%. Mismo hallazgo que S02. |
+| 16 | Escritorio | OK | "Volver a Mis Materias" funciona. Atrás del navegador desde el listado va al dashboard. No se probó el atrás desde el detalle. |
+| 17 | Escritorio | NO APLICA (no existe) | No hay lista ni modal de compañeros del grupo (ver S09). |
+| 18 | Escritorio | NO APLICA | Requiere acción del docente. El grupo ya tiene una sesión AUSENTE (#3) que se usó en el paso 19. |
+| 19 | Escritorio | OK | "Radicar Reclamo" aparece solo en la sesión #3 (AUSENTE). Móvil: NO EJECUTADO. |
+| 20 | Escritorio | OK | Con formulario vacío "Radicar Reclamo" está deshabilitado. Categoría desde catálogo (6 opciones). Móvil: NO EJECUTADO. |
+| 21 | Escritorio | OK | (a) PDF válido: `POST /archivos/subir` 201 y muestra nombre y tamaño. (b) Ejecutable renombrado .pdf: 400, "El archivo fue rechazado: no cumple los requisitos de seguridad o formato". (c) 6 MB: rechazo en cliente "supera el tamaño máximo de 5 MB", sin petición. (d) Cadena EICAR: 400 con el mismo mensaje genérico. "Quitar" funciona. Móvil: NO EJECUTADO. |
+| 22 | Escritorio | OK | Envío con prefijo `CULM1-`: `POST /asistencias/revisiones` 202, sesión pasa a "Solicitud de revisión: pendiente". Doble clic: una sola petición. Sin confirmación visible (ver S13). |
+| 23 | Escritorio | NO APLICA | No hay faltas de más de 5 días para Carlos. |
+| 24 | Escritorio | NO APLICA (no existe) | No hay botón "Retirar solicitud" ni en Mis Reclamos ni en el detalle. No se produjo ninguna petición DELETE (ver S15). |
+| 25 | Escritorio / Móvil | OK | Filtro Estado: "Rechazadas" muestra 1 de 1; "Aprobadas" muestra "No tienes solicitudes de revisión con este filtro." Paginación "Mostrando 1 a 2 de 2" y selector 5/10/20/50. Móvil: sin scroll horizontal. "Descargar soporte" presente pero NO pulsado (la descarga requiere permiso). Fecha "Radicada el 2026-11-07" con fecha local 2026-11-06 (ver S16). |
+| 26 | Escritorio | NO APLICA | Requiere que el docente resuelva. La solicitud rechazada muestra "Respuesta del docente" tras recargar. La actualización en vivo no se pudo verificar. |
+| 27 | Escritorio / Móvil | FALLO | Horario muestra "No hay clases registradas" con 0 clases por día, aunque el grupo tiene sesiones (ver S06). Móvil: columnas apiladas y sin scroll horizontal. |
+| 28 | Escritorio / Móvil | PARCIAL | Estado vacío OK. Estado de error (XHR bloqueado): sin mensaje ni "Reintentar" (ver S12). No hay selector de días (HU021). Móvil: NO EJECUTADO. |
+| 29 | Escritorio / Móvil | OK | Oferta: tarjetas con cupos (20 de 30 y 37 de 42), badge "Vigente", buscador "Buscar por asignatura, código o grupo...", paginación. "Solicitar ingreso" aparece en el Grupo 03, donde Carlos ya figura como matriculado (ver S01). No se pulsó. Móvil: sin scroll. |
+| 30 | Escritorio | OK | Solicitudes: lista con estado (Aceptada, Retirada), filtro por estado (Todos/Pendientes/En espera/Aceptadas/Rechazadas/Retiradas), paginación. No hay botón de retiro visible. |
+| 31 | Escritorio | FALLO | Modal "Matricularse con Código": vacío y "12" dejan el botón deshabilitado; "ABCDEF" también lo deja deshabilitado, aunque el campo acepta letras. Con "000000": `POST /estudiante/matricular-grupo` 500 INTERNAL_ERROR; la UI muestra "error en el servidor" (ver S04). Escape no cierra el modal (ver S10). Campo sin etiqueta (ver S11). Cancelar sí cierra. Móvil: NO EJECUTADO. |
+| 32 | Escritorio / Móvil | NO APLICA | Requiere PIN real y ventana de matrícula QR del docente. No se pudo validar la red Wi-Fi. |
+| 33 | Escritorio | PARCIAL | Auto-Registro: vacío deshabilitado. "ABCDEF" con `POST /estudiante/asistencia-qr` 400 `ERR_SESION_ASISTENCIA_REQUERIDA`, mensaje "La sesion de asistencia es obligatoria." (sin tildes). Campo sin `inputmode` numérico (ver S11). No hay lector de cámara QR, solo campo de token. Registro real con PIN válido: NO APLICA (requiere docente). Móvil: NO EJECUTADO. |
+| 34 | Escritorio | OK | `/matricula/pin`: 6 dígitos, `inputmode=numeric`, maxlength 6. `/matricula/qr?t=TOKENFALSO`: el token se retira de la URL, pero el mensaje dice "No fue posible conectar con el servidor" (ver S14). `/verificar-correo` sin token y con token falso: "El enlace de verificación no es válido o ya venció." y el token se retira de la URL. `/register` redirige a `/login`. Móvil: NO EJECUTADO. |
+| 35 | Escritorio | NO APLICA | Requiere PIN real del docente. |
+| 36 | Escritorio / Móvil | FALLO | `/app/perfil` muestra el botón "Editar" y "Editar Información" (el PUT debía retirarse). Datos en solo lectura correctos. Móvil: sin scroll horizontal (ver S07). |
+| 37 | Escritorio | FALLO | No hay campana ni panel ni indicador de alertas de riesgo (ver S08). |
+| 38 | Escritorio | FALLO | No se observó conexión `realtime/stream` en Materias, Dashboard ni Perfil: ni EventSource ni fetch. Sin polling: 0 llamadas HTTP en 25 s en Materias (ver S05). |
+| 39 | Escritorio / Móvil | OK | "Cerrar sesión" lleva a `/login`. Atrás del navegador muestra `/login` sin datos del estudiante. |
+| 40 | Escritorio | NO APLICA | Requiere datos del docente y del coordinador para comparar. Vista estudiante: "No disponible" y una sesión AUSENTE, sin porcentaje. |
+
+Cierre: sesión cerrada desde el menú lateral y app en `/login`. Viewport restaurado a escritorio (`resize_window` desktop).
+
+## 2. Hallazgos nuevos
+
+| ID | Rol | HU | Severidad | Tipo | Pasos | Esperado | Obtenido | Evidencia | Capa sospechosa | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| F-EST-S01 | ESTUDIANTE | HU001, HU008, HU026 | alta | inconsistencia | 8, 29, 30 | Grupo 5C23 con matrícula `I` no aparece como matriculado ni ofrecido como solicitud | Aparece como tarjeta de materia ("Grupo 03 (prueba)", "Materias Matriculadas 2"), en Oferta muestra "Solicitar ingreso" y en Solicitudes aparece "Aceptada" y "Retirada" para el mismo grupo | `/app/estudiante/materias`, `/app/dashboard`, `/app/estudiante/oferta`, `/app/estudiante/solicitudes`; `GET /estudiante/materias` 200 | Backend: consulta de materias/matrículas (filtro por estado de matrícula); frontend: render de tarjetas | abierto |
+| F-EST-S02 | ESTUDIANTE | HU002, HU004, HU013 | alta | bug | 5, 8, 9, 13, 15 | Asistencia 0.00%, faltas 0, promedio 0% (BD: 2 sesiones ejecutadas, sin faltas en el grupo 5C6D según guion; el detalle muestra sesión #3 AUSENTE) | "No disponible" en asistencia, promedio y fallas; texto "El sistema aún no expone tu asistencia consolidada." aunque existe una sesión AUSENTE | `GET /estudiante/materias` 200 y `GET .../sesiones` 200; vistas de materias y dashboard | Backend: cálculo de porcentaje y agregados (`uv_*`/`usp_*` de asistencia consolidada) | abierto |
+| F-EST-S03 | ESTUDIANTE | HU001 | alta | UX | 11 | Mensaje de error con "Reintentar" cuando falla la carga de materias | Lista vacía sin mensaje ni botón de reintento | Petición `estudiante/materias` abortada por XHR simulado; sin "Reintentar" en `/app/estudiante/materias` | Frontend: manejo de error del servicio de materias (estado de error) | abierto |
+| F-EST-S04 | ESTUDIANTE | HU176B | alta | bug | 31 | PIN inválido devuelve 4xx con mensaje de usuario claro ("PIN no válido o expirado") | HTTP 500 INTERNAL_ERROR; UI muestra "error en el servidor. Por favor intente más tarde." | `POST /api/v1/estudiante/matricular-grupo` 500, correlationId `100ebacc-fcf1-40ae-b7dc-d06422ff2bb3`, path `/api/v1/estudiante/matricular-grupo` | Backend: caso de uso de matrícula (excepción no mapeada a 4xx); posible SP de validación de PIN | abierto |
+| F-EST-S05 | ESTUDIANTE | HU022, HU026C | alta | notificación | 38 | Conexión SSE única a `/realtime/stream` con Bearer en cabecera, y actualizaciones en vivo | No se observa ninguna conexión de streaming (ni EventSource ni fetch) en Materias, Dashboard ni Perfil. Sin polling (0 llamadas en 25 s) | Monitorización de fetch y EventSource en la pestaña; sin petición a `realtime/stream` | Frontend: `core/realtime` (transporte SSE no iniciado para la vista del estudiante); no verificado si se inicia en otra ruta | abierto |
+| F-EST-S06 | ESTUDIANTE | HU017 | media | inconsistencia | 27, 13 | Horario coherente con las sesiones del grupo | "No hay clases registradas", 0 clases por día. En Materias el mismo grupo muestra sesiones con fecha y hora, y "Horario no informado" | `GET /estudiante/horarios` 200 (vacío); `/app/estudiante/horarios` | Backend: consulta de horario (`uv_horario_estudiante`) frente a datos de sesiones; o datos sembrados sin horario | abierto |
+| F-EST-S07 | ESTUDIANTE | HU006 | media | inconsistencia | 36 | Perfil en solo lectura sin botón "Editar" (el PUT se retira) | Botones "Editar Información" y "Editar" visibles | `/app/perfil` | Frontend: vista de perfil (feature de edición no retirada) | abierto |
+| F-EST-S08 | ESTUDIANTE | HU026C | media | notificación | 37 | Indicador o panel de alertas de riesgo (15% y 20%) | No existe campana, panel ni indicador | Revisión de cabecera y menú en escritorio | Frontend: layout/cabecera (feature no implementada o no expuesta) | abierto |
+| F-EST-S09 | ESTUDIANTE | HU003, HU007, HU018, HU019 | media | inconsistencia | 12, 17 | Buscador/filtro de materias, acordeón por semestre, barra de créditos y lista de compañeros | No existen en la UI | `/app/estudiante/materias` y detalle | Frontend: funcionalidades pendientes; marcar en matriz de trazabilidad | abierto |
+| F-EST-S10 | ESTUDIANTE | HU176B | media | UX | 31 | Escape cierra el modal de matrícula | Escape no cierra el modal; sí cierra con Cancelar | Pulsación de Escape en el modal "Matricúlate a un Grupo" | Frontend: modal (manejo de teclado y foco) | abierto |
+| F-EST-S11 | ESTUDIANTE | HU176, HU176B | baja | a11y | 31, 33 | Campos PIN con etiqueta accesible y teclado numérico | Campo PIN de matrícula sin etiqueta; campo de auto-registro sin `inputmode` numérico; ambos aceptan letras | Inspección DOM: `placeholder` sin `aria-label`; `inputmode` nulo en auto-registro | Frontend: componentes de PIN | abierto |
+| F-EST-S12 | ESTUDIANTE | HU017 | media | UX | 28 | Mensaje de error con reintento en el horario | Grilla vacía sin mensaje cuando falla la carga | Petición `estudiante/horarios` abortada por XHR simulado | Frontend: vista de horario (estado de error) | abierto |
+| F-EST-S13 | ESTUDIANTE | HU010, HU011 | media | notificación | 22 | Confirmación visible tras radicar y respuesta con `mensajeUsuario` (contrato ApiResponse) | Sin toast ni confirmación visible; respuesta `{"exitoso":true,"mensaje":"Solicitud de revision registrada correctamente."}` sin `mensajeUsuario` | `POST /api/v1/asistencias/revisiones` 202 (requestId 18244.928) | Backend: contrato de respuesta del controlador de revisiones; Frontend: feedback tras envío | abierto |
+| F-EST-S14 | ESTUDIANTE | HU176B | baja | inconsistencia | 34 | Token QR inválido muestra "token no válido o expirado" | "No fue posible conectar con el servidor. Verifique su conexión de red." | `/matricula/qr?t=<token falso>` | Frontend: mapeo de error de la vista de matrícula QR | abierto |
+| F-EST-S15 | ESTUDIANTE | HU014 | media | inconsistencia | 24 | Opción "Retirar solicitud" en solicitudes pendientes | No existe botón de retiro en Mis Reclamos ni en el detalle | `/app/estudiante/reclamos`, detalle de materia | Frontend: acción de retiro no expuesta; backend pendiente de `DELETE /estudiante/reclamos/{id}` | abierto |
+| F-EST-S16 | ESTUDIANTE | HU010 | baja | UI | 25 | Fecha de radicación igual a la fecha local | "Radicada el 2026-11-07" con fecha local 2026-11-06 (hora 22:xx en -05:00) | `/app/estudiante/reclamos` | Backend o frontend: zona horaria UTC frente a local | abierto |
+| F-EST-S17 | ESTUDIANTE | HU024 | baja | UX | 13 | Sesiones en orden cronológico | Sesión #3 (11-06 22:30), #4 (11-07 23:35), #5 (11-06 22:45) | `GET .../materias/{id}/sesiones` 200; detalle de Grupo 001 | Frontend: ordenación del listado (o backend sin ORDER BY) | abierto |
+| F-EST-S18 | ESTUDIANTE | HU005, HU016 | baja | rendimiento | 14 | Una sola petición de categorías por visita | `GET /categorias-justificacion` 200 cuatro veces en una misma visita | Pestaña Red, al abrir "Ver motivos" | Frontend: suscripciones o componentes que vuelven a pedir el catálogo | abierto |
+| F-EST-S19 | ESTUDIANTE | HU001 | baja | inconsistencia | 0.1 | Portada pública sin errores de consola | 5 errores 401 en consola al cargar `/login` sin sesión | `read_console_messages` onlyErrors al cargar `http://localhost:4200` | Frontend: llamada inicial de sesión (`auth/me`) sin manejo silencioso del 401 | abierto |
+| F-EST-S20 | ESTUDIANTE | HU176B | baja | UX | 31 | El campo PIN solo acepta dígitos | Acepta letras ("ABCDEF") en el campo de matrícula, aunque tenga `inputmode` numérico | Campo PIN del modal de matrícula | Frontend: validación del campo PIN | abierto |
+
+## 3. Notas
+
+- Los pasos 10, 11 y 28 usan interceptación de XHR, no throttling de red real. Repetir con DevTools si se necesita el estado de carga exacto.
+- No se pulsó "Descargar soporte" ni "Solicitar ingreso" (requieren permiso o son acciones no pedidas).
+- Móvil: ejecutados y OK los pasos 0.1, 3, 5, 6, 8 (sin scroll), 9, 25, 27, 29, 36 y 39. No ejecutados en móvil: 10, 11, 13, 14, 19, 20, 21, 28, 31, 33, 34.
+- No se registraron respuestas 501 en el recorrido. Se observaron 500 (S04, matricular-grupo), 400 (adjuntos en paso 21 y auto-registro en paso 33) y 201/202 esperados (subida y reclamo).
+- Paso 24: no se pudo probar el 501 de `DELETE` porque la acción no existe en la UI.
