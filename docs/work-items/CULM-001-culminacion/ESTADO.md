@@ -1,6 +1,6 @@
 # CULM-001 — ESTADO (fuente de verdad del avance)
 
-> Actualizado: 2026-11-07 03:30 (hora local). Leer primero al retomar la tarea.
+> Actualizado: 2026-11-07 08:40 (hora local). Leer primero al retomar la tarea.
 
 ## Entorno de trabajo
 
@@ -38,6 +38,7 @@
 
 | Gate | Resultado | Detalle |
 | :--- | :--- | :--- |
+| Backend `mvnw verify -Pintegration` | **FAIL (línea base)** | 13 fallos/33 errores en `72a1675e` (AsistenciaCommand*, AcademicQuery, SoporteArchivo, JpaAttendance…), detectados por B.1; sin regresión en B.1 (12F/33E). Pendiente de análisis en D/Fase 3 |
 | Backend `mvnw verify` | PASS (base `72a1675e`) | 3309 pruebas, 0 fallos; JaCoCo "All coverage checks have been met". Requiere `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:\jtmp -Djdk.net.hosts.file=C:\jtmp\hosts`. Log `C:\jtmp\culm-mvn-verify-base.log` |
 | Frontend `npm run verify` | PASS | 1630/1630 specs; realtime LINE 95.06 % / BRANCH 84.52 %; build producción OK |
 | `verify-contracts.ps1 -Root C:\Proyectos\GestionAsistencia-CULM001` | **FAIL (línea base, como anticipa el prompt §4)** | `DB_OBJ_MISMATCH` en `usp_generar_sesiones_grupo.sql` y `usp_registrar_asistencias_sesion.sql` (manifiesto `DB_DEVELOP_FREEZE_MANIFEST.sha256` vs `repo-antiguo/develop` de DB) y `CROSS_REPO_DRIFT` del `openapi-golden-path.yaml` entre Infra y Backend. Los 4 contratos canónicos de Infra coinciden con su `.sha256` |
@@ -56,8 +57,8 @@
 | :--- | :--- | :--- |
 | Fase 0 | **completa** (2026-11-06 22:45) | worktrees desde la base correcta (DEC-002), BD restaurada y desplegada, backend/frontend arriba desde worktrees, 5 logins OK, gates de línea base registrados, work item creado, `test_all_hus.ps1` adaptado (commit `523456d`) y OpenAPI sincronizado (commit `704823c`) |
 | Fase 1 | **completa** (2026-11-07 00:30) | 6 líderes (5 roles + transversal) con pruebas por API (token PKCE), revisión estática y matriz de ámbito de 1003 celdas (0 fugas con los datos actuales; faltan datos de 2.º ámbito); recorridos en pantalla con Haiku: estudiante completo, docente/coordinador/decano parciales, administrador en curso (se repiten completos en la Fase 3). Consolidado en `FINDINGS.md`: 113 hallazgos (3 críticos, 24 altos, 52 medios, 34 bajos). Triage del orquestador en DEC-022; asignación: A 22, B 11, B2 2, C 4, D 34, E 33, no-se-corrige 3, en espera 2, entorno/docs 2 |
-| A | **CONTRACT congelado** (v5, `84e2fca2…`, DEC-035; 4 rondas de revisión). **GREEN en curso** (2026-11-07 03:30): implementadores de BD, backend y frontend en paralelo sobre `feature/CULM-001-A-retiro-solicitudes` (worktrees principales). Gates pendientes | |
-| B | **CONTRACT congelado** (v4, `401c76b6…`, DEC-033; 3 rondas). B.1 (BD) en GREEN en worktrees propios `C:\Proyectos\GestionAsistencia-CULM001-B` (DEC-034); B.2 pendiente | |
+| A | **CONTRACT congelado** (v5, `84e2fca2…`, DEC-035). GREEN: BD 18 commits (migraciones 13/14 aplicadas en la BD local, fixture del 2.º ámbito aplicado, F-000 corregido), backend 19 commits (`mvnw verify` 3342 pruebas, LINE 93,1 %/BRANCH 85,1 %; `-Pintegration` en curso), frontend 14 commits (`npm run verify` verde, 1631 specs), Infra 5 commits (golden path 1.2.0 en paridad, catálogo 134 cert./24 desc.). Pendiente: AUDIT (jar de A en :8080 + recorrido), PRs y mezcla | |
+| B | **CONTRACT congelado** (v4, `401c76b6…`, DEC-033). B.1 GREEN: BD 8 commits (47 pruebas nuevas; objetos desplegados en la BD local), backend 9 commits (`mvnw verify` 3449 pruebas, LINE 93,5 %/BRANCH 85,3 %; `OpenApiGoldenPathConformanceTest…DtoPropertyShapes` `@Disabled` hasta la 1.3.0), frontend en curso; B.2 (tomas/QR) BD arrancando en `feature/CULM-001-B2-tomas-qr` (desde B.1). Worktrees `C:\Proyectos\GestionAsistencia-CULM001-B` | |
 | B2 | **CONTRACT congelado** (v5, `9b668c7d…`, DEC-029/DEC-032; 3 rondas). Implementación pendiente (después de B) | |
 | C | pendiente | |
 | D | pendiente | |
