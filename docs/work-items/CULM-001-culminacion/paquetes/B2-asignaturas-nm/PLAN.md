@@ -1,7 +1,7 @@
 # CULM-001 · Paquete B2 — PLAN (asignaturas N:M y ámbito por relación)
 
 > Fecha: 2026-11-06. Fuentes: prompt de culminación §3.8–§3.9, `DECISIONES.md` (DEC-019, DEC-020), `RESEARCH-ASIGNATURA-PLAN.md`, `FINDINGS-{coordinador,docente,decano}.md`.
-> Contrato detallado: [`CONTRACT.md`](CONTRACT.md) (versión 2, responde a REVIEW-1). Depende de A (matrícula y los tres SP de ámbito de A.2) y B (horas, sesiones canceladas). Alcance del GREEN: mínimo imprescindible; diferibles en CONTRACT §7. Prefijo de artefactos `culm001_b2nm`.
+> Contrato detallado: [`CONTRACT.md`](CONTRACT.md) (versión 4, responde a REVIEW-1, REVIEW-2 y REVIEW-3). Depende de A (matrícula y los tres SP de ámbito de A.2) y B (horas, sesiones canceladas). Alcance del GREEN: mínimo imprescindible; diferibles en CONTRACT §7. Prefijo de artefactos `culm001_b2nm`.
 
 ## Objetivo
 
@@ -22,7 +22,7 @@
 
 ## Orden de trabajo
 
-1. BD: catálogo de carácter, tabla puente, migración `up`/`down` con backfill y reporte, vistas, SPs, permisos, semilla de un segundo programa, pruebas.
+1. BD: catálogo de carácter, tabla puente, migraciones `17` (puente, backfill, columna `NULL`) y `18` (retiro de la columna) con sus `down` (DEC-025), backfill y reporte, vistas, SPs, permisos, fixture de asignatura compartida sobre el fixture de segundo ámbito de A, pruebas.
 2. Backend: entidades/proyecciones de SP, repositorios, casos de uso (JPQL directo → SP), endpoints, clasificador de errores, OpenAPI 1.2.0.
 3. Frontend: modelos, servicios, malla con carácter y asociación, listados paginados, selector de programa en matrícula, specs.
 4. Docs: HU-CATALOG, deuda técnica, contrato OpenAPI y su `.sha256` en Infra y Backend.
