@@ -519,7 +519,7 @@ Respuestas en `ApiDataResponse<T>`, `ApiListResponse<T>` o `ApiPageResponse<T>`;
 ### 3.4 Contratos WORM
 
 Cada archivo tiene dos copias idénticas, y cada copia su `.sha256` regenerado:
-- `openapi-golden-path.yaml`, en Infra `docs/contracts/openapi/` y en Backend `docs/contracts/openapi/`: pasa a **1.2.0 (CULM-001-B2NM)**, o a la menor siguiente si A ya publicó una 1.1.x.
+- `openapi-golden-path.yaml`, en Infra `docs/contracts/openapi/` y en Backend `docs/contracts/openapi/`: pasa a **1.4.0 (CULM-001-B2NM)**, después de la 1.2.0 de A y la 1.3.0 de B (DEC-032).
 - `BACKEND_GOLDEN_PATH_CONTRACT.md`, en Infra `docs/contracts/openapi/` y en Backend `docs/contracts/`.
 
 Solo cambian descripciones; **ningún** schema ni conjunto de respuestas cambia:
@@ -792,3 +792,5 @@ Nada de esta tabla entra en el GREEN de B2. Cada punto queda como TD en `TECHNIC
 | :--- | :--- |
 | Numeración definitiva (DEC-028) | B2 pasa a la migración `17_culm001_b2nm_asignatura_plan_*` (puente, columna `NULL`) y a la `18_culm001_b2nm_retirar_semestre_plan_*` (`DROP`). Se renumeró en todo el contrato (cabecera, R4, §2.3, §2.9, §5.2, §5.3, §6, §8, §9) y en `PLAN.md`. Las semillas `37`–`39` se mantienen. La cabecera recoge la tabla completa: A.1 = 13, A.2 = 14, B.1 = 15, B.2 = 16, B2 = 17 y 18. Las secciones §8 y §9 conservan su texto, salvo los números de migración, que se actualizaron |
 | O3-N2 | El `down` de la 17 (§2.3.2, paso 3) y el de la 18 (§2.3.4) actualizan **todas** las filas de `Asignatura.semestrePlanEstudio` desde el vínculo vigente de la puente, no solo las `NULL`. Se fija que cambiar el semestre de un vínculo actualiza la misma fila de la puente (§2.3.4, nota). B2NM-12 agrega el caso: en la ventana entre la 17 y la 18 se cambia el semestre del vínculo de una asignatura existente, y tras el `17 down` la columna tiene el semestre nuevo |
+
+v5: DEC-032, versión 1.4.0 del golden path (A publica 1.2.0 y B 1.3.0).

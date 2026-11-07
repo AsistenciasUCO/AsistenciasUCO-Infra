@@ -1,7 +1,7 @@
 # CULM-001 · Paquete B — CONTRACT (tomas por horas, QR de asistencia, ventana de sesión, sesión cancelada y festivos)
 
-> **Estado:** BORRADOR v2, corregido tras `REVIEW-1.md` (20 objeciones, 9 bloqueantes; respuesta punto por punto en §8) y las decisiones del orquestador del 2026-11-07. Pendiente de la segunda pasada de la revisión 9.2. Nada se congela ni se firma (`.sha256`) antes de "sin objeciones" y del registro de DEC-024 (`DEC-024-propuesta.md`).
-> **Fecha:** 2026-11-06 (v1) · 2026-11-07 (v2). **Fase SDD:** 02 CONTRACT (el RED empieza solo después de la revisión).
+> **Estado:** v4 final para congelar. Incorpora las correcciones de `REVIEW-1.md` (20 objeciones, respuesta en §8), de `REVIEW-2.md` (4 objeciones, respuesta en §9) y de `REVIEW-3.md` (sin bloqueantes, respuesta en §10), además de las decisiones del orquestador (DEC-024, DEC-028, DEC-032). Nada se congela ni se firma (`.sha256`) antes de "sin objeciones".
+> **Fecha:** 2026-11-06 (v1) · 2026-11-07 (v2, v3 y v4). **Fase SDD:** 02 CONTRACT (el RED empieza solo después de la revisión).
 > **Fuentes:** `PROMPT_FABLE_CULMINACION.md` §3.2, §3.3, §3.4, §3.7 y §3.10; `DECISIONES.md` DEC-011 a DEC-018 (cerradas, no se reabren); `RESEARCH-MODELO-ACTUAL.md`; `FINDINGS-docente|estudiante|coordinador.md`; `AGENTS.md` §3.3.
 > **Convenciones de ruta:** `DB:` = `GestioAsistenciaDB/`, `BE:` = `GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/`, `BE-T:` = `GestioAsistenciaBackend/src/test/java/co/edu/uco/asistenciasuco/`, `FE:` = `GestioAsistenciaFrontend/src/app/`, `INFRA:` = `AsistenciasUCO-Infra/`. Todos bajo `C:\Proyectos\GestionAsistencia-CULM001\`.
 
@@ -61,7 +61,7 @@ B.1 va primero porque B.2 necesita `uv_sesion_estado` (las tomas no se abren en 
 | HU040, HU041 (docente: sábana y riesgo) | Endpoint de resumen por grupo; la sábana deja de calcular en el cliente | B.2 |
 | HU065 (cumplimiento) | `uv_cumplimiento_sesion_grupo` excluye canceladas (B.1) y cuenta tomas (B.2) | B.1/B.2 |
 | HU066, HU070 (alertas tempranas) | Vía `uv_resumen_*` por horas | B.2 |
-| HU102, HU106 (decano) | `usp_consultar_kpis_decano` y comparativas por horas | B.2 |
+| HU102, HU106 (decano) | `usp_consultar_kpis_decano` por horas (comparativas diferidas a D) | B.2 |
 | HU133, HU138 (institución) | `usp_consultar_kpis_institucion` por horas; cumplimiento sin canceladas | B.1/B.2 |
 | HU067, HU069 | Bitácora e historial agregan por sesión/horas | B.2 |
 | HU061, HU103, HU134, HU139 (consolidado, comparativas, tendencia) | **Diferido a D: deben pasar a horas** ([SUPUESTO-B-23]). En B solo se evita la duplicación de filas con varias tomas | D |
@@ -483,7 +483,9 @@ CREATE OR ALTER PROCEDURE dbo.usp_generar_sesiones_grupo_v2
 1. **Fase 1:** `INSERT INTO @resultadoGeneracion EXEC dbo.usp_generar_sesiones_grupo @idGrupo, @idCorrelacion, @idUsuarioEjecutor;` (texto del SP congelado intacto; no usa `INSERT … EXEC` internamente, se verifica en el RED). **No** se exige `@@TRANCOUNT = 0` y no hay `SES_015` (B-6 de REVIEW-1: dentro de `INSERT … EXEC` `@@TRANCOUNT` vale 1 aunque fuera valga 0, así que el requisito no evita el 3915; la ruta feliz funciona dentro de una transacción externa, como ya prueba `test_rec3_falla_intermedia_transaccion.sql:223-224`). Los errores de negocio del SP congelado (RBAC, titularidad, horarios, fechas, zona) ocurren antes de su `BEGIN TRANSACTION` (línea 237) y no hacen `ROLLBACK`: su tupla llega intacta.
 2. Si `estadoResultado = 0` → devuelve esa tupla tal cual (misma tupla que el v1).
 3. **Fase 2:** transacción propia o `SAVE TRANSACTION sp_generar_sesiones_v2` (§2.0) → `usp_internal_aplicar_festivos_grupo @soloFuturas = 0, @idUsuarioEjecutor = NULL` → commit. Éxito: mensaje del SP congelado (`GEN_004`) + conteos.
-4. **CATCH** del v2: `IF XACT_STATE() <> 0 ROLLBACK` (respetando ownership: si la transacción no es propia y está condenada, `THROW`), y el error 3915 (el `ROLLBACK` del `CATCH` del SP congelado dentro del `INSERT … EXEC`) o cualquier otro error de la fase 1 se devuelve como `SYS_001` con la tupla canónica y `ufn_obtener_detalle_error`. Las dos fases son idempotentes; si la segunda falla, repetir la llamada completa deja el estado correcto (R1).
+4. **CATCH** del v2 (R2-1 de REVIEW-2): al empezar, el v2 guarda `@trancountEntrada = @@TRANCOUNT`, y la reversión depende solo de ese nivel de entrada, no de una bandera de la fase 2:
+   - **`@trancountEntrada = 0`**: si `@@TRANCOUNT > 0`, hace `ROLLBACK`; después devuelve la tupla canónica con `SYS_001` y `ufn_obtener_detalle_error`. Así se traduce el error 3915 (el `ROLLBACK` del `CATCH` del SP congelado dentro del `INSERT … EXEC`) o cualquier otro error de la fase 1 o 2. Al salir, `@@TRANCOUNT = 0`.
+   - **`@trancountEntrada > 0`**: hace `THROW` sin `ROLLBACK` y no devuelve tupla. Con transacción externa, el `BEGIN TRANSACTION` del SP congelado queda abierto al fallar su `ROLLBACK` (`XACT_STATE() = -1`, `@@TRANCOUNT = 2`, error 266), así que solo el llamador puede revertir. El adaptador del backend recibe la excepción y la traduce como error técnico (500 `SYS_001`). Las dos fases son idempotentes; si la segunda falla, repetir la llamada completa deja el estado correcto (R1).
 5. El adaptador del backend no necesita `Propagation.NOT_SUPPORTED`.
 
 `usp_precargar_sesiones_grupo_interno` (MODIFICADO, no congelado): al final del paso de inserción llama a `usp_internal_aplicar_festivos_grupo @soloFuturas = 0` dentro de la misma transacción del llamador (crear grupo + horarios + precarga, `GrupoJpaRepository`). El borrado de sesiones futuras que ya no encajan en el horario (`NOT EXISTS Asistencia`, línea 144) añade `NOT EXISTS TomaAsistencia` (B.2) y borra antes la `SesionCancelacion` de esas sesiones (una sesión que deja de existir pierde su cancelación). Las sesiones canceladas que siguen encajando no se borran ni se recrean (idempotencia por `(grupo, fechaHoraInicio, fechaHoraFin)`).
@@ -796,7 +798,7 @@ La semilla `DB:schema/seed/36_backfill_toma_asistencia.sql` ejecuta el paso 3 co
 3. Restaura el texto anterior de `usp_sincronizar_asistencia_estudiante_interno`, `uv_resumen_asistencia_estudiante_grupo`, `uv_cumplimiento_sesion_grupo` (versión B.1), los consumidores de §2.9, `usp_cancelar_sesion`/`usp_internal_aplicar_festivos_grupo`/precarga (versión B.1) y `DetalleAsistencia.sql`; `DROP` de los SP, funciones y vistas de B.2; restaura el texto anterior de `usp_ejecutar_cierre_masivo_periodo` (`COUNT(da.id)`). No toca permisos de `usp_registrar_asistencia_estudiante_autonomo` (B no los cambia).
 4. Borra parámetros y mensajes de B.2 con la misma regla de `15_down`.
 
-`@@TRANCOUNT = 0` al terminar cada script; cada migración se prueba `up → down → up` en `DB:test/test_culm001_b2_migraciones.sql` (y la 14 en `test_culm001_b1_sesion_cancelada.sql`) (§2.16).
+`@@TRANCOUNT = 0` al terminar cada script; cada migración se prueba `up → down → up` en `DB:test/test_culm001_b2_migraciones.sql` (y la 15 en `test_culm001_b1_sesion_cancelada.sql`) (§2.16).
 
 ### 2.15 Manifiestos y contratos de BD
 
@@ -844,7 +846,8 @@ Archivos nuevos en `DB:test/` (se registran en `test_suite.sql`/`test_summary.ps
 | B1-FES-05 | Cargas concurrentes del mismo año (2 sesiones T-SQL) | Sin duplicados (único por fecha) ni error de clave: la segunda espera al bloqueo |
 | B1-FES-06 | **Las 19 fechas de 2026 y las 19 de 2027 de la tabla §3.4.1** (NB-6), que cubren fijos, trasladados al lunes (también los que no se trasladan ese año, como San Pedro y Raza 2026), de Pascua y Chiquinquirá | Una sesión generada en cada una de las 38 fechas (franja del horario en ese día) nace cancelada con motivo `Día festivo: <nombre>`; una sesión el día anterior y el siguiente de cada una no se cancela |
 | B1-FES-07 | `usp_generar_sesiones_grupo_v2` en un periodo con festivos | Las sesiones de días festivos quedan con `SesionCancelacion` tipo automático y `diaFestivo`; las demás sin cancelar; segunda ejecución: 0 sesiones nuevas, 0 cancelaciones nuevas |
-| B1-FES-08 | (B-6) Falla inyectada en la fase 1 con el patrón `CK_REC3_TMP_SESION` de `test_rec3_falla_intermedia_transaccion.sql` (TX-04), con y sin transacción externa | `estadoResultado = 0` con `SYS_001` (el 3915 se traduce), 0 sesiones del grupo, `@@TRANCOUNT` igual al de entrada |
+| B1-FES-08a | (B-6, R2-1) Falla inyectada en la fase 1 con el patrón `CK_REC3_TMP_SESION` de `test_rec3_falla_intermedia_transaccion.sql` (TX-04), **sin** transacción externa | Una tupla con `estadoResultado = 0` y `SYS_001` (el 3915 traducido), `@@TRANCOUNT = 0` y 0 sesiones del grupo |
+| B1-FES-08b2 | (R2-1) La misma falla **con** transacción externa (`BEGIN TRANSACTION` en la prueba) | El v2 hace `THROW` sin `ROLLBACK` y no devuelve tupla; el `CATCH` de la prueba ve `XACT_STATE() = -1`, hace `ROLLBACK` y al final quedan 0 sesiones del grupo y `@@TRANCOUNT = 0` |
 | B1-FES-08b | Paridad de la tupla de negocio: grupo sin horarios (y docente no titular) | `usp_generar_sesiones_grupo_v2` devuelve exactamente la misma tupla que `usp_generar_sesiones_grupo` |
 | B1-FES-08c | Ruta feliz dentro de una transacción externa | Genera y aplica festivos; el llamador confirma o revierte todo |
 | B1-FES-09 | Precarga (crear grupo + horario) en periodo con festivo | Sesiones del festivo creadas canceladas en la misma transacción; un cambio de horario que borra una sesión futura cancelada borra también su `SesionCancelacion` |
@@ -1120,7 +1123,7 @@ BE:infrastructure/adapter/secondary/
 │                                         AsistenciaQrJpaRepository (SHA-256 aquí), ResumenAsistenciaJpaRepository}
 ├── persistence/sqlserver/jpa/entity/{UvSesionEstadoEntity, UvTomaAsistenciaEntity, UvAsistenciaSesionHorasEntity, UvDetalleAsistenciaV2Entity}
 ├── calendar/{CalendariosNacionalesFestivosAdapter, FeriadosIoFestivosAdapter, CalculoLocalFestivosColombiaAdapter}
-└── security/SlidingWindowLimitadorIntentosAdapter   -- reutiliza SlidingWindowRateLimiter; máx. claves app.asistencia-qr.rate-limit.max-claves (10000)
+└── security/SlidingWindowLimitadorIntentosAdapter   -- usa infrastructure/ratelimit/SlidingWindowRateLimiter (paquete compartido, R2-2); máx. claves app.asistencia-qr.rate-limit.max-claves (10000)
 
 BE:infrastructure/adapter/primary/
 ├── controller/tomaasistencia/{SesionTomaController (/api/v1/sesiones/{id}/tomas), TomaAsistenciaController (/api/v1/tomas/**)}
@@ -1132,6 +1135,16 @@ BE:infrastructure/adapter/primary/
 
 BE:infrastructure/config/{asistenciaqr/AsistenciaQrWiringConfiguration, festivos/FestivosWiringConfiguration, tomaasistencia/TomaAsistenciaWiringConfiguration}
 ```
+
+**Limitador compartido (R2-2 de REVIEW-2):** `SlidingWindowRateLimiter` sale de `infrastructure/adapter/primary/controller/filter/` y pasa a un paquete neutral de infraestructura, `BE:infrastructure/ratelimit/`, para que lo usen tanto el filtro (adaptador primario) como `SlidingWindowLimitadorIntentosAdapter` (adaptador secundario). Hoy no existe un paquete compartido equivalente, y dejarlo en `controller/filter/ratelimit` obligaría al adaptador secundario a depender de un paquete del primario. A `tryAcquire(clave, limite)` se le añaden dos métodos:
+- `boolean superaLimite(String clave, int limitePorMinuto)`: solo lectura; poda la ventana y no registra.
+- `void registrar(String clave)`: registra un intento.
+
+`tryAcquire` se conserva sin cambio de comportamiento para `MatriculaQrRateLimitFilter` y `VerificacionCorreoRateLimitFilter`, Lista completa de archivos afectados por el movimiento (R3-1). En todos solo cambia el `import` o el `package`, y ninguna aserción:
+- `MatriculaQrRateLimitFilter`, `VerificacionCorreoRateLimitFilter`, `MatriculaQrWiringConfiguration`, `VerificacionCorreoWiringConfiguration` y `SecurityConfig` (código de producción);
+- `SlidingWindowRateLimiterTest`, que se mueve con la clase a `infrastructure/ratelimit/`, y `VerificacionCorreoRateLimitFilterTest`, `MatriculaQrControllersTest` (pruebas).
+
+La lista se verifica en el RED con `grep -r SlidingWindowRateLimiter` sobre `src/main` y `src/test`. `AsistenciaQrRateLimitFilter` llama a `superaLimite` antes de la cadena y, si la respuesta es ≥ 400 y ≠ 429, a `registrar` en el `finally`. Pruebas unitarias nuevas en `SlidingWindowRateLimiterTest`: `superaLimite` no consume cupo; `registrar` + `superaLimite` en el borde; poda de la ventana; límite de claves; `tryAcquire` igual que hoy. La regla ArchUnit nueva permite `infrastructure.ratelimit` desde `adapter.primary` y `adapter.secondary`, y lo prohíbe desde `application`.
 
 `AsistenciaQrController` (existente) se elimina al moverse su único método vivo a `EstudianteAsistenciaQrController`.
 
@@ -1230,7 +1243,7 @@ Todos se publican **después** del commit (nunca ante error), con `payload.grupo
 3. `GET /api/v1/grupos/{grupoId}/asistencias`: solo descripción (estado consolidado por sesión); esquema sin cambio.
 4. `GET /api/v1/realtime/stream` y `RealtimeEventResponse` (`type: const ASISTENCIAS_SESION_ACTUALIZADAS`): **sin cambio**. Los tipos nuevos no entran al golden path (precedente: `MATRICULA_QR_ROTADO` tampoco está); se documentan en el contrato de eventos.
 5. Los endpoints nuevos (tomas, QR, festivos, resumen, cancelar) **no** entran al golden path: se documentan con springdoc (`/v3/api-docs`) y en `GestioAsistenciaBackend/docs/contracts/HTTP_AS_IS_MATRIX.md`.
-6. **Versión (NB-10):** `info.version` 1.1.0 → **1.2.0**, con una línea en `info.description`: "CULM-001 B: `Sesion`/`SesionV2` + `estado`, `cancelacion`; lote escribe en la toma vigente; 409 `ERR_SESION_CANCELADA`". B2 pasa a 1.3.0 (se registra en `DECISIONES.md`). Pruebas que se actualizan por este cambio formal: `OpenApiGoldenPathConformanceTest.criticalSchemasDeclareExactlyTheFrozenPropertiesAndRequiredFields` (`Sesion` + 2 campos), `criticalOpenApiSchemasMatchProviderDtoPropertyShapes` (`SesionConsultadaDTO` + 2), `OpenApiSesionesV2ContractRedTest` y el `.sha256` en los dos repos. La lista `forbiddenGhosts` (`tipo`, `status`, …) **no** se toca: `tipo` va anidado dentro de `cancelacion`.
+6. **Versión (NB-10; DEC-032, que sustituye a DEC-030):** B parte del golden path **1.2.0 que publica el paquete A** (DOCENTE en `x-roles`) y publica **1.3.0**, con una línea en `info.description`: "CULM-001 B: `Sesion`/`SesionV2` + `estado`, `cancelacion`; lote escribe en la toma vigente; 409 `ERR_SESION_CANCELADA`". B2 publica 1.4.0 y se rebasa sobre B. Si A aún no está integrado cuando B congele, B espera a la 1.2.0 de A: no publica sobre la 1.1.0. Pruebas que se actualizan por este cambio formal: `OpenApiGoldenPathConformanceTest.criticalSchemasDeclareExactlyTheFrozenPropertiesAndRequiredFields` (`Sesion` + 2 campos), `criticalOpenApiSchemasMatchProviderDtoPropertyShapes` (`SesionConsultadaDTO` + 2), `OpenApiSesionesV2ContractRedTest` y el `.sha256` en los dos repos. La lista `forbiddenGhosts` (`tipo`, `status`, …) **no** se toca: `tipo` va anidado dentro de `cancelacion`.
 
 **`BACKEND_GOLDEN_PATH_CONTRACT.md`**: fila 5 (`/asistencias/lote`) + "escribe en la toma vigente; 409 `ERR_SESION_CANCELADA`"; "Nota Sesion" + `estado`/`cancelacion`. Nada más. **`REALTIME_EVENT_CONTRACT.md`** (Infra, WORM con `.sha256`) y `REALTIME_EVENT_STANDARD.md` (backend): tabla AS-IS con los 6 tipos nuevos, la política de audiencia y la excepción documentada de payload con token para `ASISTENCIA_QR_ROTADO` (además de `MATRICULA_QR_ROTADO`, que hoy no figura). `GoldenPathSqlStoredProcedureContractIT` y las pruebas de conformidad OpenAPI del backend se actualizan **solo** en lo que cambian los puntos 1, 2 y 6.
 
@@ -1331,9 +1344,9 @@ Las listas de sesiones (`coordinator-management.service.ts:591`, `dean-facultad.
 | `INFRA:docs/user-stories/HU-CATALOG.md` | HU047, HU175 y HU176 pasan de `[BLOQUEADO 501]`/Fase 3 a implementadas, **a certificar en la Fase 3** (evidencia: pruebas de §2.16, §3.11, §4.8 y recorrido en pantalla). HU004, HU009, HU013, HU040, HU041, HU065, HU066, HU070, HU102, HU106, HU133, HU138, HU067 y HU069 llevan la nota "porcentaje de inasistencia calculado por horas (CULM-001 B, DEC-012/DEC-024); `asistencias/faltas/excusas` cuentan tomas" (NB-2). HU061, HU103, HU134 y HU139 llevan la nota **"diferido a D: deben pasar a horas"**. HU144/HU145: "muestran sesiones canceladas" |
 | `INFRA:docs/baseline/TECHNICAL_DEBT.md` | **TD-009 sigue abierta** (retiro de `POST /asistencias` diferido a D, [SUPUESTO-B-19]). Deudas nuevas: literales de `RazonCausa` en vistas ([SUPUESTO-B-03]); `usp_registrar_asistencia_estudiante_autonomo` sin consumidor, con `REVOKE`/`DROP` pendiente en D ([SUPUESTO-B-18]); cierre masivo con regla mínima por sesiones distintas, que C reescribe por horas; payload con token en `*_QR_ROTADO` ([SUPUESTO-B-16]); límites de intentos en memoria por JVM; generación v2 en dos fases no atómicas (§2.7.6); comparativas, tendencia y consolidado por horas en D ([SUPUESTO-B-23]); SSE para estudiantes en C ([SUPUESTO-B-17]) |
 | `AsistenciasUCO-Infra/scripts/tests/test_all_hus.ps1` (y la copia que use el workspace) | Casos nuevos: HU047 (cancelar con motivo 200; repetir 409; sin motivo 400), HU175 (abrir toma QR 201, abrir QR 201 con `pin`/`urlAsistencia`/`qrPngBase64`, rotar 200, cerrar 200), HU176 (registrar por PIN 201, repetir 200 `yaRegistrado`, PIN inválido 404, cuerpo antiguo 400), tomas (faltantes 200, cierre 200), festivos (GET 200, recarga 200), `GET /estudiante/materias` con `indicadores`. Se elimina la expectativa 501 de `qr-token`; `POST /asistencias` sigue esperando 501 hasta D |
-| Contratos WORM | §2.15 (manifiesto de Infra con hashes efectivos, post-freeze `WORK_ITEM` de B, addendum de BD) y §3.10 (golden path 1.2.0, `BACKEND_GOLDEN_PATH_CONTRACT.md`, eventos) |
+| Contratos WORM | §2.15 (manifiesto de Infra con hashes efectivos, post-freeze `WORK_ITEM` de B, addendum de BD) y §3.10 (golden path 1.3.0 sobre la 1.2.0 de A, `BACKEND_GOLDEN_PATH_CONTRACT.md`, eventos) |
 | `docs/realtime-sse-architecture.md` (workspace) y `docs/rutas-por-rol.md` | Tipos nuevos, política de audiencia (solo titular en B), rutas `/app/asistencia/qr`, `/app/asistencia/pin`, `/app/admin/festivos` |
-| `DECISIONES.md` (lo registra el orquestador) | DEC-024 (precisión de DEC-012, `DEC-024-propuesta.md`); drift previo del manifiesto de Infra (B-2); golden path 1.2.0 para B y 1.3.0 para B2 (NB-10); política de audiencia en B y apertura a estudiantes en C (NB-11); cancelación de sesiones pasadas sin asistencia (NB-7) |
+| `DECISIONES.md` (lo registra el orquestador) | DEC-024 (precisión de DEC-012, `DEC-024-propuesta.md`); drift previo del manifiesto de Infra (B-2); golden path: A 1.2.0, **B 1.3.0**, B2 1.4.0 (NB-10, **ya registrado en DEC-032, que sustituye a DEC-030**); política de audiencia en B y apertura a estudiantes en C (NB-11); cancelación de sesiones pasadas sin asistencia (NB-7) |
 | Work items por repo | `docs/work-items/CULM-001-B1-sesiones-festivos/` y `CULM-001-B2-tomas-qr/` en DB, Backend y Frontend (PLAN/RED/GREEN/AUDIT/CLOSURE de cada repo, patrón HU176B) |
 
 ---
@@ -1346,7 +1359,7 @@ Las listas de sesiones (`coordinator-management.service.ts:591`, `dean-facultad.
 1. **DB**: tablas + FKs → funciones/vistas → SP → semillas/permisos → migración 15 → pruebas → manifiesto post-freeze. Gate: `infra.ps1 db-test` sin fallos nuevos (F-000 es de línea base) y `freeze-manifest.ps1` verde.
 2. **Backend**: puertos y casos de uso → adaptadores (JPA, calendario, vault) → controladores/seguridad/catálogo de acceso → política de audiencia SSE → scheduler → DTOs de sesión. Gate: `mvnw verify` (con `JAVA_TOOL_OPTIONS` de `ESTADO.md`) y `-Pintegration` de los IT de B.1.
 3. **Frontend**: modelos/servicios → estado cancelado en todos los roles → cancelar sesión → festivos del administrador. Gate: `npm run verify`.
-4. **Infra**: manifiesto de Infra con los hashes efectivos (B-2), golden path 1.2.0, contrato de eventos, `test_all_hus.ps1`, catálogo y deuda. Gate: `infra.ps1 verify` y `verify-contracts.ps1 -Root C:\Proyectos\GestionAsistencia-CULM001` en verde; `-Mode Generate` solo después de la aprobación 9.2 y con el `git diff` de los cuatro `.sha256` revisado.
+4. **Infra**: manifiesto de Infra con los hashes efectivos (B-2), golden path 1.3.0 (sobre la 1.2.0 de A), contrato de eventos, `test_all_hus.ps1`, catálogo y deuda. Gate: `infra.ps1 verify` y `verify-contracts.ps1 -Root C:\Proyectos\GestionAsistencia-CULM001` en verde; `-Mode Generate` solo después de la aprobación 9.2 y con el `git diff` de los cuatro `.sha256` revisado.
 
 **B.2** (rama `feature/CULM-001-B2-tomas-qr`, desde `integracion/CULM-001` con B.1 integrado): mismo orden DB → Backend → Frontend → Infra.
 - **DB**: catálogos y tablas → `DetalleAsistencia` + secuencia → conversión NOT NULL (semilla 36 / migración 16) → sincronización/toma vigente → SP de tomas → horas (funciones, `uv_resumen_*`, consumidores de §2.9, cierre masivo) → QR → consultas → concurrencia. El GREEN de tomas y horas puede empezar mientras se conoce la causa de F-DOC-015.
@@ -1361,9 +1374,9 @@ Conventional Commits en español, en imperativo, de 72 caracteres como máximo y
 
 **B.1**
 - DB: `feat(db/tables): agregar sesion cancelada y catalogo de dias festivos` · `feat(db/sp): admitir tolerancia y rechazar sesiones canceladas en SES-01` · `feat(db/sp): implementar cancelacion de sesion con justificacion` · `feat(db/sp): cargar festivos por anio y aplicarlos a las sesiones` · `feat(db/sp): generar sesiones v2 y precargar con festivos cancelados` · `feat(db/views): excluir sesiones canceladas del cumplimiento` · `feat(db/seed): sembrar parametros, mensajes y plantilla de B.1` · `feat(db/migrations): agregar migracion 15 de sesiones y festivos` · `test(db): cubrir ventana con tolerancia, cancelacion y festivos` · `chore(db/scripts): generar manifiestos post-freeze por work item` · `docs(db/contracts): registrar manifiesto post-freeze de CULM-001 B.1`
-- Backend: `test(backend): agregar pruebas RED de cancelacion y festivos` · `feat(backend/ports): agregar puertos de cancelacion y calendario` · `feat(backend/adapter): agregar proveedores de festivos y respaldo local` · `feat(backend/usecase): implementar cancelacion de sesion HU047` · `feat(backend/controller): exponer festivos del administrador` · `feat(backend/realtime): agregar politica de audiencia por tipo exacto` · `feat(backend/adapter): generar sesiones con festivos cancelados` · `feat(backend/security): actualizar catalogo de acceso de B.1` · `docs(backend): documentar estado de sesion en el golden path 1.2.0`
+- Backend: `test(backend): agregar pruebas RED de cancelacion y festivos` · `feat(backend/ports): agregar puertos de cancelacion y calendario` · `feat(backend/adapter): agregar proveedores de festivos y respaldo local` · `feat(backend/usecase): implementar cancelacion de sesion HU047` · `feat(backend/controller): exponer festivos del administrador` · `feat(backend/realtime): agregar politica de audiencia por tipo exacto` · `feat(backend/adapter): generar sesiones con festivos cancelados` · `feat(backend/security): actualizar catalogo de acceso de B.1` · `docs(backend): documentar estado de sesion en el golden path 1.3.0`
 - Frontend: `test(frontend): agregar specs RED de sesion cancelada y festivos` · `feat(frontend/docente): cancelar sesion con justificacion` · `feat(frontend/ui): mostrar sesiones canceladas en todos los roles` · `feat(frontend/admin): agregar consulta y recarga de festivos`
-- Infra: `docs(contracts): agregar estado de sesion al golden path 1.2.0` · `docs(contracts): fijar hashes efectivos UTC-D06 en el manifiesto de BD` · `test(scripts): agregar HU047 y festivos a test_all_hus` · `docs(hus): actualizar HU047 en el catalogo`
+- Infra: `docs(contracts): agregar estado de sesion al golden path 1.3.0` · `docs(contracts): fijar hashes efectivos UTC-D06 en el manifiesto de BD` · `test(scripts): agregar HU047 y festivos a test_all_hus` · `docs(hus): actualizar HU047 en el catalogo`
 
 **B.2**
 - DB: `feat(db/tables): agregar tomas de asistencia y tokens QR por toma` · `feat(db/migrations): migrar detalles existentes a la toma 1` · `feat(db/sp): resolver la toma vigente al sincronizar asistencia` · `feat(db/sp): abrir, cerrar y registrar asistencia por toma` · `feat(db/sp): emitir, rotar y registrar asistencia por QR` · `feat(db/functions): calcular horas de sesion y de toma` · `feat(db/views): calcular inasistencia por horas en el resumen` · `perf(db/sp): reemplazar MAX+1 por secuencia en detalle de asistencia` · `refactor(db/sp): pasar KPIs de coordinador, decano e institucion a horas` · `fix(db/sp): contar sesiones distintas en el cierre por inasistencia` · `refactor(db/sp): evitar filas duplicadas por toma en consultas diferidas` · `feat(db/seed): sembrar catalogos, parametros y mensajes de B.2` · `test(db): cubrir tomas, horas, QR y concurrencia 5x40` · `docs(db/contracts): ampliar manifiesto post-freeze con B.2`
@@ -1379,7 +1392,7 @@ Conventional Commits en español, en imperativo, de 72 caracteres como máximo y
 
 | # | Riesgo | Mitigación |
 | :--- | :--- | :--- |
-| R1 | `usp_generar_sesiones_grupo_v2` usa `INSERT … EXEC` sobre el SP congelado, que hace `ROLLBACK` en su `CATCH`: un error interno de la fase 1 produce el 3915 con o sin transacción externa | El `CATCH` del v2 traduce el 3915 (y cualquier error de la fase 1) a `SYS_001` con la tupla canónica; B1-FES-08 lo prueba con una falla inyectada; las dos fases son idempotentes (B-6) |
+| R1 | `usp_generar_sesiones_grupo_v2` usa `INSERT … EXEC` sobre el SP congelado, que hace `ROLLBACK` en su `CATCH`: un error interno de la fase 1 produce el 3915 con o sin transacción externa | Sin transacción externa, el `CATCH` del v2 hace `ROLLBACK` y traduce el 3915 a `SYS_001` con la tupla canónica (B1-FES-08a). Con transacción externa, hace `THROW` y revierte el llamador (B1-FES-08b2, R2-1); las dos fases son idempotentes (B-6) |
 | R2 | `uv_detalle_asistencia` (congelada) cambia de cardinalidad (una fila por toma) sin cambiar su texto: un consumidor no inventariado duplicaría filas | Inventario de §2.9 y §3.6 contrastado por el revisor con RESEARCH §7; addendum del contrato de BD; con una toma por sesión (todo el histórico tras el backfill) no cambia nada |
 | R3 | Se tocan unos 30 archivos de prueba, fixture o limpieza ([SUPUESTO-B-20], §2.16.3) | Solo cambian la inserción o el orden de borrado; la única aserción que cambia es la de `test_attendance_commands.sql:202` (cambio formal por DEC-011); el PR lista archivo por archivo; B2-SEG-02 prueba que los fixtures se pueden repetir |
 | R4 | Los KPIs cambian de valor en grupos con sesiones de distinta duración (horas frente a sesiones) | Es la regla 3.3 (DEC-012/DEC-024); `porcentajeInasistenciaSesiones` queda para trazabilidad; nota en el catálogo |
@@ -1408,7 +1421,7 @@ Conventional Commits en español, en imperativo, de 72 caracteres como máximo y
 | :--- | :--- |
 | `porcentajeInasistencia`/`codigoPermanencia` a horas con el mismo nombre | Aceptado; se registra como DEC-024 (`DEC-024-propuesta.md`) antes de congelar |
 | Estado consolidado por sesión | Aceptado; `PARCIAL` solo en DTOs que no son golden |
-| `estado`/`cancelacion` requeridos en `Sesion`/`SesionV2` | Aceptado, con golden path 1.2.0 y las pruebas de conformidad actualizadas |
+| `estado`/`cancelacion` requeridos en `Sesion`/`SesionV2` | Aceptado, con golden path 1.3.0 (DEC-032) y las pruebas de conformidad actualizadas |
 | SSE para estudiantes en B | Pasa a C; B solo diseña la política de audiencia del titular |
 | Secuencia de `codigo` | Aceptada, con `START WITH` dinámico y B2-MIG-06 |
 | Toma implícita cerrada y denominador | Aceptados (DEC-024) |
@@ -1447,7 +1460,29 @@ Además se aplican los [SUPUESTO] del prompt:
 | NB-7 Cancelación retroactiva | NB | **Aceptada en parte, por decisión del orquestador**: se puede cancelar una sesión futura o una sin asistencia registrada (también pasada); una pasada con asistencia exige reclamo (`SES_016`, prueba B1-CAN-08). No se adopta el corte general por `ventanaCierreUtc` que propuso el revisor, porque el orquestador decidió permitir cancelar sesiones pasadas sin asistencia ([SUPUESTO-B-10], R16) |
 | NB-8 Token en la URL de retorno | NB | **Aceptada**: `sessionStorage` y sin `returnUrl` hacia el IdP, con spec en `auth.guard.spec.ts` (§4.5, §4.8) |
 | NB-9 Cabecera sin detalle | NB | **Aceptada**: prueba B2-HOR-09, `sesionesConCabeceraSinDetalle` en el resultset de control y nota de que las sesiones sin asistencia no reciben toma (§2.14, §2.16.2) |
-| NB-10 Versión del golden path | NB | **Aceptada**: 1.2.0 para B y 1.3.0 para B2; pruebas de conformidad actualizadas; `forbiddenGhosts` intacto (§3.10) |
+| NB-10 Versión del golden path | NB | **Aceptada**: B publica 1.3.0 sobre la 1.2.0 de A y B2 publica 1.4.0 (DEC-032, que sustituye a DEC-030); pruebas de conformidad actualizadas; `forbiddenGhosts` intacto (§3.10) |
 | NB-11 SSE del estudiante y DEC-022 | NB | **Resuelta por el alcance del orquestador**: el SSE para estudiantes queda en C y B solo diseña la política de audiencia para eventos del titular, con igualdad exacta de tipo ([SUPUESTO-B-17], §3.8, §3.11, §4.5) |
 | Numeración (DEC-028, complemento del orquestador) | — | Migraciones B.1 = 15 y B.2 = 16 (A usa 13/14, B2 usa 17/18), semillas 34-36, prefijos `culm001_b1`/`culm001_b2` en archivos, pruebas y fixtures (`culm001_b2_toma_fixture.sql`, `test_culm001_b1.ps1`, `test_culm001_b2.ps1`, `zz_archivo_DetalleAsistencia_culm001_b2`) y registro de pruebas por nombre exacto, sin comodín `culm001_b2*` ([SUPUESTO-B-01]) |
 | §9 de REVIEW-1 (diferibles) | — | Se difieren a D, como recomendó el revisor y decidió el orquestador: comparativas, tendencia y consolidado (marcados "diferido a D: deben pasar a horas") y el retiro de `POST /asistencias`. **No se difieren** feriados.io (respaldo 1 exigido por 3.7, con implementación mínima) ni la lista de sesiones en festivo con asistencia (salida del SP y su consulta), por decisión del orquestador |
+
+---
+
+## 9. Respuesta a REVIEW-2
+
+| Objeción | Tipo | Cambio en el contrato |
+| :--- | :--- | :--- |
+| **R2-1** B1-FES-08 imposible con transacción externa | B | **Aceptada con la corrección exacta.** §2.7.6, paso 4: el v2 guarda `@trancountEntrada = @@TRANCOUNT`. Si la entrada es 0, hace `ROLLBACK` si `@@TRANCOUNT > 0` y devuelve `SYS_001`. Si es mayor que 0, hace `THROW` sin `ROLLBACK` y revierte el llamador. B1-FES-08 se divide en **08a** (sin transacción externa: tupla `SYS_001`, `@@TRANCOUNT = 0`, 0 sesiones) y **08b2** (con transacción externa: `THROW`, el llamador ve `XACT_STATE() = -1`, hace `ROLLBACK`, 0 sesiones). B1-FES-08b (paridad de la tupla) y 08c (ruta feliz) no cambian. R1 actualizado |
+| **R2-2** El limitador no permite consultar sin consumir | NB | **Aceptada.** `SlidingWindowRateLimiter` pasa a `infrastructure/ratelimit/` y gana `superaLimite(clave, limite)` (solo lectura) y `registrar(clave)`, con pruebas unitarias. `tryAcquire` se conserva sin cambio para la matrícula QR y la verificación de correo. Hay regla ArchUnit para el paquete (§3.3). Se eligió un paquete neutral en lugar de `controller/filter/ratelimit` porque no existe un paquete compartido equivalente, y ese otro haría depender al adaptador secundario de uno primario |
+| **R2-3** Textos que quedaron de la v1 | NB | **Aceptada:** en §2.14, "la 14" pasa a "la 15"; en §1.2, la fila HU102/HU106 queda como "`usp_consultar_kpis_decano` por horas (comparativas diferidas a D)" |
+| **R2-4** Versión del golden path de B2 | NB | **Aceptada** en v3 con DEC-030; **sustituida en v4 por DEC-032**: A = 1.2.0, B = 1.3.0, B2 = 1.4.0 (ver §10). No se toca B2 |
+| Nota del revisor fuera de B: el contrato A llama `13_culm001_a_correcciones_fase1_*` a lo que DEC-028 reserva como migración 14 | — | Sin cambio en B: es del contrato A y lo resuelve el orquestador. B usa 15/16 y no choca con A |
+
+---
+
+## 10. Respuesta a REVIEW-3
+
+| Objeción | Tipo | Cambio en el contrato |
+| :--- | :--- | :--- |
+| **R3-1** Lista incompleta de archivos afectados por mover `SlidingWindowRateLimiter` | NB | **Aceptada.** En §3.3 se añaden `VerificacionCorreoWiringConfiguration` y `SecurityConfig`. `SlidingWindowRateLimiterTest` se mueve con la clase a `infrastructure/ratelimit/`, y `VerificacionCorreoRateLimitFilterTest` y `MatriculaQrControllersTest` también quedan en la lista. En todos cambia solo el `import` o el `package`; la lista se verifica con `grep` en el RED |
+| **R3-2** Versión del golden path | NB | **Aceptada, por DEC-032 (que sustituye a DEC-030).** A publica 1.2.0 (DOCENTE en `x-roles`), **B publica 1.3.0** sobre la 1.2.0 de A, y B2 publica 1.4.0. Se actualizan §3.10 punto 6, §5 (fila de contratos WORM y de `DECISIONES.md`), §6 (gate de Infra y commits) y §7.3/§8/§9 |
+

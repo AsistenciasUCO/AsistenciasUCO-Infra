@@ -23,7 +23,7 @@
 ## Orden de trabajo
 
 1. BD: catálogo de carácter, tabla puente, migraciones `17` (puente, backfill, columna `NULL`) y `18` (retiro de la columna) con sus `down` (DEC-025), backfill y reporte, vistas, SPs, permisos, fixture de asignatura compartida sobre el fixture de segundo ámbito de A, pruebas.
-2. Backend: entidades/proyecciones de SP, repositorios, casos de uso (JPQL directo → SP), endpoints, clasificador de errores, OpenAPI 1.2.0.
+2. Backend: entidades/proyecciones de SP, repositorios, casos de uso (JPQL directo → SP), endpoints, clasificador de errores, OpenAPI 1.4.0 (DEC-032).
 3. Frontend: modelos, servicios, malla con carácter y asociación, listados paginados, selector de programa en matrícula, specs.
 4. Docs: HU-CATALOG, deuda técnica, contrato OpenAPI y su `.sha256` en Infra y Backend.
 
