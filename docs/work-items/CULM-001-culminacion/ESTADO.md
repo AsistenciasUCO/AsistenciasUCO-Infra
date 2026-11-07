@@ -1,6 +1,6 @@
 # CULM-001 — ESTADO (fuente de verdad del avance)
 
-> Actualizado: 2026-11-07 01:40 (hora local). Leer primero al retomar la tarea.
+> Actualizado: 2026-11-07 03:30 (hora local). Leer primero al retomar la tarea.
 
 ## Entorno de trabajo
 
@@ -21,7 +21,7 @@
 | SQL Server `:1433` | arriba |
 | MinIO `:9000` | arriba · ClamAV `:3310` contenedor `unhealthy` (por revisar) |
 | MessageUcoLab `:8000` / `:5174` | arriba |
-| Backend `:8080` | arriba desde el worktree en modo **baseline** con `infra/security-baseline/scripts/start-backend-baseline.ps1 -Provider baseline -LogDirectory C:\jtmp\culm-backend-logs` (jar `target/AsistenciasUCO-0.0.1-SNAPSHOT.jar`; `.env` del worktree con `SECURITY_BASELINE_JWK_SET_URI` por `localhost`, DEC-006/DEC-007). Para reiniciar: detener el `java.exe` que escucha en 8080, `mvnw -B -DskipTests package` si cambió el código, y volver a lanzar el script |
+| Backend `:8080` | (DEC-018: el `.env` del worktree ya fija `APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER=sqlserver`; aplica en el próximo reinicio) arriba desde el worktree en modo **baseline** con `infra/security-baseline/scripts/start-backend-baseline.ps1 -Provider baseline -LogDirectory C:\jtmp\culm-backend-logs` (jar `target/AsistenciasUCO-0.0.1-SNAPSHOT.jar`; `.env` del worktree con `SECURITY_BASELINE_JWK_SET_URI` por `localhost`, DEC-006/DEC-007). Para reiniciar: detener el `java.exe` que escucha en 8080, `mvnw -B -DskipTests package` si cambió el código, y volver a lanzar el script |
 | Frontend `:4200` | arriba desde el worktree (`npm start`, log `C:\jtmp\culm-frontend-4200.log`); el `ng serve` del checkout original se detuvo (DEC-003) |
 
 ## Logins `uco-*` (realm `security-baseline`)
@@ -56,9 +56,9 @@
 | :--- | :--- | :--- |
 | Fase 0 | **completa** (2026-11-06 22:45) | worktrees desde la base correcta (DEC-002), BD restaurada y desplegada, backend/frontend arriba desde worktrees, 5 logins OK, gates de línea base registrados, work item creado, `test_all_hus.ps1` adaptado (commit `523456d`) y OpenAPI sincronizado (commit `704823c`) |
 | Fase 1 | **completa** (2026-11-07 00:30) | 6 líderes (5 roles + transversal) con pruebas por API (token PKCE), revisión estática y matriz de ámbito de 1003 celdas (0 fugas con los datos actuales; faltan datos de 2.º ámbito); recorridos en pantalla con Haiku: estudiante completo, docente/coordinador/decano parciales, administrador en curso (se repiten completos en la Fase 3). Consolidado en `FINDINGS.md`: 113 hallazgos (3 críticos, 24 altos, 52 medios, 34 bajos). Triage del orquestador en DEC-022; asignación: A 22, B 11, B2 2, C 4, D 34, E 33, no-se-corrige 3, en espera 2, entorno/docs 2 |
-| A | CONTRACT v1 revisado (REVIEW-1: 18 objeciones, 6 bloqueantes); en corrección v2 + sección A.2 (`CORRECCIONES-A.md`) | |
-| B | CONTRACT v1 (1347 líneas) revisado (REVIEW-1: 20 objeciones, 9 bloqueantes); en corrección v2; DEC-024 pendiente de registro (propuesta del redactor) | |
-| B2 | CONTRACT v2 revisado (REVIEW-2: 2 bloqueantes); en corrección v3 (DEC-025) | |
+| A | **CONTRACT congelado** (v5, `84e2fca2…`, DEC-035; 4 rondas de revisión). **GREEN en curso** (2026-11-07 03:30): implementadores de BD, backend y frontend en paralelo sobre `feature/CULM-001-A-retiro-solicitudes` (worktrees principales). Gates pendientes | |
+| B | **CONTRACT congelado** (v4, `401c76b6…`, DEC-033; 3 rondas). B.1 (BD) en GREEN en worktrees propios `C:\Proyectos\GestionAsistencia-CULM001-B` (DEC-034); B.2 pendiente | |
+| B2 | **CONTRACT congelado** (v5, `9b668c7d…`, DEC-029/DEC-032; 3 rondas). Implementación pendiente (después de B) | |
 | C | pendiente | |
 | D | pendiente | |
 | E | **E.1 (tokenización) hecha y mezclada** a `integracion/CULM-001` del frontend (`ba02d89`, PR shesho22/AsistenciasUCO-Frontend#54, DEC-026): `lint:tokens` en `npm run verify`, 806 clases + 15 hex migrados, fuentes en `styles.css`, `docs/sistema-diseno-tokens.md`. Pendiente E.2: pulido UX/UI y responsive por rol (53 hallazgos `paquete-E`) y la comprobación en pantalla del cambio de `primary` (escritorio y móvil) | |

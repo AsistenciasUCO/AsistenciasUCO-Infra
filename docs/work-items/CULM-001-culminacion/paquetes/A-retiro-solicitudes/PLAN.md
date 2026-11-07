@@ -1,5 +1,5 @@
 ---
-status: draft-r3
+status: draft-r5
 type: plan
 work-item: CULM-001
 paquete: A
@@ -20,9 +20,9 @@ last-reviewed: 2026-11-07
 - `db-test` en verde (F-000), fixture del segundo ámbito y retiro de stubs 501;
 - búsqueda del estudiante a matricular por documento exacto (DEC-027: `usp_buscar_estudiante_por_documento_grupo` y `GET /api/v1/grupos/{grupoId}/estudiantes/busqueda`).
 
-**Revisión.** `REVIEW-1.md` (18 objeciones, 6 bloqueantes) se responde en `CONTRACT.md` §9 y `REVIEW-2.md` (15 objeciones, 4 bloqueantes) en la §10; todas atendidas. Decisiones aplicadas: DEC-027 (búsqueda por documento y DOCENTE con ámbito en `GET /estudiantes`), DEC-028 (A.1 = migración 13, A.2 = migración 14, semillas 33), DEC-030 (el paquete B recongela `x-roles` en el golden path 1.2.0) y DEC-031 (`SES_017` en adelante; ámbito del administrador por institución; grupos mixtos).
+**Revisión.** `REVIEW-1.md` (18 objeciones, 6 bloqueantes) se responde en `CONTRACT.md` §9 y `REVIEW-2.md` (15 objeciones, 4 bloqueantes) en la §10 y `REVIEW-3.md` (6 objeciones, 2 bloqueantes) en la §11; todas atendidas (v5, final). Decisiones aplicadas: DEC-027 (búsqueda por documento y DOCENTE con ámbito en `GET /estudiantes`), DEC-028 (A.1 = migración 13, A.2 = migración 14, semillas 33), DEC-032 (A publica el golden path 1.2.0 con DOCENTE en el `x-roles` de `/api/v1/estudiantes`; sustituye a DEC-030) y DEC-031 (`SES_017` en adelante; ámbito del administrador por institución; grupos mixtos).
 
-**Contratos WORM.** A no edita archivos congelados ni `.sha256` (`CONTRACT.md` §1.4 y §8.1). El `x-roles` de `/api/v1/estudiantes` lo recongela B en 1.2.0 (DEC-030).
+**Contratos WORM.** A.1 no toca contratos congelados. A.2 publica el golden path 1.2.0 (DEC-032): solo `x-roles`, la descripción de `GET /api/v1/estudiantes` y la versión de `openapi-golden-path.yaml`, con los `.sha256` de Infra y Backend, las pruebas de conformidad e `infra.ps1 verify`. Commit: `docs(contracts): publicar golden path 1.2.0 con docente en estudiantes` (`CONTRACT.md` §1.4 y A2-C1).
 
 ## Orden (mismas ramas `feature/CULM-001-A-retiro-solicitudes` en los 4 repos, desde `integracion/CULM-001`)
 
