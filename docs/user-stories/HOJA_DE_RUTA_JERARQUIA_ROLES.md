@@ -34,6 +34,7 @@ flowchart TD
 4. **Docente:** Solo opera sobre los **Grupos donde es titular**. Es el **único** que registra asistencias y resuelve justificaciones; matricula y retira alumnos de su curso (el coordinador también puede inscribir estudiantes en los grupos de su programa) y resuelve las solicitudes de ingreso de los estudiantes (HU053-HU055).
 5. **Estudiante:** Accede en modo consulta a sus asignaturas matriculadas, radica solicitudes de justificación y solicita el ingreso a grupos de la oferta (HU008/HU053).
 6. **Corrección de identidad (HU159, decisión de John 2026-11-05):** cada nivel corrige al de abajo los nombres, apellidos y el tipo y número de documento, con motivo y auditoría: el Administrador al Decano, el Decano al Coordinador de su facultad (HU121), el Coordinador al Docente vinculado (HU092) y al Estudiante de su programa. Nadie corrige su propio documento por la app y el administrador no se corrige por la app. La corrección del documento se apaga con el parámetro `IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO`.
+7. **Alta de usuarios con ámbito (directriz de John, 2026-11-07):** no se aceptan perfiles ni se crean usuarios "por crear". La primera creación de un usuario o perfil va obligatoriamente atada a su ámbito: el Administrador a una universidad, el Decano a una facultad, el Coordinador a un programa, y el Docente y el Estudiante a un grupo. Por eso un estudiante nuevo entra a la app matriculado en un grupo (HU050, por el docente o el coordinador del programa, o HU176B por QR) y HU156 (admitirlo solo a un programa) quedó DESCARTADA.
 
 ---
 
