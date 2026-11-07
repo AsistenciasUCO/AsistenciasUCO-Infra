@@ -68,6 +68,9 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-052](#td-052) | Webhook Azure acepta credencial por URL/query | RESUELTA (LB-001D.2) | no |
 | [TD-053](#td-053) | Cloud Integration Azure corre como test normal | RESUELTA (LB-001D.2) | no |
 | [TD-054](#td-054) | Semántica Azure→realtime sin decisión explícita | DECISION_REQUIRED | no para documentación; sí para cambio realtime futuro |
+| [TD-CULM001-A-01](#td-culm001-a-01) | Dos fuentes del código `I` de matrícula retirada | ABIERTA / NON_BLOCKING | no |
+| [TD-CULM001-A-02](#td-culm001-a-02) | Texto local del 409 de matrícula duplicada en el frontend | ABIERTA / NON_BLOCKING | no |
+| [TD-CULM001-A-03](#td-culm001-a-03) | `SES_017` ausente de la tabla §G del Golden Path | ABIERTA / NON_BLOCKING | no |
 | [TD-055](#td-055) | MessageUcoLab: validación operacional extremo a extremo pendiente | ABIERTA / NON_BLOCKING | no |
 | [TD-056](#td-056) | MessageUcoLab: límites de código (10) y contenido (100) incompatibles con el catálogo canónico | DECISION_REQUIRED | no mientras `azure` sea el provider por defecto |
 
@@ -746,3 +749,28 @@ GOLDEN PATH EFFECT:         NONE
 - **Evidencia:** análisis de `GestioAsistenciaDB/schema/seed/04_mensaje.sql`; hallazgos H-01/H-02 en [FINDINGS_FOR_MESSAGES_TEAM](../work-items/backend/MSG-001-messageucolab-catalog-switch/FINDINGS_FOR_MESSAGES_TEAM.md).
 - **Resolución esperada:** respuesta del equipo de mensajería (ampliar límites) o decisión contractual sobre alias.
 - **Bloquea línea base:** no. **Estado:** DECISION_REQUIRED. **Work item:** MSG-001.
+
+## TD-CULM001-A-01
+
+- **Descripción:** Dos fuentes del código `I` (matrícula retirada): el parámetro `MATRICULA/ESTADO_RETIRADA`, que lee la reactivación de matrícula (DEC-009), y el literal `'I'` en `usp_retirar_estudiante_grupo.sql:41`.
+- **Impacto:** Medio-bajo; si el parámetro cambia, el retiro y la reactivación divergen.
+- **Evidencia:** contrato CULM-001 paquete A, riesgo R-12 y objeción N5 de REVIEW-1.
+- **Motivo:** No se toca `usp_retirar_estudiante_grupo` (HU051 certificada) fuera del alcance del paquete A.
+- **Resolución esperada:** que el retiro lea el mismo parámetro que la reactivación.
+- **Bloquea línea base:** no. **Estado:** ABIERTA. **Work item:** CULM-001 A.
+
+## TD-CULM001-A-02
+
+- **Descripción:** El texto local `MENSAJE_MATRICULA_DUPLICADA_DOCENTE` del frontend (`attendance-control.component.ts`) muestra el 409 `ERR_MATRICULA_DUPLICADA` sin pasar por el catálogo.
+- **Impacto:** Bajo; contradice SSOT de mensajes (el texto debe venir del catálogo).
+- **Evidencia:** contrato CULM-001 paquete A, A-C5 y riesgo R-9.
+- **Resolución esperada:** pasar a `messages:user:ERR_MATRICULA_DUPLICADA` con un texto para el docente.
+- **Bloquea línea base:** no. **Estado:** ABIERTA. **Work item:** CULM-001 A.
+
+## TD-CULM001-A-03
+
+- **Descripción:** El solape de sesiones responde 400 `VALIDATION_ERROR` con `SES_017`, pero la tabla §G de `BACKEND_GOLDEN_PATH_CONTRACT.md` (orígenes de `VALIDATION_ERROR`) no lo enumera.
+- **Impacto:** Bajo; documentación del contrato incompleta.
+- **Evidencia:** contrato CULM-001 paquete A, §8.1 (nota para la próxima revisión formal).
+- **Resolución esperada:** añadir `SES_017` a la tabla §G en la próxima revisión formal del contrato (WORM: requiere nuevo hash).
+- **Bloquea línea base:** no. **Estado:** ABIERTA. **Work item:** CULM-001 A.
