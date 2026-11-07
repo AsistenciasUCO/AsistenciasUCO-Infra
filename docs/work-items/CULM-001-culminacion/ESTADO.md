@@ -67,5 +67,7 @@
 
 ## Bloqueos
 
+- **B-01 (abierto, requiere al responsable):** el PDP del laboratorio deniega toda ruta nueva del backend (`NO_APPLICABLE_POLICY`). El procedimiento oficial es `provision_asistencias.py pdp` (incremental) tras actualizar `access-catalog.json`, pero el clasificador de permisos de esta sesión lo denegó (DEC-037/DEC-038). **Acción del responsable:** en `GestioAsistenciaBackend` (rama `integracion/CULM-001` una vez mezclados los paquetes, o cada rama `feature/CULM-001-*`), con Python de Windows: `python -X utf8 -I infra\security-baseline\scripts\provision_asistencias.py pdp` y después `... verify` y `... verify-decisions`. Hasta entonces, en pantalla fallan con 403: búsqueda por documento (A), festivos del administrador (B.1), tomas/QR (B.2) y lo nuevo de C/D. Los gates de código no dependen de esto.
+
 - Ninguno todavía.
 - Límite de uso de la API alcanzado el 2026-11-07 ~00:50 (5 h): los subagentes de contratos A/B/B2 y E.1 se interrumpieron y se reanudaron a la 01:00.
