@@ -1,6 +1,6 @@
 # CULM-001 — ESTADO (fuente de verdad del avance)
 
-> Actualizado: 2026-11-07 08:40 (hora local). Leer primero al retomar la tarea.
+> Actualizado: 2026-11-07 12:30 (hora local). Leer primero al retomar la tarea.
 
 ## Entorno de trabajo
 
@@ -58,10 +58,10 @@
 | Fase 0 | **completa** (2026-11-06 22:45) | worktrees desde la base correcta (DEC-002), BD restaurada y desplegada, backend/frontend arriba desde worktrees, 5 logins OK, gates de línea base registrados, work item creado, `test_all_hus.ps1` adaptado (commit `523456d`) y OpenAPI sincronizado (commit `704823c`) |
 | Fase 1 | **completa** (2026-11-07 00:30) | 6 líderes (5 roles + transversal) con pruebas por API (token PKCE), revisión estática y matriz de ámbito de 1003 celdas (0 fugas con los datos actuales; faltan datos de 2.º ámbito); recorridos en pantalla con Haiku: estudiante completo, docente/coordinador/decano parciales, administrador en curso (se repiten completos en la Fase 3). Consolidado en `FINDINGS.md`: 113 hallazgos (3 críticos, 24 altos, 52 medios, 34 bajos). Triage del orquestador en DEC-022; asignación: A 22, B 11, B2 2, C 4, D 34, E 33, no-se-corrige 3, en espera 2, entorno/docs 2 |
 | A | **MEZCLADO a `integracion/CULM-001`** (2026-11-07): PRs johnjduque/gestion-asistencia-db#93, alejovh12/AsistenciasUCO#97, shesho22/AsistenciasUCO-Frontend#56, AsistenciasUCO/AsistenciasUCO-Infra#23. Gates: `mvnw verify` 3349 pruebas verde; `npm run verify` verde; suite T-SQL verde en A (fallos cruzados con B.1 en la BD compartida hasta mezclar B.1); contratos en paridad (OpenAPI 1.2.0). AUDIT en pantalla hecha (`paquetes/A-retiro-solicitudes/AUDIT-PANTALLA.md`): F-A-S02/S03/S04 y el 500 de matrícula corregidos; F-A-S01 (403 de la búsqueda) pendiente del PDP (bloqueo B-01); F-A-S05 (503 PDP) y S06–S09 → E | |
-| B | **B.1 MEZCLADO a `integracion/CULM-001`** (2026-11-07): PRs johnjduque/gestion-asistencia-db#94, alejovh12/AsistenciasUCO#98, shesho22/AsistenciasUCO-Frontend#57; gates tras la mezcla: `mvnw verify` 3490 pruebas (93,9 %/85,9 %), `npm run verify` 1729 specs verde, suite T-SQL con A y B.1 verdes (5 fallos por datos E2E acumulados y 2 pruebas frágiles de línea base; se repite tras restablecer datos). Pendiente: AUDIT en pantalla de B.1 (festivos bloqueado por B-01), golden path 1.3.0 al cerrar B. **B.2** (tomas/QR): BD en GREEN (`feature/CULM-001-B2-tomas-qr`), backend y frontend pendientes | |
+| B | **B.1 MEZCLADO a `integracion/CULM-001`** (2026-11-07): PRs johnjduque/gestion-asistencia-db#94, alejovh12/AsistenciasUCO#98, shesho22/AsistenciasUCO-Frontend#57; gates tras la mezcla: `mvnw verify` 3490 pruebas (93,9 %/85,9 %), `npm run verify` 1729 specs verde, suite T-SQL con A y B.1 verdes (5 fallos por datos E2E acumulados y 2 pruebas frágiles de línea base; se repite tras restablecer datos). AUDIT en pantalla de B.1 hecha (`paquetes/B-tomas-qr-sesiones/AUDIT-PANTALLA-B1.md`): cancelar sesión, estado cancelado por rol y festivos (19/2026 y 19/2027 cargados por el job; 4 sesiones canceladas por festivo) correctos; `/admin/festivos` bloqueado solo por B-01; hallazgos menores F-B1-S02..S07 → E/B.2. Pendiente: golden path 1.3.0 al cerrar B. **B.2** (tomas/QR): BD en GREEN (`feature/CULM-001-B2-tomas-qr`), backend y frontend pendientes | |
 | B2 | **CONTRACT congelado** (v5, `9b668c7d…`, DEC-029/DEC-032; 3 rondas). Implementación pendiente (después de B) | |
-| C | pendiente | |
-| D | pendiente | |
+| C | diseño DEC-039/DEC-041; CONTRACT v1 (895 líneas) en revisión 9.2. RED tras mezclar B.2 y B2 | |
+| D | alcance DEC-040/DEC-042; CONTRACT v1 (730 líneas) en revisión 9.2 | |
 | E | **E.1 (tokenización) hecha y mezclada** a `integracion/CULM-001` del frontend (`ba02d89`, PR shesho22/AsistenciasUCO-Frontend#54, DEC-026): `lint:tokens` en `npm run verify`, 806 clases + 15 hex migrados, fuentes en `styles.css`, `docs/sistema-diseno-tokens.md`. Pendiente E.2: pulido UX/UI y responsive por rol (53 hallazgos `paquete-E`) y la comprobación en pantalla del cambio de `primary` (escritorio y móvil) | |
 | Fase 3 | pendiente | |
 
