@@ -1,6 +1,6 @@
 # CULM-001 — ESTADO (fuente de verdad del avance)
 
-> Actualizado: 2026-11-07 00:30 (hora local). Leer primero al retomar la tarea.
+> Actualizado: 2026-11-07 01:40 (hora local). Leer primero al retomar la tarea.
 
 ## Entorno de trabajo
 
@@ -56,14 +56,15 @@
 | :--- | :--- | :--- |
 | Fase 0 | **completa** (2026-11-06 22:45) | worktrees desde la base correcta (DEC-002), BD restaurada y desplegada, backend/frontend arriba desde worktrees, 5 logins OK, gates de línea base registrados, work item creado, `test_all_hus.ps1` adaptado (commit `523456d`) y OpenAPI sincronizado (commit `704823c`) |
 | Fase 1 | **completa** (2026-11-07 00:30) | 6 líderes (5 roles + transversal) con pruebas por API (token PKCE), revisión estática y matriz de ámbito de 1003 celdas (0 fugas con los datos actuales; faltan datos de 2.º ámbito); recorridos en pantalla con Haiku: estudiante completo, docente/coordinador/decano parciales, administrador en curso (se repiten completos en la Fase 3). Consolidado en `FINDINGS.md`: 113 hallazgos (3 críticos, 24 altos, 52 medios, 34 bajos). Triage del orquestador en DEC-022; asignación: A 22, B 11, B2 2, C 4, D 34, E 33, no-se-corrige 3, en espera 2, entorno/docs 2 |
-| A | CONTRACT redactado (`paquetes/A-retiro-solicitudes/CONTRACT.md`, 543 líneas) + `CORRECCIONES-A.md` (críticos/altos de la Fase 1); revisión Opus 9.2 en curso (`REVIEW-1.md`) | |
-| B | diseño decidido (DEC-011..018); CONTRACT en redacción (`paquetes/B-tomas-qr-sesiones/`) | |
-| B2 | CONTRACT redactado (598 líneas) + DEC-019..021; revisión Opus en curso | |
+| A | CONTRACT v1 revisado (REVIEW-1: 18 objeciones, 6 bloqueantes); en corrección v2 + sección A.2 (`CORRECCIONES-A.md`) | |
+| B | CONTRACT v1 (1347 líneas) revisado (REVIEW-1: 20 objeciones, 9 bloqueantes); en corrección v2; DEC-024 pendiente de registro (propuesta del redactor) | |
+| B2 | CONTRACT v2 revisado (REVIEW-2: 2 bloqueantes); en corrección v3 (DEC-025) | |
 | C | pendiente | |
 | D | pendiente | |
-| E | pendiente | |
+| E | **E.1 (tokenización) hecha y mezclada** a `integracion/CULM-001` del frontend (`ba02d89`, PR shesho22/AsistenciasUCO-Frontend#54, DEC-026): `lint:tokens` en `npm run verify`, 806 clases + 15 hex migrados, fuentes en `styles.css`, `docs/sistema-diseno-tokens.md`. Pendiente E.2: pulido UX/UI y responsive por rol (53 hallazgos `paquete-E`) y la comprobación en pantalla del cambio de `primary` (escritorio y móvil) | |
 | Fase 3 | pendiente | |
 
 ## Bloqueos
 
 - Ninguno todavía.
+- Límite de uso de la API alcanzado el 2026-11-07 ~00:50 (5 h): los subagentes de contratos A/B/B2 y E.1 se interrumpieron y se reanudaron a la 01:00.

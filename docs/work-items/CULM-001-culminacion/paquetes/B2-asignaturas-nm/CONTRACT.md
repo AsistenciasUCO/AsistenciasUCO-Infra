@@ -1,9 +1,11 @@
 # CULM-001 · Paquete B2 — CONTRACT: asignaturas en varios planes/programas y ámbito por relación en grupos mixtos
 
-> **Estado:** BORRADOR para revisión independiente (§9.2 del prompt). Se congela con su `.sha256` antes del RED.
-> **Fecha:** 2026-11-06. **Fuentes:** `docs/PROMPT_FABLE_CULMINACION.md` §3.8–§3.9 (líneas 91-100), `DECISIONES.md` DEC-019 y DEC-020 (cerradas, no se reabren), `RESEARCH-ASIGNATURA-PLAN.md`, `FINDINGS-coordinador.md`, `FINDINGS-docente.md`, `FINDINGS-decano.md`, `AGENTS.md` §3.3.
+> **Estado:** versión 2 (corrige `REVIEW-1.md`: 17 objeciones, 7 bloqueantes). Se congela con su `.sha256` cuando la revisión cierre las objeciones.
+> **Fecha:** 2026-11-07. **Fuentes:** `docs/PROMPT_FABLE_CULMINACION.md` §3.8–§3.9 (líneas 91-100); `DECISIONES.md` DEC-019, DEC-020, DEC-021 (S1–S4 aceptados) y DEC-022 (fixture de segundo ámbito en A); `RESEARCH-ASIGNATURA-PLAN.md`; `FINDINGS-{coordinador,docente,decano}.md`; CONTRACT de A (incluida su sección A.2) y de B; `AGENTS.md` §3.3 y §4.
 > **Rutas:** relativas a cada worktree `C:\Proyectos\GestionAsistencia-CULM001\<repo>`. DB = `GestioAsistenciaDB/`, BE = `GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/`, FE = `GestioAsistenciaFrontend/src/app/`.
-> **Base:** `integracion/CULM-001` **después** de mezclar A y B. Todo objeto que A o B ya hayan modificado se edita sobre su versión (§5.2).
+> **Base:** `integracion/CULM-001` **después** de mezclar A y B (B.1 y B.2). Todo objeto que A o B modifiquen se edita sobre su versión (§5.2).
+> **Prefijo de artefactos:** `culm001_b2nm` (migración `16_culm001_b2nm_*`, pruebas, permisos, fixture, reporte). El prefijo `culm001_b2` es del subpaquete B.2 de B.
+> **Alcance del GREEN:** el "alcance mínimo imprescindible" de REVIEW-1 §8. El resto está en §7 como diferible (post 2026-11-13).
 
 ---
 
@@ -11,61 +13,63 @@
 
 ### 1.1 Alcance
 
-| Incluido | Excluido |
+| Incluido (GREEN) | Excluido |
 | :--- | :--- |
-| Relación N:M `Asignatura` ↔ `SemestrePlanEstudio` con carácter por catálogo (DEC-019) | Sedes, bloques o aulas (§3.9: el sistema no gestiona sedes) |
-| Separar "crear asignatura" de "asociar asignatura existente a un plan/semestre"; desvincular (reemplaza el 501 de F-COO-005) | Prerrequisitos (HU025 descartada; `07_hu025_descartar_prerrequisitos_up.sql`) |
-| Ámbito por `EstudiantePrograma` en grupos mixtos para coordinador y decano (DEC-020); eliminación de los `TOP 1` de programa | Flujo de cancelación por inasistencia (paquete C). B2 deja lista la función de pertenencia (`ufn_programas_grupo`, R6) que C usa para "coordinador del programa del estudiante" |
-| Backfill de vínculos y reporte de ambiguos; la matrícula manual y por QR exigen o crean el vínculo | Cálculo por horas y sesiones canceladas (paquete B). B2 solo cambia el join de programa de las vistas que B ya modificó |
-| Malla, oferta, creación de asignaturas y grupos, KPIs por programa, listados del coordinador y del decano | Rediseño visual (paquete E). B2 agrega los controles necesarios con los componentes existentes |
-| | `usp_ejecutar_cierre_masivo_periodo`: no une a plan ni a programa (solo `EstudianteGrupo`/`Grupo`/`Sesion`); no cambia en B2. Su umbral fijo de 3 faltas es del paquete C |
+| Relación N:M `Asignatura` ↔ `SemestrePlanEstudio` con carácter por catálogo (DEC-019); `Asignatura.codigo` único | Sedes, bloques o aulas (§3.9) |
+| Crear asignatura (catálogo + primer vínculo), asociar una asignatura existente, cambiar semestre o carácter de un vínculo, desvincular (reemplaza el 501 de F-COO-005) | Prerrequisitos (HU025 descartada) |
+| Ámbito por `EstudiantePrograma` en grupos mixtos para coordinador y decano (DEC-020), extendiendo los tres SP de ámbito de A (A.2); eliminación de los cuatro `TOP 1` de programa | Flujo de cancelación por inasistencia (paquete C). B2 entrega `ufn_programas_grupo` y R6, que C usa para "coordinador del programa del estudiante" |
+| Backfill de vínculos (solo estudiantes activos sin programa) y reporte; matrícula manual y por QR que exigen o crean el vínculo; S3 en su forma mínima | Horas y sesiones canceladas (B). B2 solo cambia el join de programa de las vistas que B ya modificó |
+| Malla, oferta (HU008), creación de asignaturas y grupos, KPIs por programa, y las consultas del coordinador, del decano y de la institución que pasan por la cadena asignatura → programa | `usp_ejecutar_cierre_masivo_periodo`: no une a plan ni a programa; su umbral fijo de 3 faltas es de C |
+| | Todo lo listado en §7 (diferible) |
 
-### 1.2 Decisiones aplicadas (detalle de DEC-019 y DEC-020)
+### 1.2 Decisiones aplicadas
 
 | Regla | Detalle contractual |
 | :--- | :--- |
-| R1 (DEC-019) | Tabla puente `AsignaturaPlanEstudio (asignatura, semestrePlanEstudio, caracter, estaActivo)` única por `(asignatura, semestrePlanEstudio)`. El carácter es FK al catálogo `CaracterAsignaturaPlan` (`OBL` Obligatoria, `OPT` Optativa); nunca un literal en T-SQL: los SP reciben `@codigoCaracter` tipado o leen `ASIGNATURA_PLAN/CARACTER_DEFECTO`. |
-| R2 (DEC-019) | `Asignatura.codigo` pasa a UNIQUE global (`UX_Asignatura_codigo`). La asignatura es un elemento de catálogo; su pertenencia a planes vive solo en la puente. |
-| R3 (DEC-019) | "Crear asignatura" (`usp_crear_asignatura`) inserta el catálogo **y** su primer vínculo en la misma transacción (vía `usp_internal_asociar_asignatura_plan`); "asociar asignatura existente" (`usp_asociar_asignatura_plan`) solo crea o reactiva un vínculo. Crear con un código existente → `ASI_002` (409); la UI ofrece siempre "Asociar asignatura existente" en la malla (sin parsear el mensaje). |
-| R4 (DEC-019) | `Asignatura.semestrePlanEstudio` y `FK_Asignatura_SemestrePlanEstudio` se eliminan **al final de la misma migración**; el `down` restaura la columna desde la puente cuando cada asignatura tiene un único vínculo. |
-| R5 (DEC-019) | `uv_grupo_programa` es explícitamente 1:N (un grupo → todos los programas cuyos planes contienen su asignatura con vínculo vigente). Todo consumidor que cuente o pagine grupos, sesiones o estudiantes usa `EXISTS` o `DISTINCT` sobre la clave de negocio. |
-| R6 (DEC-020) | La pertenencia de un estudiante a un programa se resuelve **solo** por `EstudiantePrograma`. En un grupo, un coordinador ve al estudiante si existe `EstudiantePrograma(estudiante, p)` con `p` ∈ (programas que coordina ∩ programas del grupo). Igual para el decano con los programas de su facultad. |
-| R7 (DEC-020) | Invariante: toda matrícula `EstudianteGrupo` tiene al menos un `EstudiantePrograma` del estudiante en un programa del grupo. La garantizan el backfill (§2.4) y la matrícula manual y por QR (§2.7.3). Las excepciones del backfill quedan en el reporte y en la prueba de invariante (T-B2-11). |
-| R8 (DEC-020) | Se eliminan los `TOP 1` que eligen "el" programa: `usp_registrar_estudiante_en_grupo_interno.sql:122`, `usp_validar_gestion_grupo_coordinador_o_titular_interno.sql:101`, `usp_validar_docente_vinculo_activo_programa_interno.sql:33`, `usp_resolver_programa_coordinador_interno.sql:51`. Se reemplazan por `EXISTS` sobre conjuntos o por un programa explícito y validado. |
-| R9 (DEC-020) | Los KPIs por programa cuentan solo estudiantes con `EstudiantePrograma` en ese programa. Los de facultad e institución cuentan `DISTINCT` (un estudiante o grupo compartido por dos programas de la misma facultad cuenta una vez). La comparativa por programa puede sumar más que el total de la facultad; se rotula en la API y en la UI. |
-| R10 (derivada) | El docente titular sigue viendo a **todos** los estudiantes de su grupo (§3.8: "docente → solo los grupos donde es titular y sus estudiantes"); el filtro por programa aplica a coordinador y decano. El administrador ve su institución. |
+| R1 (DEC-019) | Tabla puente `AsignaturaPlanEstudio (asignatura, semestrePlanEstudio, caracter, estaActivo)` única por `(asignatura, semestrePlanEstudio)`. El carácter es FK a `CaracterAsignaturaPlan` (`OBL`, `OPT`, con columna `orden`). Los SP reciben `@codigoCaracter` o leen `ASIGNATURA_PLAN/CARACTER_DEFECTO`; ningún literal de carácter en T-SQL. |
+| R2 (DEC-019) | `Asignatura.codigo` es UNIQUE global (`UX_Asignatura_codigo`). La pertenencia a planes vive solo en la puente. |
+| R3 (DEC-019) | `usp_crear_asignatura` inserta el catálogo y el primer vínculo en una transacción; `usp_asociar_asignatura_plan` crea o reactiva un vínculo. Un código existente devuelve `ASI_002`; la UI deja siempre visible "Asociar asignatura existente" (no interpreta el mensaje). |
+| R4 (DEC-019) | `Asignatura.semestrePlanEstudio` y su FK se eliminan al final de la misma migración, después de la verificación y en la misma transacción (§2.3). El `down` la restaura cuando cada asignatura tiene un único vínculo. |
+| R5 (DEC-019) | `uv_grupo_programa` es 1:N. Todo consumidor que cuente o pagine grupos, sesiones o estudiantes usa `EXISTS` o `DISTINCT` sobre la clave de negocio, o declara su nuevo grano. |
+| R6 (DEC-020) | Para **coordinador y decano**, un estudiante de un grupo es visible si existe `EstudiantePrograma(estudiante, p)` con `p` ∈ (programas del grupo ∩ programas del ámbito del ejecutor). |
+| R7 (DEC-020) | Toda matrícula **activa** tiene al menos un `EstudiantePrograma` en un programa de su grupo, salvo las filas `AMBIGUO` y `SIN_INTERSECCION` del reporte del backfill. La matrícula manual y por QR la garantizan hacia adelante. |
+| R8 (DEC-020) | Se eliminan los `TOP 1` de programa de `usp_registrar_estudiante_en_grupo_interno.sql:122`, `usp_validar_gestion_grupo_coordinador_o_titular_interno.sql:101`, `usp_validar_docente_vinculo_activo_programa_interno.sql:33` y `usp_resolver_programa_coordinador_interno.sql:51`. |
+| R9 (DEC-020) | KPIs por programa: solo estudiantes con `EstudiantePrograma` en ese programa. Facultad e institución: `COUNT(DISTINCT)` por estudiante, grupo o sesión. |
+| R10 | El administrador (en su institución), el docente titular y el propio estudiante **no** dependen de `EstudiantePrograma`: ven a todos los estudiantes de sus grupos, incluidos los `AMBIGUO` y `SIN_INTERSECCION`. |
 
-**Supuestos que la revisión debe confirmar** (detalle no decidido; no reabren DEC-019/020):
-- **S1.** Fechas de vigencia del vínculo (`fechaVinculacionUtc`, `fechaDesvinculacionUtc`) para que desvincular no borre la historia de KPIs ni haga visibles a otro programa los grupos anteriores a su vínculo (§2.1).
-- **S2.** Los datos de catálogo de una asignatura compartida (código, nombre, créditos, área, componente, estado global) solo los cambia un coordinador que coordine **todos** los programas con vínculo activo; si no, `ASI_006` y solo puede cambiar semestre y carácter de su propio vínculo.
-- **S3.** En la matrícula por QR de un grupo de varios programas, el docente fija al abrir la ventana un programa por defecto para estudiantes sin vínculo con ninguno de ellos ("el que elija el docente", DEC-020); si no lo fija, `MQR_008`.
-- **S4.** Un coordinador de varios programas filtra con `programaId`; si lo omite, las listas usan todos sus programas y los KPIs exigen elegir uno (`COO_002`) cuando tiene más de uno. Con la semilla (un programa por coordinador) el comportamiento actual no cambia.
+**Supuestos aceptados por DEC-021:**
+- **S1.** Vigencia del vínculo con `fechaVinculacionUtc` / `fechaDesvinculacionUtc` (§2.1).
+- **S2.** Los datos de catálogo de una asignatura compartida solo los cambia quien coordina **todos** sus programas con vínculo activo (`ASI_006`).
+- **S3 (forma mínima, decisión del orquestador).** `POST /api/v1/grupos/{grupoId}/matricula-qr` recibe `programaId` opcional. Es **obligatorio** solo si el grupo pertenece a más de un programa (`EST_005`), debe ser un programa del grupo (`EST_006`) y se guarda en `TokenMatriculaGrupo.programaPorDefecto`. La matrícula por QR de un estudiante sin vínculo con los programas del grupo usa ese programa. `MQR_008` queda solo como defensa para ventanas abiertas antes de la migración.
+- **S4.** El coordinador de varios programas filtra con `programaId`. Sin ese parámetro, las listas usan todos sus programas y los KPIs devuelven `COO_002`.
 
-### 1.3 HUs y hallazgos afectados
+DEC-021 menciona un 404 de ámbito en `/grupos/{id}/estudiantes|asistencias`. Por decisión del orquestador sobre O-B7 se usa **403** (§3.4).
 
-| HU / hallazgo | Qué cambia en B2 |
+### 1.3 HUs y hallazgos
+
+| HU / hallazgo | Qué cambia en el GREEN |
 | :--- | :--- |
-| HU075, HU084, HU108 (malla) | La malla de un plan lista sus vínculos con semestre y carácter y marca las compartidas; el coordinador asocia, edita el vínculo y desvincula; el decano consulta |
-| HU008 (oferta del estudiante) | "Propias" = grupos cuya asignatura tiene vínculo activo con un plan de un programa del estudiante; muestra el carácter en su programa; sin duplicados |
-| HU076B, HU085 (crear asignatura) | Código único global; carácter obligatorio; código existente → `ASI_002` y flujo de asociación |
-| HU087 (crear grupo) | El docente debe tener vínculo activo con **algún** programa de la asignatura; la firma congelada de `usp_crear_grupo` (`DB_BASELINE_CONTRACT.md:79`) no cambia |
-| HU065, HU066, HU070 (KPIs y alertas del coordinador), HU102, HU106 (KPIs del decano) | R9; cierra F-COO-006 (13 vs 12) y F-DEC-013 (nombre `sesionesEjecutadas`) |
-| HU060, HU064, HU068, HU069, HU071, HU072 (listados del coordinador) | Paginados por `usp_consultar_*`; filtro por `EstudiantePrograma` en grupos mixtos; 404 por id fuera de ámbito (F-COO-003, F-COO-008) |
-| HU144 (decano grupos y sesiones) | SP paginado con ámbito de facultad (F-DEC-002); `idGrupo` filtrado en servidor (F-DEC-014); 404 en plan inexistente o ajeno (F-DEC-015) |
-| F-COO-001, F-COO-002, F-DOC-013 (críticos) | **A** corrige de inmediato; **B2** rehace el ámbito sobre N:M (§1.4) |
-| F-COO-005 | `DELETE /coordinador/planes-estudio/{planId}/asignaturas/{asigId}` deja de responder 501 |
-| F-COO-011 | La confirmación de desvincular usa el modal del sistema de diseño (misma pantalla) |
+| HU075, HU084, HU108 (malla) | Vínculos con semestre y carácter. El coordinador asocia, edita el vínculo y desvincula; el decano consulta. Plan inexistente o ajeno → 404 (F-COO-008, F-DEC-015) |
+| HU008 (oferta) | "Propias" = grupos con vínculo activo a un plan de un programa del estudiante; carácter en su programa; sin duplicados |
+| HU076B, HU085 | Código único; carácter obligatorio; `ASI_002` |
+| HU087 | Docente con vínculo activo a **algún** programa de la asignatura; la firma congelada de `usp_crear_grupo` no cambia |
+| HU065, HU066, HU070, HU102, HU106 | R9; cierra F-COO-006 (13 vs 12) |
+| HU060, HU064, HU068, HU069, HU071, HU072 | R6 en grupos, sesiones, asistencias, ficha, bitácora y alertas; grupo fuera de ámbito → 403 (F-COO-003, sobre A) |
+| HU144 | `GET /decano/grupos` por SP con ámbito (F-DEC-002); el HQL actual se rompe al retirar columnas |
+| F-COO-001, F-COO-002, F-DOC-013, F-COO-003 | Los resuelven los SP de A.2; B2 los extiende a N:M (§1.4) |
+| F-COO-005 | `DELETE .../planes-estudio/{planId}/asignaturas/{asigId}` deja de responder 501 (A lo oculta hasta B2, DEC-022 punto 8) |
 
-### 1.4 Reparto A / B2 para los hallazgos críticos y altos de ámbito
+### 1.4 Reparto con A (A.2): B2 reutiliza y extiende, no redefine
 
-| Hallazgo | Paquete A (inmediato, modelo 1:1) | Paquete B2 (completa sobre N:M) |
-| :--- | :--- | :--- |
-| F-COO-001 `GET /api/v1/estudiantes` | El caso de uso recibe al ejecutor; la consulta pasa a un SP paginado con ámbito dentro del SP (nombre lo fija el CONTRACT de A; aquí `usp_consultar_estudiantes_directorio_paginado`): coordinador → estudiantes con `EstudiantePrograma` en su programa; administrador → su institución; DOCENTE y ESTUDIANTE → 403 (el golden path ya dice "No se abre a DOCENTE") | La rama coordinador pasa a `ufn_programas_coordinador` (varios programas, sin `TOP 1`); `programaId` fuera de ámbito → 403; `programaId` significa vínculo `EstudiantePrograma` (cambio formal del golden path, §3.4) |
-| F-COO-002 `GET /api/v1/estudiantes/{id}` | 404 si el estudiante no está en el ámbito (misma regla que el listado) | Mismo SP con `@idEstudiante`; los contextos académicos del detalle muestran solo grupos cuyo programa ∩ programas del ejecutor ≠ ∅ |
-| F-DOC-013 (docente) | 403 en ambos endpoints para DOCENTE | Sin cambio adicional (el docente usa `/grupos/{id}/estudiantes`) |
-| F-COO-003 grupos sin ámbito | Los casos de uso reciben al ejecutor; grupo fuera del programa → 404; listado de grupos del coordinador filtrado por su programa | En grupos mixtos, `/grupos/{id}/estudiantes`, `/grupos/{id}/asistencias` y `/sesiones/{id}/asistencias` muestran a un coordinador solo los estudiantes de sus programas (R6); conteos por programa |
+El paquete A crea estos SP con el ámbito **dentro** del SP y la regla de DEC-020 en el modelo 1:1:
 
-Si el CONTRACT de A congela otro nombre para el SP del directorio, B2 modifica ese objeto con la misma semántica; no crea un segundo SP.
+| SP de A.2 | Endpoint | Regla en A | Extensión en B2 (mismo objeto, misma firma + parámetros opcionales) |
+| :--- | :--- | :--- | :--- |
+| `usp_consultar_directorio_estudiantes_paginado` | `GET /api/v1/estudiantes`, `GET /api/v1/estudiantes/{id}` | ADMINISTRADOR → institución; COORDINADOR → `EstudiantePrograma` en su programa; DOCENTE → titularidad de grupo | Rama coordinador sobre `ufn_programas_coordinador` (varios programas, sin `TOP 1`). `@idPrograma` fuera de su coordinación → `COO_003` (403). Los contextos académicos del detalle salen de `uv_estudiante` con `tieneVinculoPrograma = 1` e intersección de programas (R6). Ramas administrador y docente sin cambio (R10) |
+| `usp_consultar_estudiantes_grupo_ambito_paginado` | `GET /api/v1/grupos/{grupoId}/estudiantes` | Grupo fuera de ámbito → 403; el coordinador ve a los estudiantes con `EstudiantePrograma` en su programa | Ámbito del grupo por `EXISTS (ufn_programas_grupo ∩ programas del ejecutor)`; filas por `ufn_estudiantes_grupo_visibles` (R6/R10) |
+| `usp_consultar_asistencias_grupo_ambito_paginado` | `GET /api/v1/grupos/{grupoId}/asistencias` y el legacy `POST /api/v1/asistencias/consultas/grupo` (`AsistenciaQueryController.java:61`) | idem | idem. Si A no conecta el legacy, B2 lo apunta al mismo SP |
+
+El resultset de los tres SP es el de A, que respeta los DTO congelados del golden path; B2 no agrega columnas. Si al empezar el RED la firma de A difiere, B2 extiende la que esté mezclada.
 
 ---
 
@@ -81,14 +85,16 @@ BEGIN
         id      UNIQUEIDENTIFIER NOT NULL,
         codigo  NVARCHAR(3)      NOT NULL,
         nombre  NVARCHAR(50)     NOT NULL,
+        orden   INT              NOT NULL,
         estado  BIT              NOT NULL CONSTRAINT DF_CaracterAsignaturaPlan_estado DEFAULT (1),
         CONSTRAINT PK_CaracterAsignaturaPlan PRIMARY KEY CLUSTERED (id),
         CONSTRAINT UQ_CaracterAsignaturaPlan_codigo UNIQUE (codigo),
-        CONSTRAINT UQ_CaracterAsignaturaPlan_nombre UNIQUE (nombre)
+        CONSTRAINT UQ_CaracterAsignaturaPlan_nombre UNIQUE (nombre),
+        CONSTRAINT UQ_CaracterAsignaturaPlan_orden UNIQUE (orden)
     );
 END
 ```
-Semilla `DB/schema/seed/33_caracter_asignatura_plan.sql` (MERGE idempotente con GUIDs fijos de semilla, como `16_tipo_vinculacion.sql`): `OBL` Obligatoria, `OPT` Optativa. Catálogo de solo consulta (sin SP de escritura), igual que `CategoriaJustificacion` (`12_categoria_justificacion_up.sql`).
+Semilla `DB/schema/seed/37_caracter_asignatura_plan.sql` (MERGE con GUIDs fijos, patrón `16_tipo_vinculacion.sql`): `OBL` Obligatoria con `orden 1`, `OPT` Optativa con `orden 2`. Es un catálogo de solo consulta. Cuando hay que elegir un carácter entre varios se ordena por `orden` (O-N4).
 
 `DB/schema/tables/AsignaturaPlanEstudio.sql`
 ```sql
@@ -112,393 +118,467 @@ BEGIN
         ON dbo.AsignaturaPlanEstudio (semestrePlanEstudio) INCLUDE (asignatura, caracter, estaActivo);
 END
 ```
-FKs en `zz_foreign_keys.sql` (bloques nuevos con `IF NOT EXISTS`): `FK_AsignaturaPlanEstudio_Asignatura`, `FK_AsignaturaPlanEstudio_SemestrePlanEstudio`, `FK_AsignaturaPlanEstudio_CaracterAsignaturaPlan`. Se **retira** el bloque 18 (`FK_Asignatura_SemestrePlanEstudio`, `zz_foreign_keys.sql:140-144`).
+FKs en `zz_foreign_keys.sql`: `FK_AsignaturaPlanEstudio_Asignatura`, `_SemestrePlanEstudio` y `_CaracterAsignaturaPlan`. Se retira el bloque 18 (`FK_Asignatura_SemestrePlanEstudio`, l.140-144).
 
-**Regla de vigencia (S1).** Un vínculo aplica a un grupo `g` del periodo `pa` si `fechaLocal(fechaVinculacionUtc) <= pa.fechaFin` y (`fechaDesvinculacionUtc IS NULL` o `fechaLocal(fechaDesvinculacionUtc) >= pa.fechaInicio`), con la fecha local institucional del parámetro `TIEMPO/ZONA_HORARIA_SQLSERVER` (mismo cálculo que `uv_grupo`). Se encapsula en la función inline `ufn_vinculo_asignatura_vigente_periodo` (§2.6). Reasociar un vínculo inactivo reactiva **la misma fila** (por el UNIQUE): `estaActivo = 1`, `fechaDesvinculacionUtc = NULL`, conserva `fechaVinculacionUtc` (limitación aceptada, §6.3).
+**Vigencia (S1).** Un vínculo aplica a un grupo del periodo `pa` si `fechaLocal(fechaVinculacionUtc) <= pa.fechaFin` y además `fechaDesvinculacionUtc IS NULL` o `fechaLocal(fechaDesvinculacionUtc) >= pa.fechaInicio`. La zona sale de `CatalogoParametro` (`TIEMPO/ZONA_HORARIA_SQLSERVER`), con el mismo cálculo que `uv_grupo`. `PlanEstudio.estado = 0` **no** saca un grupo de `uv_grupo_programa`, para conservar la historia (O-N10). Reactivar un vínculo reutiliza la fila y conserva `fechaVinculacionUtc` (§6.3).
 
-**Unicidad por plan.** Una asignatura no puede tener dos vínculos **activos** en semestres distintos del mismo plan. Se valida en `usp_internal_asociar_asignatura_plan` con `WITH (UPDLOCK, HOLDLOCK)` (`ASI_003`); no se agrega una columna `planEstudio` redundante.
+**Unicidad por plan.** Una asignatura no puede tener dos vínculos activos en semestres distintos del mismo plan. Lo valida `usp_internal_asociar_asignatura_plan` con `WITH (UPDLOCK, HOLDLOCK)` (`ASI_003`).
 
-### 2.2 Cambios en tablas y semillas existentes
+### 2.2 Cambios en tablas, semillas y fixtures
 
 | Objeto | Cambio |
 | :--- | :--- |
-| `tables/Asignatura.sql` | El `CREATE TABLE` deja de tener `semestrePlanEstudio`; se agrega `UX_Asignatura_codigo` (índice único sobre `codigo`; el SP ya lo guarda en `UPPER(TRIM())`, `usp_crear_asignatura.sql:33`) |
-| `tables/EstudiantePrograma.sql` | `UX_EstudiantePrograma_estudiante_programa` único `(estudiante, programa)`: cierra el "sin UNIQUE" de la investigación §1 y protege la creación concurrente de vínculos (§2.7.3) |
-| `tables/TokenMatriculaGrupo.sql` (HU176B) | Columna `programaPorDefecto UNIQUEIDENTIFIER NULL` + FK a `Programa` (S3). No está en el manifiesto congelado |
-| `migrations/01_gestionasistenciadb.sql` | No se edita (baseline histórico) |
-| `seed/13_academico_asignaturas.sql` | El MERGE de `Asignatura` deja de usar `semestrePlanEstudio`; se agrega el MERGE del vínculo `ARQ-402` (`E2F3A4B5-...01`) ↔ SPE `D2E3F4A5-...01` con carácter `OBL` |
-| `seed/14_grupos_sesiones.sql` | La inserción de `EstudiantePrograma` deja de depender de la regla ESP (R7: un vínculo por estudiante matriculado) |
-| `seed/34_culm001_b2_programa_compartido.sql` (nueva) | Segundo programa en la misma facultad con su coordinador, plan y semestre; una optativa `OPT` vinculada a ambos planes; un grupo de esa optativa con un estudiante de cada programa. Permite repetir la matriz de fugas con dos programas reales (recomendación de `FINDINGS-coordinador.md`) |
+| `tables/Asignatura.sql` | Sin `semestrePlanEstudio`; índice único `UX_Asignatura_codigo` |
+| `tables/EstudiantePrograma.sql` | Índice único `UX_EstudiantePrograma_estudiante_programa (estudiante, programa)` |
+| `tables/TokenMatriculaGrupo.sql` | `programaPorDefecto UNIQUEIDENTIFIER NULL` + FK a `Programa` (S3 mínimo) |
+| `migrations/01_gestionasistenciadb.sql` | No se edita |
+| `seed/13_academico_asignaturas.sql` | MERGE de `Asignatura` sin `semestrePlanEstudio` + MERGE del vínculo `ARQ-402` (`E2F3A4B5-...01`) ↔ SPE `D2E3F4A5-...01`, con el carácter `OBL` resuelto por código contra la tabla |
+| `seed/14_grupos_sesiones.sql` | `EstudiantePrograma` para cada estudiante matriculado (sin la regla ESP) |
+| Fixture de segundo ámbito de A (DEC-022 punto 9) | B2 **no** crea una semilla de segundo programa. Agrega `test/fixtures/culm001_b2nm_asignatura_compartida.sql`, que sobre el fixture de A crea una optativa `OPT` vinculada a los planes de los dos programas, un grupo G de esa optativa con un estudiante de cada programa y un estudiante sin vínculo (para R10) |
 
-### 2.3 Migración `NN_culm001_b2_asignatura_plan_nm_up.sql` / `_down.sql`
+Las semillas nuevas usan el siguiente número libre después de A (`33_*`) y B (`34_*`–`36_*`): `37_caracter_asignatura_plan.sql`, `38_mensajes_asignatura_plan.sql` y `39_parametro_asignatura_plan.sql`. Antes del RED se repite el control de números libres.
 
-`NN` = siguiente número libre en `DB/migrations/` al empezar el RED (hoy el último es `12_*`; A y B toman los siguientes). Ambos scripts son idempotentes, usan `SET XACT_ABORT ON`, una transacción explícita por bloque de datos y `IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;` en el `CATCH`.
+### 2.3 Migración `16_culm001_b2nm_asignatura_plan_up.sql` / `_down.sql`
 
-**`up` (orden obligatorio):**
-1. Prechequeo (patrón `06_catalogos_area_estado_unicidad_up.sql:8-12`): `THROW 52900` si hay duplicados `UPPER(TRIM(codigo))` en `Asignatura` (el mensaje lista los códigos) o asignaturas cuyo `semestrePlanEstudio` no existe.
-2. Crear `CaracterAsignaturaPlan` + semilla; crear `AsignaturaPlanEstudio`, sus FKs e índice.
-3. Parámetro `ASIGNATURA_PLAN/CARACTER_DEFECTO = OBL` en `CatalogoParametro` (MERGE).
-4. Backfill 1:1 (solo si `COL_LENGTH('dbo.Asignatura','semestrePlanEstudio')` no es NULL): un vínculo por asignatura con su `semestrePlanEstudio`, carácter `CARACTER_DEFECTO`, `estaActivo = 1` (el estado global sigue en `Asignatura.estado`), `fechaVinculacionUtc = COALESCE(MIN(pa.fechaInicio) de los periodos de sus grupos, SYSUTCDATETIME())` para que la historia siga vigente; `WHERE NOT EXISTS` sobre el UNIQUE.
-5. `UX_Asignatura_codigo`.
-6. Deduplicar `EstudiantePrograma` (conserva la fila de menor `id`; las borradas quedan en el reporte con tipo `DEDUPLICADO`) y crear `UX_EstudiantePrograma_estudiante_programa`. No hay FKs hacia `EstudiantePrograma`.
-7. `ALTER TABLE TokenMatriculaGrupo ADD programaPorDefecto` + FK.
-8. `CREATE OR ALTER` de funciones, vistas y SPs de §2.5–§2.7 (el `up` incluye su texto, como las migraciones 11 y 12; `deploy_schema.ps1` despliega los mismos archivos de `schema/`).
-9. Backfill de `EstudiantePrograma` (§2.4).
-10. `DROP CONSTRAINT FK_Asignatura_SemestrePlanEstudio` y `DROP COLUMN semestrePlanEstudio` (con guardas).
-11. Mensajes (§2.8.1), permisos (§2.8.2) y verificación final: `THROW 52901` si alguna asignatura quedó sin vínculo o si hay matrículas que violan R7 sin fila en el reporte.
+Técnica obligatoria (O-B5):
+- Toda sentencia que nombra `Asignatura.semestrePlanEstudio` (precheck, backfill, `UPDATE` y `ALTER COLUMN` del `down`) va en `EXEC sys.sp_executesql` dentro de `IF COL_LENGTH('dbo.Asignatura','semestrePlanEstudio') IS NOT NULL` (o `IS NULL` en el `down`). Así el lote compila con la columna presente o ausente.
+- `SET XACT_ABORT ON`. Cada bloque de datos va en `BEGIN TRY / BEGIN TRANSACTION ... COMMIT`, con `IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION; THROW;` en el `CATCH`.
+- Lotes separados con `GO` para el DDL de objetos programables (`CREATE OR ALTER`).
+
+**`up`:**
+1. Precheck (patrón `06_catalogos_area_estado_unicidad_up.sql:8-12`, en SQL dinámico): `THROW 52900` si hay códigos duplicados por `UPPER(TRIM(codigo))` o asignaturas cuyo `semestrePlanEstudio` no existe.
+2. Tablas `CaracterAsignaturaPlan` (con sus filas) y `AsignaturaPlanEstudio`, FKs e índice; parámetro `ASIGNATURA_PLAN/CARACTER_DEFECTO = OBL`.
+3. Backfill 1:1 de la puente (SQL dinámico, `WHERE NOT EXISTS`): un vínculo por asignatura con el carácter por defecto, `estaActivo = 1` y `fechaVinculacionUtc = COALESCE(MIN(pa.fechaInicio) de los periodos de sus grupos, SYSUTCDATETIME())`.
+4. `UX_Asignatura_codigo`. Deduplicación de `EstudiantePrograma` (conserva el menor `id`; las filas borradas quedan en el reporte como `DEDUPLICADO`) y `UX_EstudiantePrograma_estudiante_programa`. Columna `TokenMatriculaGrupo.programaPorDefecto`.
+5. `CREATE OR ALTER` de funciones, vistas y SP de §2.5–§2.7, con el mismo texto que `schema/`.
+6. Backfill de `EstudiantePrograma` (§2.4).
+7. **Último lote, una sola transacción:**
+   - (a) Verificación: `THROW 52901` si alguna asignatura no tiene vínculo, o si hay matrículas activas que violan R7 sin fila `AMBIGUO`/`SIN_INTERSECCION` en el reporte.
+   - (b) Solo si pasa la verificación: `DROP CONSTRAINT FK_Asignatura_SemestrePlanEstudio` y `DROP COLUMN semestrePlanEstudio` (SQL dinámico con guardas). Si (a) falla, la columna queda intacta.
+8. Mensajes (§2.8.1) y permisos (§2.8.2), idempotentes.
+
+Un segundo `up` sobre la BD migrada no cambia nada: los pasos que nombran la columna se saltan por `COL_LENGTH`, y los MERGE e índices son condicionales.
 
 **`down`:**
-1. `THROW 52902` (sin cambios) si alguna asignatura tiene 0 o más de 1 vínculo: el `down` solo es seguro con datos 1:1; el mensaje técnico lista las asignaturas. Para volver atrás con datos compartidos hay que desvincular primero.
-2. `ADD semestrePlanEstudio UNIQUEIDENTIFIER NULL`; `UPDATE` desde el único vínculo; `ALTER COLUMN ... NOT NULL`; recrear `FK_Asignatura_SemestrePlanEstudio`.
-3. Restaurar el texto previo de vistas, funciones y SPs (el de `integracion/CULM-001` antes de B2, incluido en el `down`) y eliminar los objetos nuevos.
-4. Borrar los `EstudiantePrograma` con tipo `CREADO` en el reporte (los `DEDUPLICADO` no se reinsertan: eran duplicados exactos); quitar `UX_EstudiantePrograma_estudiante_programa`, `UX_Asignatura_codigo`, `TokenMatriculaGrupo.programaPorDefecto`, la puente, el catálogo, el parámetro y los mensajes nuevos.
-5. El reporte `zz_reporte_b2_estudiante_programa` se conserva (solo lectura) para auditoría.
+1. `THROW 52902`, sin cambios, si alguna asignatura tiene **0 o más de 1 vínculo, contando activos e inactivos**. Una asignatura desvinculada de un plan y asociada a otro tiene 2 filas, así que no es 1:1. El mensaje técnico lista las asignaturas.
+2. `ADD semestrePlanEstudio NULL`. En otro lote: `UPDATE` desde el único vínculo, `ALTER COLUMN ... NOT NULL` y FK (SQL dinámico).
+3. Restaura el texto de vistas, funciones y SP **en su versión A + B mezclada**, copiada literal en el `down` (O-N9). Eso incluye las versiones B.2 de `uv_resumen_asistencia_estudiante_grupo`, `uv_cumplimiento_sesion_grupo`, `usp_consultar_resumen_asistencia_grupo_docente_paginado` y `usp_consultar_resumen_asistencia_estudiante`, y la versión A.2 de los tres SP de ámbito. Elimina los objetos nuevos.
+4. Borra los `EstudiantePrograma` con tipo `CREADO` en el reporte; quita los dos índices únicos, `programaPorDefecto`, la puente, el catálogo, el parámetro y los mensajes de B2.
+5. Conserva `zz_reporte_culm001_b2nm_estudiante_programa` (solo lectura).
 
-Prueba `up → down → up` en T-B2-12.
+### 2.4 Backfill de `EstudiantePrograma` y reporte
 
-### 2.4 Backfill de `EstudiantePrograma` y reporte de ambiguos
-
-Tabla de reporte (sin FKs, `DENY INSERT, UPDATE, DELETE` al runtime, patrón `zz_archivo_*` de DEC-010):
 ```sql
-CREATE TABLE dbo.zz_reporte_b2_estudiante_programa (
-    id          UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_zz_reporte_b2_estudiante_programa PRIMARY KEY,
+CREATE TABLE dbo.zz_reporte_culm001_b2nm_estudiante_programa (
+    id          UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_zz_reporte_culm001_b2nm PRIMARY KEY,
     estudiante  UNIQUEIDENTIFIER NOT NULL,
     grupo       UNIQUEIDENTIFIER NULL,
     programa    UNIQUEIDENTIFIER NULL,
-    tipo        NVARCHAR(20)     NOT NULL,   -- CREADO | AMBIGUO | DEDUPLICADO | RESUELTO
+    tipo        NVARCHAR(20)     NOT NULL,   -- CREADO | AMBIGUO | SIN_INTERSECCION | DEDUPLICADO | RESUELTO
     detalle     NVARCHAR(400)    NULL,
-    fechaUtc    DATETIME2(3)     NOT NULL CONSTRAINT DF_zz_reporte_b2_fecha DEFAULT (SYSUTCDATETIME())
+    fechaUtc    DATETIME2(3)     NOT NULL CONSTRAINT DF_zz_reporte_culm001_b2nm_fecha DEFAULT (SYSUTCDATETIME())
 );
 ```
-Algoritmo (con la puente ya creada; los programas de un grupo salen de la nueva `uv_grupo_programa`):
-1. **Estudiantes sin ningún `EstudiantePrograma`** con matrículas (cualquier estado): si todas caen en **un único** programa → se crea el vínculo (`CREADO`). Si caen en dos o más → no se crea nada (`AMBIGUO`, `detalle` = programas). Es la regla literal de DEC-020.
-2. **Estudiantes con vínculo** cuya matrícula en un grupo no tiene intersección con los programas del grupo (caso F-COO-006 y transversales depuradas por `scripts/maintenance/hu008_depurar_estudiante_programa_transversales.sql`): si el grupo tiene un único programa → se crea el vínculo (`CREADO`, la misma regla que la matrícula de §2.7.3); si tiene varios → `AMBIGUO`. Antes de B2 todo grupo tiene un único programa, así que en la práctica los `AMBIGUO` solo salen del paso 1.
-3. El `up` devuelve un resumen (`SELECT tipo, COUNT(*)`) y deja el detalle en la tabla. Los `AMBIGUO` se resuelven con `DB/scripts/maintenance/b2_resolver_estudiante_programa_ambiguo.sql` (`@idEstudiante`, `@idPrograma`; valida que el programa sea de uno de sus grupos, crea el vínculo y registra `RESUELTO`). Mientras tanto el docente los ve (R10); coordinador y decano no.
-4. `hu008_depurar_estudiante_programa_transversales.sql` se **retira** porque contradice R7 (se borra en el commit de BD con esa justificación).
+Sin FKs; `DENY INSERT, UPDATE, DELETE` al runtime (patrón `zz_archivo_*` de DEC-010).
 
-Resultado esperado en la BD local actual (un programa): 0 `AMBIGUO`; `CREADO` incluye al estudiante `b1a2c3d4-...-0023` de F-COO-006; después, `totalEstudiantes` del KPI = directorio del coordinador.
+Algoritmo, literal a DEC-020 (O-B4):
+1. **Solo estudiantes activos sin ningún `EstudiantePrograma`.** "Activo" significa con al menos una matrícula en estado activo; el estado se resuelve contra `EstadoEstudianteGrupo`, sin literal.
+   - Si sus matrículas activas caen en un único programa → se crea el vínculo (`CREADO`).
+   - Si caen en dos o más → `AMBIGUO` (`detalle` = programas) y no se crea nada.
+2. **Matrículas activas sin intersección** de estudiantes que ya tienen algún vínculo: **solo se reportan** como `SIN_INTERSECCION`; no se crea nada. Es el caso de F-COO-006 si el estudiante tiene otro programa, y el de las transversales depuradas por `hu008_depurar_estudiante_programa_transversales.sql`.
+3. Estudiantes sin vínculo y sin matrículas activas (solo historia): no se crean ni se reportan. Su historia la ven el administrador y el docente (R10).
+4. El `up` devuelve `SELECT tipo, COUNT(*)`. `DB/scripts/maintenance/culm001_b2nm_resolver_estudiante_programa.sql` resuelve cada fila con una de dos opciones explícitas y registra `RESUELTO`:
+   - (a) asociar la asignatura del grupo al plan del programa del estudiante (llama a `usp_asociar_asignatura_plan`; flujo §4.3.1);
+   - (b) crear el vínculo `EstudiantePrograma` con un programa del grupo.
+5. `hu008_depurar_estudiante_programa_transversales.sql` se conserva, porque no contradice el backfill literal. Su cabecera se actualiza para decir que la matrícula nueva sigue R7.
+
+Resultado esperado en la BD local (un programa): si el estudiante `b1a2c3d4-...-0023` de F-COO-006 no tiene ningún vínculo, sale como `CREADO`; si tiene otro, sale como `SIN_INTERSECCION` y se resuelve con el script. Después de la resolución, `totalEstudiantes` del KPI coincide con el directorio del coordinador.
 
 ### 2.5 Vistas
 
 **Nuevas**
 
-| Vista | Grano | Columnas / definición |
+| Vista | Grano | Definición |
 | :--- | :--- | :--- |
-| `uv_caracter_asignatura_plan` | 1 por carácter | id, codigo, nombre, estaActivo |
-| `uv_asignatura_plan_estudio` | 1 por vínculo | idAsignaturaPlanEstudio, idAsignatura, codigoAsignatura, nombreAsignatura, credito, idArea, nombreArea, idComponente, codigoComponente, nombreComponente, estaActivaAsignatura, idSemestrePlanEstudio, idSemestre, numeroSemestre, codigoSemestre, idPlanEstudio, inpPlanEstudio, estaActivoPlan, idPrograma, nombrePrograma, idFacultad, idInstitucion, idCaracter, codigoCaracter, nombreCaracter, estaActivoVinculo, fechaVinculacionUtc, fechaDesvinculacionUtc, totalProgramasActivos (programas distintos con vínculo activo de la asignatura) |
-| `uv_estudiante_grupo_programa` | 1 por (matrícula, programa propio que comparte el grupo) | idEstudianteGrupo, idEstudiante, idGrupo, idPrograma, idPeriodoAcademico, codigoEstadoEstudiante: `uv_estudiante_grupo eg JOIN uv_grupo_programa gp ON gp.idGrupo = eg.idGrupo JOIN EstudiantePrograma ep ON ep.estudiante = eg.idEstudiante AND ep.programa = gp.idPrograma` (investigación §5, propuesta 1) |
-| `uv_resumen_asistencia_estudiante_programa_grupo` | 1 por (matrícula, programa) | columnas de `uv_resumen_asistencia_estudiante_grupo` + idPrograma: resumen `JOIN uv_estudiante_grupo_programa` por `idEstudianteGrupo` |
+| `uv_caracter_asignatura_plan` | 1 por carácter | id, codigo, nombre, orden, estaActivo |
+| `uv_asignatura_plan_estudio` | 1 por vínculo | idAsignaturaPlanEstudio, idAsignatura, codigoAsignatura, nombreAsignatura, credito, idArea, nombreArea, idComponente, codigoComponente, nombreComponente, estaActivaAsignatura, idSemestrePlanEstudio, idSemestre, numeroSemestre, codigoSemestre, idPlanEstudio, inpPlanEstudio, estaActivoPlan, idPrograma, nombrePrograma, idFacultad, idInstitucion, idCaracter, codigoCaracter, nombreCaracter, ordenCaracter, estaActivoVinculo, fechaVinculacionUtc, fechaDesvinculacionUtc, totalProgramasActivos |
+| `uv_estudiante_grupo_programa` | 1 por (matrícula, programa del grupo con vínculo del estudiante) | `uv_estudiante_grupo eg JOIN uv_grupo_programa gp ON gp.idGrupo = eg.idGrupo JOIN EstudiantePrograma ep ON ep.estudiante = eg.idEstudiante AND ep.programa = gp.idPrograma` |
+| `uv_resumen_asistencia_estudiante_programa_grupo` | 1 por (matrícula, programa) | Columnas de `uv_resumen_asistencia_estudiante_grupo` (versión B.2) + `idPrograma`, por `JOIN uv_estudiante_grupo_programa` |
 
-**Modificadas** (lista exacta; cada una con prueba de cardinalidad en §2.9)
+**Modificadas**
 
-| Vista | Cambio | Grano resultante |
+| Vista | Cambio | Grano |
 | :--- | :--- | :--- |
-| `uv_asignatura` | Deja de unir plan/semestre/programa (`uv_asignatura.sql:30-35`). Se quitan `idSemestrePlanEstudio`, `inp`, `nombrePrograma`, `codigoSemestre`; se agrega `totalPlanesActivos` | 1 por asignatura (catálogo) |
-| `uv_grupo_programa` | `uv_grupo g JOIN AsignaturaPlanEstudio apl ON apl.asignatura = g.idAsignatura JOIN SemestrePlanEstudio JOIN PlanEstudio` con `ufn_vinculo_asignatura_vigente_periodo` y `SELECT DISTINCT idGrupo, idPrograma, idPeriodoAcademico, grupoEstaHablitado` (dos semestres o dos planes del mismo programa no duplican) | **1:N** por (grupo, programa) |
-| `uv_grupo` | **Sin cambio de texto**: une `uv_asignatura` por `id` y solo lee `id`/`nombre` (`uv_grupo.sql` l.40); como `uv_asignatura` sigue siendo 1 por asignatura, conserva 1 fila por grupo | 1 por grupo |
-| `uv_estudiante_grupo` (**congelada**) | **No se toca**. Depende de `uv_grupo`, que sigue 1:1; por eso no se duplica. T-B2-03 fija `COUNT(*) = COUNT(DISTINCT id)` con una asignatura en dos planes y el hash del manifiesto no cambia | 1 por matrícula |
-| `uv_auth_grupo` | El join a la cadena `Asignatura.semestrePlanEstudio → ... → Facultad` (l.29-33) se reemplaza, en las ramas administrador (`f.institucion`), decano (`f.decano`) y coordinador (`pr.coordinador`), por `EXISTS` sobre `uv_grupo_programa gp JOIN Programa pr JOIN Facultad f`; ramas docente y estudiante sin cambio | 1 por grupo |
-| `uv_auth_programa`, `uv_auth_facultad`, `uv_auth_institucion` | Ramas docente y estudiante (l.41-45, 34-39, 33-50): la cadena se reemplaza por `uv_grupo_programa` dentro del `EXISTS` | sin cambio |
-| `uv_docente` | Programa por `uv_grupo_programa` en lugar de `uv_asignatura.idSemestrePlanEstudio` (l.46-51) | 1 por (docente, grupo, programa del grupo) |
-| `uv_estudiante` | Programa por `uv_estudiante_grupo_programa` (R6): la fila existe si el estudiante tiene `EstudiantePrograma` en un programa del grupo. `idPlanEstudio`/`inpPlanEstudio` = plan **activo** de ese programa que contiene la asignatura; si hay varios, el de mayor `inp` y luego menor `id` (regla determinista documentada en la vista, no un `TOP 1` arbitrario) | 1 por (estudiante, grupo, programa propio) |
-| `uv_auth_estudiante` | Sin cambio de texto: su rama coordinador (`pr.id = e.idPrograma`, l.42) queda correcta al cambiar `uv_estudiante` | idem |
-| `uv_estudiante_programa` | Parte de `EstudiantePrograma` + `uv_estudiante_identidad` (no de `DISTINCT uv_estudiante`); un estudiante con vínculo y sin grupos también aparece; agrega `estaActivoUsuario` | 1 por vínculo |
-| `uv_cumplimiento_sesion_grupo` | Se quita `idPrograma` (una sesión no tiene programa propio); `idPeriodoAcademico` sale de `uv_grupo`. Se aplica sobre la versión de B (exclusión de canceladas, DEC-016) | 1 por sesión |
-| `uv_resumen_asistencia_estudiante_grupo` | Se quita `idPrograma` y el join a `uv_grupo_programa`; `idPeriodoAcademico` sale de `uv_grupo`. Se aplica sobre la versión de B (columnas de horas, DEC-012) | 1 por matrícula |
-| `uv_semestre_plan_estudio`, `uv_plan_estudio`, `uv_auth_docente`, `uv_auth_sesion` | Sin cambio de texto | — |
+| `uv_asignatura` | Sin la cadena plan/programa; sin `idSemestrePlanEstudio`, `inp`, `nombrePrograma`, `codigoSemestre`; + `totalPlanesActivos` | 1 por asignatura |
+| `uv_grupo_programa` | `uv_grupo` + `CROSS APPLY dbo.ufn_programas_grupo(g.id)` (S1). Columnas: idGrupo, idPrograma, idPeriodoAcademico, grupoEstaHablitado, **idPlanEstudio, inpPlanEstudio**. El plan es el del programa que contiene la asignatura con vínculo vigente; si hay varios: activo primero, mayor `inp`, menor `id` (regla documentada en la vista) | 1:N por (grupo, programa) |
+| `uv_grupo` | Sin cambio de texto: solo lee `id` y `nombre` de `uv_asignatura` | 1 por grupo |
+| `uv_estudiante_grupo` (**congelada**) | No se toca. Depende de `uv_grupo`, que sigue 1:1. B2NM-03 fija su cardinalidad y el manifiesto no cambia | 1 por matrícula |
+| `uv_auth_grupo` | Ramas administrador, decano y coordinador por `EXISTS` sobre `uv_grupo_programa` + `Programa` + `Facultad`, en lugar del join de l.29-33 | 1 por grupo |
+| `uv_auth_programa`, `uv_auth_facultad`, `uv_auth_institucion` | Ramas docente y estudiante por `uv_grupo_programa` dentro del `EXISTS` | sin cambio |
+| `uv_docente` | Programa y plan desde `uv_grupo_programa`; `idPlanEstudio`/`inpPlanEstudio` con la misma regla (O-N5) | 1 por (docente, grupo, programa del grupo) |
+| `uv_docente_programa` | Sin cambio de texto: su `COUNT(DISTINCT x.idGrupo)` (l.43) sigue siendo correcto con el nuevo grano de `uv_docente`. Entra en B2NM-03 | — |
+| `uv_estudiante` | Se construye desde `uv_estudiante_grupo` + `uv_grupo_programa` y no exige vínculo. Nueva columna `tieneVinculoPrograma BIT = IIF(EXISTS EstudiantePrograma(estudiante, idPrograma), 1, 0)`. El plan sale de `uv_grupo_programa` (O-B3) | 1 por (estudiante, grupo, programa del grupo) |
+| `uv_auth_estudiante` | Las ramas **coordinador** y **decano** exigen `e.tieneVinculoPrograma = 1`; las ramas administrador, docente titular y propio no (R10). Expone `tieneVinculoPrograma` | idem |
+| `uv_estudiante_programa` | Desde `EstudiantePrograma` + `uv_estudiante_identidad`, no desde `DISTINCT uv_estudiante`; + `estaActivoUsuario` | 1 por vínculo |
+| `uv_cumplimiento_sesion_grupo` (versión B.1/B.2) | Se quita `idPrograma`; `idPeriodoAcademico` sale de `uv_grupo`. Se conservan las columnas de B (`totalTomas`, `horasSesion`, exclusión de canceladas) | 1 por sesión |
+| `uv_resumen_asistencia_estudiante_grupo` (versión B.2) | Se quita `idPrograma` y el join a `uv_grupo_programa`; `idPeriodoAcademico` sale de `uv_grupo`. Las columnas de horas de B quedan intactas | 1 por matrícula |
+| `uv_auth_asistencia` | Sin cambio. Se declara, en un comentario de la vista y en este contrato, que **no** es fuente de ámbito del coordinador: filtra por grupo y hoy no tiene consumidores. Un consumidor nuevo debe usar `ufn_estudiantes_grupo_visibles` (O-N6) | — |
+| `uv_semestre_plan_estudio`, `uv_plan_estudio`, `uv_auth_docente`, `uv_auth_sesion` | Sin cambio | — |
 
-Ningún objeto del manifiesto (`DB/scripts/freeze-manifest.ps1:29-37`) se edita.
+No se edita ningún archivo del manifiesto (`DB/scripts/freeze-manifest.ps1:27-37`).
 
-### 2.6 Funciones nuevas
+### 2.6 Funciones nuevas (sobre tablas base, O-N3)
+
+`deploy_schema.ps1` despliega `functions/` antes que `views/` (l.75-80), y una TVF inline no admite resolución diferida. Por eso las cuatro funciones leen **solo tablas base**: `Grupo`, `PeriodoAcademico`, `AsignaturaPlanEstudio`, `SemestrePlanEstudio`, `PlanEstudio`, `Programa`, `Facultad`, `Coordinador`, `Decano`, `Docente`, `Administrador`, `Estudiante`, `EstudianteGrupo`, `EstudiantePrograma` y `CatalogoParametro` (como ya hace `uv_grupo` con `CatalogoParametro`). Las vistas pueden usarlas porque se despliegan después. B2NM-16 prueba `db-deploy` en una BD limpia.
 
 | Función | Firma (inline TVF) | Uso |
 | :--- | :--- | :--- |
-| `ufn_vinculo_asignatura_vigente_periodo` | `(@fechaVinculacionUtc, @fechaDesvinculacionUtc, @fechaInicioPeriodo, @fechaFinPeriodo) RETURNS TABLE (vigente BIT)` | Regla S1 en `uv_grupo_programa` |
-| `ufn_programas_coordinador` | `(@idUsuario UNIQUEIDENTIFIER) RETURNS TABLE (idPrograma)` | Todos los programas que coordina el usuario; reemplaza el `TOP 1` en listas y validaciones |
-| `ufn_programas_grupo` | `(@idGrupo UNIQUEIDENTIFIER) RETURNS TABLE (idPrograma)` sobre `uv_grupo_programa` | Matrícula, titularidad, oferta y revisión de cancelación (C) |
-| `ufn_estudiantes_grupo_visibles` | `(@idGrupo, @idUsuarioEjecutor) RETURNS TABLE (idEstudianteGrupo, idEstudiante)` | Filtro R6/R10 reutilizable: titular, administrador de la institución → todos; coordinador → `uv_estudiante_grupo_programa` ∩ `ufn_programas_coordinador`; decano → programas de su facultad |
+| `ufn_programas_grupo` | `(@idGrupo UNIQUEIDENTIFIER) RETURNS TABLE (idPrograma, idPlanEstudio, inpPlanEstudio)`, con la regla de vigencia S1 | `uv_grupo_programa`, matrícula, validaciones, C |
+| `ufn_programas_coordinador` | `(@idUsuario UNIQUEIDENTIFIER) RETURNS TABLE (idPrograma)` | Reemplaza el `TOP 1` en listas y validaciones |
+| `ufn_programas_ambito_ejecutor` | `(@idUsuario UNIQUEIDENTIFIER) RETURNS TABLE (idPrograma, rol)` | Coordinador → sus programas; decano → programas de su facultad |
+| `ufn_estudiantes_grupo_visibles` | `(@idGrupo, @idUsuarioEjecutor) RETURNS TABLE (idEstudianteGrupo, idEstudiante)` | Titular del grupo y administrador de la institución → todas las matrículas (R10). Coordinador y decano → matrículas con `EstudiantePrograma` en (programas del grupo ∩ `ufn_programas_ambito_ejecutor`) (R6) |
 
 ### 2.7 Procedimientos almacenados
 
-Todos los SP nuevos o modificados: `SET NOCOUNT ON; SET XACT_ABORT ON;`, `BEGIN TRY` / `BEGIN TRANSACTION ... COMMIT` en los de escritura, `IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;` en el `CATCH`, parámetros evaluados con `IS NULL`, salida canónica `(idCorrelacion, mensajeUsuarioResultado, mensajeTecnicoResultado, estadoResultado)` y, en consultas, `@numeroPagina`, `@tamanoPagina` con `OFFSET ... FETCH NEXT` y `COUNT(*) OVER() AS totalRegistros` sobre vistas `uv_*`. El ámbito se valida **dentro** del SP (RBAC con `usp_validar_permiso_rbac_usuario_interno` + titularidad). `@tamanoPagina` se acota con el parámetro de paginación existente (máximo del catálogo).
+Reglas comunes:
+- `SET NOCOUNT ON; SET XACT_ABORT ON;`; transacción explícita en las escrituras e `IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;` en el `CATCH`.
+- Parámetros evaluados con `IS NULL`; salida canónica `(idCorrelacion, mensajeUsuarioResultado, mensajeTecnicoResultado, estadoResultado)`.
+- Consultas con `@numeroPagina`, `@tamanoPagina`, `OFFSET ... FETCH NEXT` y `COUNT(*) OVER() AS totalRegistros` sobre `uv_*`.
+- RBAC con `usp_validar_permiso_rbac_usuario_interno` y titularidad dentro del SP.
 
 #### 2.7.1 SP nuevos
 
 | SP | Firma | Reglas | Mensajes |
 | :--- | :--- | :--- | :--- |
-| `usp_internal_asociar_asignatura_plan` | `(@idAsignatura, @idPlanEstudio, @semestreNumero INT, @codigoCaracter NVARCHAR(3), @idCorrelacion, @mensajeUsuarioResultado OUT, @mensajeTecnicoResultado OUT, @estadoResultado OUT)` | Interno (DENY al runtime). Resuelve SPE por plan+número (`PLA_004`); carácter por código activo, NULL → `CARACTER_DEFECTO` (`ASI_007`); con `UPDLOCK, HOLDLOCK` sobre los vínculos de la asignatura en ese plan: vínculo activo en el mismo semestre → `ASI_003`; activo en otro semestre del mismo plan → `ASI_003`; inactivo en el mismo semestre → reactiva; si no, inserta | `PLA_004`, `ASI_003`, `ASI_007`, `GEN_004` |
-| `usp_asociar_asignatura_plan` | `(@idAsignatura, @idPlanEstudio, @semestreNumero INT, @codigoCaracter NVARCHAR(3) = NULL, @idCorrelacion, @idUsuarioEjecutor = NULL)` | Público (HU075). RBAC COORDINADOR; el plan existe (`PLA_002`) y es de un programa que coordina (`SEC_002` vía `usp_validar_titularidad_jerarquica_interno`); la asignatura existe (`GEN_001`) y es de la **misma institución** (tiene algún vínculo con un programa de la institución del plan, si no `GEN_001`: no se revela su existencia); llama al interno | + `PLA_002`, `SEC_002`, `GEN_001` |
-| `usp_desvincular_asignatura_plan` | `(@idAsignatura, @idPlanEstudio, @idCorrelacion, @idUsuarioEjecutor = NULL)` | Público; reemplaza el 501 de F-COO-005. Mismas validaciones de ámbito. Vínculo activo inexistente → `ASI_004`. Bloqueo: si existen grupos de la asignatura en un periodo vigente o futuro **y** este es el único programa vigente del grupo, o si hay matrículas activas cuyo único programa común con el grupo es el de este plan → `ASI_005` (impide romper R7 o dejar grupos sin programa). Si pasa: `estaActivo = 0`, `fechaDesvinculacionUtc = SYSUTCDATETIME()` (baja lógica; la historia de KPIs se conserva por S1) | `ASI_004`, `ASI_005`, `GEN_005` |
-| `usp_consultar_asignaturas_plan_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @idPlanEstudio, @numeroPagina, @tamanoPagina, @numeroSemestre INT = NULL, @codigoCaracter NVARCHAR(3) = NULL, @busqueda NVARCHAR(100) = NULL, @incluirInactivos BIT = NULL)` | Malla del coordinador y del decano (HU075, HU084, HU108). Plan inexistente o fuera de ámbito → `PLA_002` (404, cierra F-COO-008 y F-DEC-015). Ámbito: coordinador → plan de `ufn_programas_coordinador`; decano → plan de su facultad; administrador → su institución. Sobre `uv_asignatura_plan_estudio`; columnas extra `compartida = IIF(totalProgramasActivos > 1, 1, 0)` y `programasCompartidos` (`STRING_AGG` de los otros programas, solo nombres) | `PLA_002`, `VAL_*` |
-| `usp_consultar_asignaturas_asociables_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @idPlanEstudio, @numeroPagina, @tamanoPagina, @busqueda NVARCHAR(100) = NULL)` | Candidatas para "Asociar asignatura existente": asignaturas activas de la institución del plan sin vínculo activo en ese plan; búsqueda por código o nombre; 1 fila por asignatura con `planes` (`STRING_AGG` de "Programa · Plan inp · S n") | `PLA_002`, `SEC_002` |
-| `usp_consultar_asignaturas_coordinador_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @numeroPagina, @tamanoPagina, @idPrograma = NULL, @busqueda = NULL, @estaActiva BIT = NULL)` | Reemplaza el JPQL de `GET /coordinador/asignaturas` (F-COO-008). 1 fila por (asignatura, plan de sus programas); `@idPrograma` fuera de su coordinación → `COO_003` | `COO_003` |
-| `usp_consultar_planes_estudio_programa_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @numeroPagina, @tamanoPagina, @idPrograma = NULL, @estaActivo BIT = NULL)` | Reemplaza `PlanEstudioJpaRepository.HQL_POR_PROGRAMA`/`HQL_TOTAL_SEMESTRES` y el conteo de créditos (F-COO-008). `totalAsignaturas`, `totalCreditos`, `totalObligatorias`, `totalOptativas` por plan **vía la puente** (vínculos activos) | `COO_003` |
-| `usp_consultar_estudiantes_programa_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @numeroPagina, @tamanoPagina, @idPrograma = NULL, @busqueda NVARCHAR(100) = NULL, @estaActivo BIT = NULL)` | `GET /coordinador/estudiantes` (HU068, F-COO-008): estudiantes con `EstudiantePrograma` en sus programas, paginado; columnas `programas` y `gruposActivos` (solo grupos donde R6 los hace visibles) | `COO_003` |
-| `usp_consultar_grupos_facultad_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @numeroPagina, @tamanoPagina, @idPeriodoAcademico = NULL, @idPrograma = NULL, @busqueda = NULL)` | `GET /decano/grupos` (F-DEC-002): ámbito de facultad dentro del SP con `EXISTS` sobre `uv_grupo_programa`; 1 fila por grupo; `programas` agregado; `@idPrograma` fuera de su facultad → `KPI_003` | `KPI_003` |
-| `usp_consultar_programas_grupo` | `(@idUsuarioEjecutor, @idCorrelacion, @idGrupo)` | Programas del grupo para el selector de la matrícula manual y de la ventana QR; solo titular, coordinador o decano con ámbito (`GEN_001` si no) | `GEN_001` |
+| `usp_internal_asociar_asignatura_plan` | `(@idAsignatura, @idPlanEstudio, @semestreNumero INT, @codigoCaracter NVARCHAR(3), @idCorrelacion, @mensajeUsuarioResultado OUT, @mensajeTecnicoResultado OUT, @estadoResultado OUT)` | Interno (DENY al runtime). Resuelve el SPE por plan + número (`PLA_004`) y el carácter activo por código; NULL → `CARACTER_DEFECTO` (`ASI_007`). Con `UPDLOCK, HOLDLOCK`: vínculo activo en el mismo u otro semestre del plan → `ASI_003`; inactivo en el mismo semestre → lo reactiva; si no, inserta | `PLA_004`, `ASI_003`, `ASI_007`, `GEN_004` |
+| `usp_asociar_asignatura_plan` | `(@idAsignatura, @idPlanEstudio, @semestreNumero INT, @codigoCaracter NVARCHAR(3) = NULL, @idCorrelacion, @idUsuarioEjecutor = NULL)` | RBAC COORDINADOR. El plan existe (`PLA_002`) y es de un programa suyo (`SEC_002` por `usp_validar_titularidad_jerarquica_interno`). La asignatura está activa y tiene algún vínculo en un programa de la misma institución (si no, `GEN_001`) | + `PLA_002`, `SEC_002`, `GEN_001` |
+| `usp_desvincular_asignatura_plan` | `(@idAsignatura, @idPlanEstudio, @idCorrelacion, @idUsuarioEjecutor = NULL)` | Mismas validaciones. Sin vínculo activo → `ASI_004`. `ASI_005` si hay grupos de la asignatura en un periodo vigente o futuro cuyo único programa vigente es el de este plan, o matrículas activas cuyo único programa común con el grupo es este. Si pasa: `estaActivo = 0`, `fechaDesvinculacionUtc = SYSUTCDATETIME()` | `ASI_004`, `ASI_005`, `GEN_005` |
+| `usp_consultar_asignaturas_plan_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @idPlanEstudio, @numeroPagina, @tamanoPagina, @numeroSemestre INT = NULL, @codigoCaracter NVARCHAR(3) = NULL, @busqueda NVARCHAR(100) = NULL)` | Malla del coordinador y del decano. Plan inexistente o fuera de ámbito → `PLA_002`. Coordinador → `ufn_programas_coordinador`; decano → su facultad. Lee `uv_asignatura_plan_estudio` (vínculos activos) con la columna `compartida = IIF(totalProgramasActivos > 1, 1, 0)` | `PLA_002` |
+| `usp_consultar_asignaturas_asociables_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @idPlanEstudio, @numeroPagina, @tamanoPagina, @busqueda NVARCHAR(100) = NULL)` | Asignaturas activas de la institución del plan sin vínculo activo en él. 1 fila por asignatura con `planes` (`STRING_AGG` "Programa · Plan inp · S n") | `PLA_002`, `SEC_002` |
+| `usp_consultar_asignaturas_coordinador_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @numeroPagina, @tamanoPagina, @idPrograma = NULL, @busqueda = NULL, @estaActiva BIT = NULL)` | Reemplaza `AsignaturaJpaRepository.HQL_POR_PROGRAMA`, que se rompe al retirar columnas. 1 fila por (asignatura, plan de sus programas). `@idPrograma` ajeno → `COO_003` | `COO_003` |
+| `usp_consultar_planes_estudio_programa_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @numeroPagina, @tamanoPagina, @idPrograma = NULL, @estaActivo BIT = NULL)` | Reemplaza en `PlanEstudioJpaRepository` `HQL_POR_PROGRAMA`, `HQL_TOTAL_SEMESTRES` y el conteo y la suma de créditos (l.74-90), que pasan a calcularse por la puente (vínculos activos) | `COO_003` |
+| `usp_consultar_grupos_facultad_paginado` | `(@idUsuarioEjecutor, @idCorrelacion, @numeroPagina, @tamanoPagina, @idPeriodoAcademico = NULL, @idPrograma = NULL, @busqueda = NULL)` | Reemplaza `GrupoJpaRepository.HQL_GRUPOS_POR_FACULTAD` (l.85-91), que se rompe. Ámbito de facultad por `EXISTS uv_grupo_programa`; 1 fila por grupo con `programas`. `@idPrograma` fuera de su facultad → `KPI_003` | `KPI_003` |
+| `usp_consultar_programas_grupo` | `(@idUsuarioEjecutor, @idCorrelacion, @idGrupo)` | Alimenta el selector de la matrícula manual y de la ventana QR. Lo pueden usar el titular y el coordinador o decano con ámbito; si no, `SEC_002` | `SEC_002` |
+| `usp_internal_asegurar_estudiante_programa_grupo` | `(@idEstudiante, @idGrupo, @idProgramaElegido = NULL, @idCorrelacion, @idProgramaResultado OUT, @mensajeUsuarioResultado OUT, @mensajeTecnicoResultado OUT, @estadoResultado OUT)` | Interno, ver §2.7.3 | `EST_005`, `EST_006` |
 
-#### 2.7.2 SP modificados (firma y regla)
+#### 2.7.2 SP modificados: escritura y validación
 
-| SP | Cambio de firma | Cambio de regla |
+| SP | Firma | Regla |
 | :--- | :--- | :--- |
-| `usp_crear_asignatura` | + `@codigoCaracter NVARCHAR(3) = NULL` | Unicidad de código contra la **tabla** con `UPDLOCK, HOLDLOCK` → `ASI_002` (antes `VAL_006` sobre la vista, l.141); inserta el catálogo sin `semestrePlanEstudio` y llama a `usp_internal_asociar_asignatura_plan` en la misma transacción; agrega `SET XACT_ABORT ON` y la transacción explícita que hoy no tiene |
-| `usp_actualizar_asignatura` | + `@codigoCaracter NVARCHAR(3) = NULL` (`@idPlanEstudio`, `@semestreNumero` ya existen, hoy ignorados) | Actualiza el **vínculo** del plan (semestre, carácter) y, si S2 lo permite, los datos de catálogo; código duplicado → `ASI_002`; compartida con programas ajenos y cambian datos de catálogo → `ASI_006` |
-| `usp_toggle_estado_asignatura` | sin cambio | Estado **global**; con S2 (`ASI_006` si es compartida con programas ajenos). Para quitarla de un plan se usa desvincular |
-| `usp_validar_gestion_asignatura_coordinador_interno` | + `@idPlanEstudio = NULL`, + `@exigirTodosLosProgramas BIT = 0` | Sin `SELECT` de un único programa (l.63-65): el coordinador debe coordinar **algún** programa con vínculo de la asignatura (o el del plan, si llega); con `@exigirTodosLosProgramas = 1` debe coordinar **todos** (S2) |
-| `usp_validar_gestion_grupo_coordinador_o_titular_interno` | sin cambio | `TOP 1 pe.idPrograma` (l.101) → `EXISTS (ufn_programas_grupo ∩ ufn_programas_coordinador)` |
-| `usp_validar_docente_vinculo_activo_programa_interno` | sin cambio | `TOP 1 idPrograma` (l.33) → `EXISTS` de `DocentePrograma` activo en algún programa con vínculo activo de la asignatura; `DOC_009` si solo hay vínculos inactivos |
-| `usp_crear_grupo` | **sin cambio** (firma congelada, `DB_BASELINE_CONTRACT.md:79`) | PASO 2B (l.117-119): el docente debe tener `uv_docente_programa` activo en **algún** programa de la asignatura (`SEC_002` si no); la asignatura debe tener al menos un vínculo activo con plan activo (`ASI_004`) |
-| `usp_resolver_programa_coordinador_interno` | + `@idProgramaSolicitado UNIQUEIDENTIFIER = NULL` | Sin `TOP 1` (l.51): con `@idProgramaSolicitado` valida que lo coordine (`COO_003`); sin él, si coordina uno lo devuelve, si coordina varios → `COO_002`, si ninguno → `KPI_001` (S4). Los SP de §2.7.2 que lo invocan (`usp_consultar_kpis_coordinador`, `_alerta_temprana_programa`, `_ficha_estudiante_programa`, `_bitacora_estudiante_programa`, `_resumen_asistencia_estudiante_programa`, `_resumen_docentes_programa`, `_historial_grupos_docente_programa`) reciben `@idPrograma UNIQUEIDENTIFIER = NULL` y lo pasan |
-| `usp_validar_estudiante_en_programa_interno` | sin cambio | `EXISTS` sobre `uv_estudiante_grupo_programa` (l.37) en lugar de "algún grupo cuya asignatura es del programa" (investigación §5, propuesta 2) |
-| `usp_consultar_kpis_coordinador` | + `@idPrograma = NULL` | Resumen sobre `uv_resumen_asistencia_estudiante_programa_grupo` (`idPrograma = @programa`) y cumplimiento con `EXISTS uv_grupo_programa`; `totalEstudiantes = COUNT(DISTINCT idEstudiante)` de estudiantes del programa (cierra F-COO-006) |
-| `usp_consultar_alerta_temprana_programa` | + `@idPrograma = NULL` | Sobre `uv_resumen_asistencia_estudiante_programa_grupo`; solo estudiantes del programa |
-| `usp_consultar_resumen_asistencia_estudiante_programa`, `usp_consultar_ficha_estudiante_programa`, `usp_consultar_bitacora_estudiante_programa` | + `@idPrograma = NULL` | Solo grupos donde el estudiante comparte el programa (R6); estudiante ajeno → `GEN_001` (404, comportamiento actual) |
-| `usp_consultar_consolidado_asistencia_grupos_paginado` | sin cambio (ya tiene `@idPrograma`) | 1 fila por grupo (`EXISTS` sobre `uv_grupo_programa`, l.74); para coordinador los conteos y porcentajes del grupo se calculan solo con sus estudiantes (`estudiantesPrograma`) y se agrega `estudiantesGrupo` (total, sin identidad) |
-| `usp_consultar_grupos_paginado` | + `@idPrograma = NULL` | Coordinador: `estudiantesActivos` = solo sus estudiantes; `capacidadMaximaPermitida`, `cuposDisponibles` siguen siendo del grupo (recurso compartido, sin datos personales). Titular/administrador sin cambio |
-| `usp_consultar_asistencias_sesion_paginado`, `usp_consultar_sesiones_grupo_paginado` | sin cambio | Filtran `eg.idEstudiante` con `ufn_estudiantes_grupo_visibles` (l.121-126); conteos recalculados con ese filtro (investigación §5, propuesta 4) |
-| `usp_consultar_kpis_decano` | sin cambio | Totales de facultad con `COUNT(DISTINCT)`; `sesionesEjecutadas` = sesiones distintas (misma semántica que el coordinador) y se agrega `sesionesEvaluadasPorMatricula` (el denominador que hoy viaja con ese nombre) y `matriculasActivas` rotulada aparte de `totalEstudiantes` (cierra F-DEC-013) |
-| `usp_consultar_kpis_institucion`, `usp_consultar_comparativa_facultades` | sin cambio | `DISTINCT` por estudiante/grupo/sesión al pasar por `uv_grupo_programa` (l.43, 83) |
-| `usp_consultar_comparativa_programas_facultad` | sin cambio | Cada programa cuenta sus estudiantes por `uv_resumen_asistencia_estudiante_programa_grupo`; agrega `estudiantesCompartidos` (también en otro programa) para rotular R9 |
-| `usp_consultar_aforo_grupos_facultad` | sin cambio | 1 fila por grupo (`EXISTS`, l.69), `programas` agregado; filtro por programa con `EXISTS` |
-| `usp_consultar_sesiones_facultad_paginado` | + `@idGrupo = NULL` | Filtro por grupo en servidor; grupo fuera de la facultad → `GEN_001` (cierra F-DEC-014); 1 fila por sesión (`EXISTS`, l.108) |
-| `usp_consultar_historial_estudiante` | sin cambio | Programa por `uv_estudiante_grupo_programa` (l.115); sin filas repetidas por grupo compartido |
-| `usp_resolver_periodo_kpi_interno`, `_facultad_interno`, `_institucion_interno` | sin cambio | `EXISTS` sobre `uv_grupo_programa` (l.46/44/44) |
-| `usp_cambiar_estado_programa_academico_interno` | sin cambio | Regla D4 (l.57): bloquea si hay grupos habilitados con vínculo vigente al programa (`EXISTS`) |
-| `usp_buscar_asignaturas_paginado` | sin cambio | Decano/administrador `/asignaturas` (l.85-86): 1 fila por asignatura con vínculos en planes de su ámbito; columnas `planes` (`STRING_AGG` "Programa · Plan inp · S n · Carácter") y `totalPlanes`; desaparecen `codigoSemestre`, `inpPlanEstudio`, `nombrePrograma` sueltos |
-| `usp_consultar_programas_creditos_facultad_paginado` | sin cambio | Créditos por plan vía la puente (l.64-70), vínculos activos |
-| `usp_consultar_componentes_formacion` | sin cambio | Cuenta asignaturas sobre `uv_asignatura` (1 por asignatura, l.77): sin cambio de texto si compila sin las columnas retiradas |
-| `usp_quitar_semestre_plan_estudio` | sin cambio | Bloqueo `PLA_006` (l.145) contra vínculos **activos** de la puente en ese SPE |
-| `usp_consultar_oferta_creacion_grupo_docente` | sin cambio | Sobre `uv_asignatura_plan_estudio` (l.79) con vínculos activos en programas del docente; 1 fila por asignatura, `programas` agregado |
-| `usp_consultar_oferta_grupos_estudiante` (HU008) | sin cambio | "Propias": grupos cuya asignatura tiene vínculo activo con un plan de un programa del estudiante (`EXISTS`, l.93-111); "transversales" BAS/INS por institución como hoy, excluyendo las ya propias; 1 fila por grupo; `codigoCaracter`/`nombreCaracter` del vínculo en el programa del estudiante (si hay varios, se prioriza `OBL`) |
-| `usp_consultar_historial_grupos_docente_programa` | + `@idPrograma = NULL` | `EXISTS` sobre `uv_grupo_programa` (l.94-97) |
-| `usp_consultar_destinatarios_retiro_estudiante_grupo` | sin cambio | Notifica a los coordinadores de los programas del **estudiante** que comparten el grupo (R6), no al de la asignatura (l.64-67) |
-| `usp_consultar_reenvio_verificacion_correo` | sin cambio | Ámbito del coordinador (l.79-83) por `EstudiantePrograma` ∩ `ufn_programas_coordinador` |
-| SP del directorio de A (`usp_consultar_estudiantes_directorio_paginado`) | + `@idEstudiante = NULL` si A no lo trae | Rama coordinador con `ufn_programas_coordinador`; `@idPrograma` fuera de ámbito → `COO_003`; contextos por `uv_estudiante` (ya filtrado por R6) |
-| `usp_consultar_estudiantes_facultad_paginado`, `usp_consultar_estudiante_facultad_detalle` | sin cambio | Heredan R6 por `uv_estudiante`/`uv_auth_estudiante`; los `STRING_AGG(DISTINCT)` actuales evitan repetir programas |
+| `usp_crear_asignatura` | + `@codigoCaracter NVARCHAR(3) = NULL` | Unicidad contra la tabla con `UPDLOCK, HOLDLOCK` → `ASI_002` (antes `VAL_006` sobre la vista, l.141). Inserta el catálogo y llama a `usp_internal_asociar_asignatura_plan` en la misma transacción. Agrega `SET XACT_ABORT ON` y la transacción que hoy no tiene |
+| `usp_actualizar_asignatura` | + `@codigoCaracter NVARCHAR(3) = NULL` | Actualiza el vínculo del plan (semestre, carácter). Los datos de catálogo solo con S2 (`ASI_006`). Código duplicado → `ASI_002` |
+| `usp_toggle_estado_asignatura` | sin cambio | Estado global, con S2 (`ASI_006`) |
+| `usp_validar_gestion_asignatura_coordinador_interno` | + `@idPlanEstudio = NULL`, + `@exigirTodosLosProgramas BIT = 0` | Sin el `SELECT` de un único programa (l.63-65). Basta coordinar "algún programa"; con el flag, "todos" (S2) |
+| `usp_validar_gestion_grupo_coordinador_o_titular_interno` | sin cambio | Sin `TOP 1` (l.101). **Regla para grupos compartidos (O-N7):** el titular siempre puede; un coordinador solo si coordina **todos** los programas vigentes del grupo (`NOT EXISTS (ufn_programas_grupo EXCEPT ufn_programas_coordinador)`); si no, `SEC_002`. Es la opción de mínimo privilegio, coherente con S2. Afecta a `usp_guardar_horarios_grupo`, `usp_precargar_sesiones_grupo` y `usp_actualizar_grupo`, que lo invocan |
+| `usp_validar_docente_vinculo_activo_programa_interno` | sin cambio | Sin `TOP 1` (l.33): `EXISTS` de un `DocentePrograma` activo en algún programa con vínculo activo de la asignatura. `DOC_009` si solo hay vínculos inactivos |
+| `usp_crear_grupo` | **sin cambio** (`DB_BASELINE_CONTRACT.md:79`) | PASO 2B (l.117-119): el docente necesita vínculo activo en algún programa de la asignatura (`SEC_002`). Asignatura sin vínculo activo con un plan activo → `ASI_004` |
+| `usp_resolver_programa_coordinador_interno` | + `@idProgramaSolicitado = NULL` | Sin `TOP 1` (l.51). Con `@idProgramaSolicitado`, lo valida (`COO_003`). Sin él: un programa → ese; varios → `COO_002`; ninguno → `KPI_001` (S4) |
+| `usp_validar_estudiante_en_programa_interno` | sin cambio | `EXISTS` sobre `uv_estudiante_grupo_programa` (l.37) |
+| `usp_quitar_semestre_plan_estudio` | sin cambio | `PLA_006` (l.145) contra los vínculos activos de la puente |
+| `usp_registrar_estudiante_en_programa_interno` | sin cambio | La institución del estudiante (l.46-48) ya no se lee de `uv_estudiante`, que con el grano nuevo puede no tener fila de ese programa. Se resuelve por `EstudianteGrupo` → `Grupo` → `ufn_programas_grupo` → `Programa` → `Facultad` → `institucion` de cualquiera de sus matrículas. Si no tiene matrículas, se omite la comparación y se valida solo el programa (O-B3) |
 
-#### 2.7.3 Matrícula manual y por QR: el vínculo `EstudiantePrograma`
+#### 2.7.3 Matrícula manual y por QR
 
-Las tres vías terminan en `usp_registrar_estudiante_en_grupo_interno` (manual del docente `usp_registrar_estudiante_en_grupo:164`, QR autenticado y público por `usp_internal_matricular_por_token:232`). Se modifica sobre la versión de A (reactivación `I → A`, DEC-009).
+Las tres vías terminan en `usp_registrar_estudiante_en_grupo_interno`: la manual (`usp_registrar_estudiante_en_grupo:164`) y la QR autenticada y pública (`usp_internal_matricular_por_token:232`). B2 parte de la versión de A (inserción + reactivación `I → A`, DEC-009) y **elimina la regla ESP en las dos ramas**: inserción (hoy l.122-135) y reactivación (A §2.3 paso 7) (O-N8).
 
-| SP | Cambio de firma | Regla |
+| SP | Firma | Regla |
 | :--- | :--- | :--- |
-| `usp_internal_asegurar_estudiante_programa_grupo` (nuevo, interno) | `(@idEstudiante, @idGrupo, @idProgramaElegido = NULL, @idCorrelacion, @idProgramaResultado OUT, @mensajeUsuarioResultado OUT, @mensajeTecnicoResultado OUT, @estadoResultado OUT)` | Con `UPDLOCK, HOLDLOCK` sobre `EstudiantePrograma` del estudiante: (1) si ya tiene vínculo con algún programa del grupo → lo devuelve, no crea nada (si llegó `@idProgramaElegido` distinto, se ignora y se informa en el mensaje técnico); (2) si no y el grupo tiene un único programa → crea el vínculo con ese programa (reutiliza `usp_registrar_estudiante_en_programa_interno`, hoy sin consumidores); (3) si no y el grupo tiene varios → exige `@idProgramaElegido` ∈ programas del grupo (`EST_005` si falta, `EST_006` si no pertenece) y crea el vínculo. Una violación del UNIQUE por carrera se trata como "ya existe" |
-| `usp_registrar_estudiante_en_grupo_interno` | + `@idProgramaElegido UNIQUEIDENTIFIER = NULL` | Se elimina el `TOP 1 pe.programa` con `comp.codigo = 'ESP'` (l.122-135, regla ESP de HU008 sustituida por R7 de DEC-020); llama al interno anterior antes de insertar o reactivar la matrícula, en la misma transacción |
-| `usp_registrar_estudiante_en_grupo` (manual) | + `@idPrograma UNIQUEIDENTIFIER = NULL` | Lo pasa como `@idProgramaElegido` |
-| `usp_abrir_ventana_matricula_grupo` (HU176B) | + `@idProgramaPorDefecto UNIQUEIDENTIFIER = NULL` | Si llega, debe ser un programa del grupo (`EST_006`) y se guarda en `TokenMatriculaGrupo.programaPorDefecto` (S3) |
-| `usp_internal_matricular_por_token` | sin cambio | Pasa `programaPorDefecto` del token como `@idProgramaElegido`; si el grupo tiene varios programas, el estudiante no comparte ninguno y el token no tiene programa por defecto → `MQR_008` (409) y no se crea usuario ni matrícula (en el flujo público, antes de crear el usuario) |
-| `usp_validar_token_matricula_publico` | sin cambio | Devuelve además `requiereProgramaDocente BIT` para que la pantalla pública avise antes de pedir datos |
+| `usp_internal_asegurar_estudiante_programa_grupo` | (§2.7.1) | Con `UPDLOCK, HOLDLOCK` sobre los `EstudiantePrograma` del estudiante: (1) si ya tiene vínculo con algún programa del grupo, lo devuelve; (2) si no y el grupo tiene un único programa, crea el vínculo; (3) si no y el grupo tiene varios, exige `@idProgramaElegido` ∈ programas del grupo (`EST_005` si falta, `EST_006` si es ajeno) y crea el vínculo. La creación valida la institución contra el programa elegido (que por construcción es del grupo) e inserta directamente con el mismo control de duplicado; una violación del índice único por carrera se trata como "ya existe" |
+| `usp_registrar_estudiante_en_grupo_interno` | + `@idProgramaElegido = NULL` | Llama al anterior en la misma transacción, antes de insertar o reactivar |
+| `usp_registrar_estudiante_en_grupo` (manual) | + `@idPrograma = NULL` | Lo pasa como `@idProgramaElegido` |
+| `usp_abrir_ventana_matricula_grupo` | + `@idPrograma = NULL` | S3 mínimo: si el grupo tiene más de un programa y llega NULL → `EST_005`; si no es del grupo → `EST_006`. Se guarda en `TokenMatriculaGrupo.programaPorDefecto` |
+| `usp_internal_matricular_por_token` | sin cambio | Pasa el `programaPorDefecto` del token. Si aun así no se puede resolver (ventana abierta antes de la migración en un grupo que pasó a tener varios programas) → `MQR_008`, antes de crear usuario o matrícula |
 
-#### 2.7.4 Objetos que dejan de existir
+#### 2.7.4 SP modificados: consultas (inventario completo de consumidores, O-B2)
 
-- `FK_Asignatura_SemestrePlanEstudio` y la columna `Asignatura.semestrePlanEstudio`.
-- `scripts/maintenance/hu008_depurar_estudiante_programa_transversales.sql` (§2.4).
+Origen del inventario: `git grep` de `semestrePlanEstudio`, `uv_grupo_programa`, `uv_resumen_asistencia_estudiante_grupo`, `uv_cumplimiento_sesion_grupo`, `uv_asignatura`, `uv_estudiante` y `uv_docente` sobre la base `65a4998`, más los consumidores que introducen A y B (§2.7.5).
+
+Fuentes de reemplazo:
+- conteos por programa → `uv_resumen_asistencia_estudiante_programa_grupo`;
+- programa de una sesión o de un grupo → `EXISTS uv_grupo_programa`;
+- facultad o institución → `uv_grupo` + `EXISTS uv_grupo_programa` + `DISTINCT`.
+
+| SP | Firma | Línea(s) y reemplazo |
+| :--- | :--- | :--- |
+| `usp_consultar_kpis_coordinador` | + `@idPrograma = NULL` | l.42 `r.idPrograma` → `uv_resumen_asistencia_estudiante_programa_grupo` con `idPrograma = @idPrograma`. l.52 `c.idPrograma` → `EXISTS (uv_grupo_programa gp WHERE gp.idGrupo = c.idGrupo AND gp.idPrograma = @idPrograma)`. `totalEstudiantes = COUNT(DISTINCT idEstudiante)` (F-COO-006) |
+| `usp_consultar_alerta_temprana_programa` | + `@idPrograma = NULL` | l.71 → `uv_resumen_asistencia_estudiante_programa_grupo` |
+| `usp_consultar_resumen_asistencia_estudiante_programa` | + `@idPrograma = NULL` | l.50 → idem |
+| `usp_consultar_ficha_estudiante_programa` | + `@idPrograma = NULL` | Por `usp_validar_estudiante_en_programa_interno`; estudiante ajeno → `GEN_001` |
+| `usp_consultar_bitacora_estudiante_programa` | + `@idPrograma = NULL` | l.79 `c.idPrograma = @idPrograma` → `EXISTS uv_grupo_programa` sobre `c.idGrupo` |
+| `usp_consultar_resumen_docentes_programa`, `usp_consultar_historial_grupos_docente_programa` | + `@idPrograma = NULL` | Resolver sin `TOP 1`; el historial (l.94-97) por `EXISTS uv_grupo_programa` |
+| `usp_consultar_tendencia_ausentismo` | sin cambio | l.56-57 `JOIN uv_programa p ON p.id = c.idPrograma` → `JOIN uv_grupo_programa gp ON gp.idGrupo = c.idGrupo JOIN uv_programa p ON p.id = gp.idPrograma`, con `COUNT(DISTINCT c.idSesion)` en los agregados de facultad e institución |
+| `usp_consultar_kpis_decano` | sin cambio | l.47 y l.55 `r.idPrograma` → `uv_resumen_asistencia_estudiante_programa_grupo` filtrado a los programas de la facultad, con `COUNT(DISTINCT idEstudiante)` y `COUNT(DISTINCT idEstudianteGrupo)`. l.62 `gp.idPrograma` con `DISTINCT idGrupo` |
+| `usp_consultar_kpis_institucion` | sin cambio | l.64 y 72 `r.idPrograma` → `uv_resumen_asistencia_estudiante_programa_grupo` + `DISTINCT`. l.78 `c.idPrograma` → `EXISTS uv_grupo_programa`. l.44 y 84 `gp.idPrograma` con `DISTINCT idGrupo`. l.37 (`ep.idPrograma`) sin cambio |
+| `usp_consultar_comparativa_facultades` | sin cambio | l.34 y 52 `r.idPrograma` → `uv_resumen_asistencia_estudiante_programa_grupo` + `DISTINCT idEstudiante` por facultad |
+| `usp_consultar_comparativa_programas_facultad` | sin cambio | l.31-54 `r.idPrograma` → `uv_resumen_asistencia_estudiante_programa_grupo`: cada programa cuenta sus estudiantes (R9) |
+| `usp_consultar_consolidado_asistencia_grupos_paginado` | sin cambio | l.70-76 `gp.idPrograma` → grano declarado **(grupo, programa del ámbito)**: cada fila cuenta solo a los estudiantes con vínculo en ese programa. Para un coordinador de un programa sale 1 fila por grupo |
+| `usp_consultar_aforo_grupos_facultad` | sin cambio | l.69 → 1 fila por grupo (`EXISTS`), con `programas` agregado |
+| `usp_consultar_sesiones_facultad_paginado` | sin cambio | l.108 → 1 fila por sesión (`EXISTS`) |
+| `usp_consultar_historial_estudiante` | sin cambio | l.93 y 115 → `uv_estudiante_grupo_programa`, sin repeticiones |
+| `usp_resolver_periodo_kpi_interno`, `_facultad_interno`, `_institucion_interno` | sin cambio | l.46/44/44 → `EXISTS uv_grupo_programa` |
+| `usp_cambiar_estado_programa_academico_interno` | sin cambio | l.57 (regla D4) → `EXISTS` |
+| `usp_consultar_grupos_paginado` | + `@idPrograma = NULL` | Para el coordinador, `estudiantesActivos` cuenta solo a sus estudiantes (R6); capacidad y cupos son los del grupo |
+| `usp_consultar_asistencias_sesion_paginado`, `usp_consultar_sesiones_grupo_paginado` | sin cambio | l.121-126: estudiantes por `ufn_estudiantes_grupo_visibles`, y conteos con ese mismo filtro |
+| `usp_buscar_asignaturas_paginado` | sin cambio | l.76-86: 1 fila por asignatura con `planes` y `totalPlanes`, en lugar de `codigoSemestre`, `inpPlanEstudio` y `nombrePrograma` |
+| `usp_consultar_programas_creditos_facultad_paginado` | sin cambio | l.64-70 → puente, vínculos activos |
+| `usp_consultar_estructura_facultad` | sin cambio | No usa asignaturas (l.88-98); se verifica que compila (B2NM-15) |
+| `usp_consultar_componentes_formacion` | sin cambio | l.77 sobre `uv_asignatura` 1:1; se verifica que compila |
+| `usp_consultar_oferta_creacion_grupo_docente` | sin cambio | l.79 → `uv_asignatura_plan_estudio` (vínculos activos, programas del docente); 1 fila por asignatura con `programas` |
+| `usp_consultar_oferta_grupos_estudiante` (versión A, 19 columnas) | sin cambio | l.93-111: "propias" por `EXISTS` sobre vínculos activos en planes de programas del estudiante; transversales BAS/INS como en A; 1 fila por grupo. Agrega al final `codigoCaracter` y `nombreCaracter` (vínculo en un programa del estudiante; si hay varios, el de menor `orden`). Quedan **21 columnas** posicionales: `17 codigoComponente`, `18 codigoCaracter`, `19 nombreCaracter`, `20 totalRegistros` |
+| `usp_buscar_estudiantes_institucion_paginado` | sin cambio | l.64-85 por `uv_auth_estudiante`, rama administrador sin exigir vínculo (R10). `COUNT(DISTINCT id)` y `STRING_AGG(DISTINCT)` de programas ya presentes; prueba de cardinalidad |
+| `usp_consultar_estudiantes_facultad_paginado`, `usp_consultar_estudiante_facultad_detalle` | sin cambio | La rama decano de `uv_auth_estudiante` exige vínculo (R6). El `STRING_AGG` sobre `DISTINCT` (l.107-108) ya evita repetidos |
+| `usp_consultar_destinatarios_retiro_estudiante_grupo` | sin cambio | l.64-67 → coordinadores de los programas del **estudiante** que comparten el grupo |
+| `usp_consultar_reenvio_verificacion_correo` | sin cambio | l.79-83 → `EstudiantePrograma` ∩ `ufn_programas_coordinador` |
+
+Regla de cierre: antes del RED se repite el inventario con `git grep -nE "idPrograma|semestrePlanEstudio|idSemestrePlanEstudio"` sobre los consumidores de las vistas modificadas en la base A+B mezclada. Todo consumidor nuevo se agrega a esta tabla. B2NM-15 (`sp_refreshsqlmodule`) es la prueba que lo garantiza.
+
+#### 2.7.5 Consumidores introducidos por A y B
+
+| SP (paquete) | Cambio en B2 |
+| :--- | :--- |
+| `usp_consultar_directorio_estudiantes_paginado`, `usp_consultar_estudiantes_grupo_ambito_paginado`, `usp_consultar_asistencias_grupo_ambito_paginado` (A.2) | Extensión de §1.4 |
+| `usp_consultar_resumen_asistencia_grupo_docente_paginado` (B.2, sábana del docente) | Deja de devolver `idPrograma` (la columna sale de la vista). Si su resultset es posicional, el mapeo backend de B (entidad o proyección de la sábana) se actualiza en el mismo commit, y la prueba de B que fija el resultset se actualiza por cambio formal |
+| `usp_consultar_resumen_asistencia_estudiante` (B.2, vista del estudiante) | Igual |
+| `usp_registrar_estudiante_en_grupo_interno` (A, rama de reactivación) | §2.7.3 |
+| `usp_consultar_oferta_grupos_estudiante` (A, 19 columnas) | §2.7.4 |
 
 ### 2.8 Mensajes y permisos
 
-#### 2.8.1 Mensajes nuevos
+#### 2.8.1 Mensajes
 
-Seed `DB/schema/seed/35_mensajes_asignatura_plan.sql` (MERGE en `CatalogoMensajeUsuario` y `CatalogoMensajeTecnico`, formato de `29_mensajes_asignatura.sql`) y las mismas claves en Azure App Configuration (`messages:user:<CODIGO>`, label `es`; `messages:technical:<CODIGO>`). Con DEC-018 la demo local usa el proveedor `sqlserver`. Los códigos se reservan para B2; antes del RED se verifica que A y B no los usaron.
+- Semilla `38_mensajes_asignatura_plan.sql`: MERGE en `CatalogoMensajeUsuario` y `CatalogoMensajeTecnico`, con el formato de `29_mensajes_asignatura.sql`.
+- Las mismas claves en Azure App Configuration: `messages:user:<CODIGO>` (label `es`) y `messages:technical:<CODIGO>`. Con DEC-018, la demo local usa el proveedor `sqlserver`.
+- `DB/scripts/generar-catalogo-mensajes.ps1 -Check` debe pasar.
+- Antes del RED se verifica que los códigos siguen libres en la base A+B.
 
-| Código | Tipo / HTTP | Mensaje al usuario |
+| Código | Clase / HTTP | Mensaje al usuario |
 | :--- | :--- | :--- |
 | `ASI_002` | CONFLICT / 409 | Ya existe una asignatura con ese código. Usa "Asociar asignatura existente" para agregarla a este plan. |
 | `ASI_003` | CONFLICT / 409 | La asignatura ya está asociada a este plan de estudios. |
-| `ASI_004` | NOT_FOUND / 404 | La asignatura no está asociada a este plan de estudios. |
+| `ASI_004` | RESOURCE_NOT_FOUND / 404 | La asignatura no está asociada a este plan de estudios. |
 | `ASI_005` | CONFLICT / 409 | No puedes quitar la asignatura de este plan: tiene grupos o estudiantes del programa en el periodo vigente o en periodos futuros. |
 | `ASI_006` | CONFLICT / 409 | La asignatura es compartida con programas que no coordinas; solo puedes cambiar su semestre y su carácter en tu plan. |
 | `ASI_007` | VALIDATION / 400 | El carácter de la asignatura no es válido. |
-| `EST_005` | VALIDATION / 400 | El grupo pertenece a varios programas: indica el programa del estudiante. |
+| `EST_005` | VALIDATION / 400 | El grupo pertenece a varios programas: indica el programa. |
 | `EST_006` | VALIDATION / 400 | El programa indicado no corresponde a los programas del grupo. |
-| `MQR_008` | CONFLICT / 409 | Este grupo pertenece a varios programas. Pide a tu docente que te matricule o que defina el programa de la matrícula por QR. |
+| `MQR_008` | CONFLICT / 409 | No se pudo determinar tu programa en este grupo. Pide a tu docente que te matricule. |
 | `COO_002` | VALIDATION / 400 | Coordinas varios programas: selecciona el programa que quieres consultar. |
 | `COO_003` | FORBIDDEN / 403 | El programa indicado no pertenece a tu coordinación. |
 
-Mapeo en `BE/infrastructure/adapter/secondary/persistence/sqlserver/support/error/DbFailureClassifier.java` (junto a `PLA_002`/`PLA_004` → `RESOURCE_NOT_FOUND`, l.77): `ASI_004` → `RESOURCE_NOT_FOUND`; `ASI_002/003/005/006`, `MQR_008` → `CONFLICT`; `ASI_007`, `EST_005/006`, `COO_002` → `VALIDATION`; `COO_003` → `FORBIDDEN`.
+El mapeo va en `BE/infrastructure/adapter/secondary/persistence/sqlserver/support/error/DbFailureClassifier.java`, junto a l.77-78.
 
 #### 2.8.2 Permisos
 
-Script aditivo `DB/schema/security/rol_asistencias_runtime_culm001_b2.sql` (patrón `rol_asistencias_runtime_hu081_hu083.sql`; no edita `rol_asistencias_runtime.sql`, que está en el manifiesto post-freeze): `THROW` si falta un SP requerido; `GRANT EXECUTE` sobre los SP públicos nuevos de §2.7.1; `DENY EXECUTE` sobre `usp_internal_asociar_asignatura_plan` y `usp_internal_asegurar_estudiante_programa_grupo`; `DENY INSERT, UPDATE, DELETE` sobre `AsignaturaPlanEstudio`, `CaracterAsignaturaPlan`, `zz_reporte_b2_estudiante_programa` y `EstudiantePrograma`. Las vistas `uv_*` nuevas reciben `SELECT` por el bucle de vistas de `rol_asistencias_runtime.sql:79`; las TVF `ufn_*` nuevas, `SELECT` explícito.
+`DB/schema/security/rol_asistencias_runtime_culm001_b2nm.sql`, aditivo, con el patrón de `rol_asistencias_runtime_hu081_hu083.sql`; no edita `rol_asistencias_runtime.sql`.
+- `THROW` si falta un SP requerido.
+- `GRANT EXECUTE` a los SP públicos nuevos.
+- `DENY EXECUTE` a `usp_internal_asociar_asignatura_plan` y `usp_internal_asegurar_estudiante_programa_grupo`.
+- `DENY INSERT, UPDATE, DELETE` en `AsignaturaPlanEstudio`, `CaracterAsignaturaPlan`, `EstudiantePrograma` y `zz_reporte_culm001_b2nm_estudiante_programa`.
+- `GRANT SELECT` a las TVF nuevas.
+
+Las vistas nuevas reciben `SELECT` por el bucle de `rol_asistencias_runtime.sql:79`.
 
 ### 2.9 Pruebas T-SQL (RED)
 
-Archivos nuevos en `DB/test/`, con fixture propio (dos programas A y B de la misma facultad, coordinadores CA y CB, decano D, docente T vinculado a ambos, optativa `OPT` vinculada a los planes de A y B, un grupo G de esa optativa con estudiantes EA ∈ A y EB ∈ B, y un segundo grupo de una asignatura solo de A). Cada prueba termina con `@@TRANCOUNT = 0` y deja la BD como estaba.
+Fixture: el de segundo ámbito de A + `test/fixtures/culm001_b2nm_asignatura_compartida.sql`. Contiene:
+- programas A y B de la misma facultad, con coordinadores CA y CB, decano D y administrador AD;
+- docente T con vínculo a ambos programas;
+- optativa `OPT` en los planes de A y de B;
+- grupo G de `OPT` con EA ∈ A, EB ∈ B y E0 sin vínculo;
+- un grupo de una asignatura que solo está en A.
+
+Cada prueba deja `@@TRANCOUNT = 0` y la BD como estaba. Archivos `test/test_culm001_b2nm_*.sql|ps1`.
 
 | ID | Archivo | Caso (esperado) |
 | :--- | :--- | :--- |
-| T-B2-01 | `test_culm001_b2_asignatura_plan_nm.sql` | Asociar `OPT` a 2 planes → 2 vínculos; `uv_asignatura` 1 fila; `uv_asignatura_plan_estudio` 2; `uv_grupo` 1 fila por grupo; `uv_grupo_programa` 2 filas para G |
-| T-B2-02 | idem | Crear con código existente → `ASI_002`; asociar dos veces → `ASI_003`; asociar a otro semestre del mismo plan → `ASI_003`; carácter inválido → `ASI_007`; plan ajeno → `SEC_002`; asignatura de otra institución → `GEN_001` |
-| T-B2-03 | idem | Cardinalidad de vistas congeladas y heredadas con G en 2 programas: `uv_estudiante_grupo`, `uv_asistencia`, `uv_detalle_asistencia`, `uv_sesion` con `COUNT(*) = COUNT(DISTINCT id)`; `uv_cumplimiento_sesion_grupo` 1 por sesión; `uv_resumen_asistencia_estudiante_grupo` 1 por matrícula |
-| T-B2-04 | idem | Desvincular: con grupo vigente y único programa → `ASI_005`; sin grupos → `estaActivo = 0`; grupos de periodos pasados siguen en `uv_grupo_programa` del programa (S1); grupos creados después no aparecen para el programa desvinculado; reasociar reactiva la misma fila |
-| T-B2-05 | `test_culm001_b2_ambito_grupo_mixto.sql` | CA ve G y su docente; en `usp_consultar_asistencias_sesion_paginado`, `usp_consultar_grupos_paginado`, `usp_consultar_estudiantes_programa_paginado`, ficha, bitácora y alertas, CA ve EA y **no** EB; CB al revés; T ve EA y EB; D ve ambos |
-| T-B2-06 | idem | Ficha/bitácora/resumen de EB pedidos por CA → `GEN_001` sin datos; `usp_consultar_estudiantes_directorio_paginado` con `@idPrograma = B` por CA → `COO_003` |
-| T-B2-07 | idem | KPIs: `usp_consultar_kpis_coordinador` de A cuenta EA y no EB; comparativa por programa cuenta EA en A y EB en B; `usp_consultar_kpis_decano` cuenta G una vez y 2 estudiantes; un estudiante con vínculo a A y B en G cuenta en ambos programas y una vez en la facultad |
-| T-B2-08 | idem | Coordinador con 2 programas: sin `@idPrograma` los KPIs → `COO_002`; con `@idPrograma` de otro → `COO_003`; las listas sin `@idPrograma` incluyen ambos |
-| T-B2-09 | `test_culm001_b2_matricula_vinculo_programa.sql` | Manual: estudiante sin vínculo en grupo de un programa → vínculo creado; en G sin vínculo y sin `@idPrograma` → `EST_005`; con programa ajeno → `EST_006`; con vínculo previo a A → no crea otro; reactivación `I → A` de A conserva el vínculo |
-| T-B2-10 | idem | QR: G sin programa por defecto y estudiante sin vínculo → `MQR_008` sin crear usuario (público) ni matrícula; con `programaPorDefecto` → vínculo creado; concurrencia (dos sesiones) no viola `UX_EstudiantePrograma_estudiante_programa` |
-| T-B2-11 | idem | Invariante R7: `NOT EXISTS` matrícula sin vínculo en un programa de su grupo, salvo las del reporte `AMBIGUO` |
-| T-B2-12 | `test_culm001_b2_migracion.ps1` | Sobre una BD con el esquema previo: `up` → backfill 1:1 (vínculos = asignaturas), columna eliminada, reporte con `CREADO`/`AMBIGUO` esperados; `up` otra vez no cambia nada; `down` restaura la columna con los mismos valores; `down` con una asignatura compartida → `THROW 52902` sin cambios; `up` de nuevo; `@@TRANCOUNT = 0` tras cada paso |
-| T-B2-13 | `test_culm001_b2_oferta_y_grupos.sql` | HU008: G aparece una vez en "propias" para EA y EB con su carácter; oferta docente 1 fila por asignatura; `usp_crear_grupo` con T vinculado solo a B sobre `OPT` → OK, con docente sin vínculo → `SEC_002`; `usp_quitar_semestre_plan_estudio` con vínculo activo → `PLA_006` |
-| T-B2-14 | `test_culm001_b2_decano.sql` | `usp_consultar_grupos_facultad_paginado` 1 fila por G; `usp_consultar_sesiones_facultad_paginado @idGrupo` ajeno → `GEN_001`; `usp_consultar_asignaturas_plan_paginado` con plan inexistente o de otra facultad → `PLA_002` |
+| B2NM-01 | `_asignatura_plan.sql` | Asociar `OPT` a 2 planes: 2 vínculos; `uv_asignatura` 1 fila; `uv_asignatura_plan_estudio` 2; `uv_grupo` 1 por grupo; `uv_grupo_programa` 2 para G |
+| B2NM-02 | idem | Código existente `ASI_002`; doble asociación y otro semestre del mismo plan `ASI_003`; carácter inválido `ASI_007`; plan ajeno `SEC_002`; asignatura de otra institución `GEN_001` |
+| B2NM-03 | idem | Cardinalidad con G en 2 programas: `uv_estudiante_grupo`, `uv_asistencia`, `uv_detalle_asistencia` y `uv_sesion` con `COUNT(*) = COUNT(DISTINCT id)`; `uv_cumplimiento_sesion_grupo` 1 por sesión; `uv_resumen_asistencia_estudiante_grupo` 1 por matrícula; `uv_docente_programa` sin grupos repetidos |
+| B2NM-04 | idem | Desvincular: grupo vigente con único programa `ASI_005`; sin grupos → baja lógica; los grupos pasados siguen en `uv_grupo_programa` (S1) y los posteriores no; reasociar reactiva la misma fila; `PlanEstudio.estado = 0` no saca grupos |
+| B2NM-05 | `_ambito_grupo_mixto.sql` | En los tres SP de A.2, asistencias de sesión, grupos, ficha, bitácora y alertas: CA ve EA y no EB; CB al revés; D ve EA y EB; T y AD ven EA, EB y E0; CA y D no ven E0 |
+| B2NM-06 | idem | Ficha, bitácora y resumen de EB pedidos por CA → `GEN_001`; directorio con `@idPrograma = B` por CA → `COO_003`; grupo de otra facultad por CA → `SEC_002` |
+| B2NM-07 | idem | KPIs: el coordinador de A cuenta EA y no EB; la comparativa por programa cuenta EA en A y EB en B; el decano cuenta G una vez; un estudiante con vínculo a A y B en G cuenta en ambos programas y una sola vez en facultad e institución; la tendencia de ausentismo no repite sesiones |
+| B2NM-08 | idem | Coordinador con 2 programas: KPIs sin `@idPrograma` `COO_002`; con programa ajeno `COO_003`; las listas sin `@idPrograma` incluyen ambos |
+| B2NM-09 | `_matricula.sql` | Manual: estudiante sin vínculo en un grupo de un programa → vínculo creado; en G sin programa `EST_005`; con programa ajeno `EST_006`; con vínculo previo no crea otro; la reactivación `I → A` aplica la misma regla y ya no mira ESP; estudiante nuevo sin ninguna matrícula previa → vínculo creado (O-B3) |
+| B2NM-10 | idem | QR: abrir la ventana en G sin `@idPrograma` `EST_005`; con un programa del grupo, OK; la matrícula por QR de un estudiante sin vínculo usa `programaPorDefecto`; un token sin programa en un grupo multiprograma da `MQR_008` sin crear usuario ni matrícula; dos sesiones concurrentes no violan el índice único |
+| B2NM-11 | idem | Invariante R7 sobre matrículas activas, con las excepciones `AMBIGUO` y `SIN_INTERSECCION` del reporte |
+| B2NM-12 | `_migracion.ps1` | Sobre el esquema A+B: `up` (vínculos = asignaturas; columna eliminada; reporte con los `CREADO`, `AMBIGUO` y `SIN_INTERSECCION` esperados; el paso 2 no crea vínculos); **segundo `up`** sin cambios ni errores; verificación forzada a fallar → `THROW 52901` y **la columna sigue existiendo**; `down` restaura columna, valores y versiones A+B de vistas y SP; `down` con una asignatura con 2 vínculos (uno inactivo) → `THROW 52902` sin cambios; `up` otra vez; `@@TRANCOUNT = 0` en cada paso |
+| B2NM-13 | `_oferta_y_grupos.sql` | HU008: G aparece una vez en "propias" de EA y de EB, con carácter; resultset de 21 columnas; oferta docente 1 fila por asignatura; `usp_crear_grupo` de T sobre `OPT` OK y con docente sin vínculo `SEC_002`; `usp_quitar_semestre_plan_estudio` con vínculo activo `PLA_006` |
+| B2NM-14 | `_decano.sql` | `usp_consultar_grupos_facultad_paginado` 1 fila por G; `usp_consultar_asignaturas_plan_paginado` con plan inexistente o de otra facultad `PLA_002` |
+| B2NM-15 | `_compilacion.sql` | Después del `up`, `EXEC sys.sp_refreshsqlmodule` sobre cada vista, SP y función de `dbo` (cursor sobre `sys.sql_modules`, sin los de esquema enlazado): **cero errores**. Se repite después del `down` |
+| B2NM-16 | `_deploy_limpio.ps1` | `infra.ps1 db-deploy` sobre una BD vacía termina sin errores (orden funciones → vistas) y `db-test` pasa |
+| B2NM-17 | `_asignatura_plan.sql` | S2: CA actualiza código, nombre o créditos, o cambia el estado global de `OPT` (compartida con B) → `ASI_006`; CA cambia semestre o carácter de su vínculo, OK; un coordinador de A y B puede cambiar el catálogo |
+| B2NM-18 | `_ambito_grupo_mixto.sql` | O-N7: CA sobre G en `usp_guardar_horarios_grupo`, `usp_precargar_sesiones_grupo` y `usp_actualizar_grupo` → `SEC_002`; T (titular) OK; un coordinador de A y B OK |
+| B2NM-19 | idem | R10 del administrador: `usp_buscar_estudiantes_institucion_paginado` y el directorio de A.2 consultados por AD incluyen a E0 y a un `AMBIGUO`, una vez cada uno; T ve a E0 en `usp_consultar_estudiantes_grupo_ambito_paginado` |
+| B2NM-20 | idem | `usp_consultar_programas_grupo`: T, CA y D OK; un coordinador de otra facultad `SEC_002`. `totalRegistros` correcto con `OPT` compartida en `usp_consultar_asignaturas_coordinador_paginado`, `_planes_estudio_programa_paginado`, `_asignaturas_plan_paginado` y el directorio |
 
-**Pruebas existentes que fijan el modelo actual.** Son 31 archivos de `DB/test/` (30 `.sql` + `test_usp_precargar_sesiones_concurrency.ps1`) que insertan `Asignatura(..., semestrePlanEstudio)` en el arrange: `test_authorized_views_rbac`, `test_consultas_transversales_hu112_hu157`, `test_cruce_horario_docente`, `test_hu008_regla_inscripcion_programa`, `test_ident001_correo_verificacion`, `test_rec2_rbac_asignatura`, `test_ufn_clasificar_permanencia`, `test_usp_abrir_ventana_matricula_grupo`, `test_usp_cambiar_estado_docente_programa`, `test_usp_cambiar_estado_programa_academico`, `test_usp_consultar_{aforo_grupos_facultad, alerta_temprana_programa, bitacora_estudiante_programa, comparativa_facultades, comparativa_programas_facultad, ficha_estudiante_programa, historial_grupos_docente_programa, kpis_coordinador, kpis_decano, kpis_institucion, oferta_creacion_grupo_docente, oferta_grupos_estudiante, tendencia_ausentismo}`, `test_usp_guardar_horarios_grupo`, `test_usp_plan_estudio_estado_semestres`, `test_usp_precargar_sesiones_{concurrency.ps1, grupo}`, `test_usp_resolvers_{decano, institucion_admin}`, `test_usp_retirar_estudiante_grupo`, `test_uv_resumen_asistencia_estudiante_grupo`.
+**Pruebas existentes que cambian por el cambio formal de contrato (AGENTS §4).** Cada cambio lleva en el commit la referencia a DEC-019/020 y a este contrato. No se relaja ninguna regla de negocio; donde cambia una aserción se indica cuál y por qué.
 
-| Grupo | Qué se actualiza (cambio formal de contrato, AGENTS §4) | Qué **no** cambia |
-| :--- | :--- | :--- |
-| Los 31 | Solo el arrange: `Asignatura` sin `semestrePlanEstudio` + un `INSERT AsignaturaPlanEstudio` (helper común `test/fixtures/b2_vincular_asignatura_plan.sql`) | Ninguna aserción |
-| `test_hu008_regla_inscripcion_programa` | La aserción "transversal BAS/INS no crea `EstudiantePrograma`" se reemplaza por R7 (DEC-020 sustituye la regla ESP); las demás aserciones de oferta se conservan | — |
-| `test_uv_resumen_asistencia_estudiante_grupo` | Las aserciones sobre `idPrograma` pasan a `uv_resumen_asistencia_estudiante_programa_grupo` (la columna se movió) | Aserciones de porcentajes y horas (las de B) |
-| `test_usp_consultar_kpis_coordinador`, `test_usp_consultar_kpis_decano` | Cada fixture con estudiantes del programa recibe su `EstudiantePrograma` (R6); el KPI de decano agrega las aserciones de `sesionesEvaluadasPorMatricula` (F-DEC-013) | Los valores esperados de los casos existentes |
-| `test_authorized_views_rbac`, `test_rec2_rbac_asignatura` | Arrange; se agregan casos de grupo mixto en el mismo archivo | Las aserciones de RBAC existentes |
+| Prueba | Qué cambia |
+| :--- | :--- |
+| Los 31 archivos que insertan `Asignatura(..., semestrePlanEstudio)`: `test_authorized_views_rbac`, `test_consultas_transversales_hu112_hu157`, `test_cruce_horario_docente`, `test_hu008_regla_inscripcion_programa`, `test_ident001_correo_verificacion`, `test_rec2_rbac_asignatura`, `test_ufn_clasificar_permanencia`, `test_usp_abrir_ventana_matricula_grupo`, `test_usp_cambiar_estado_docente_programa`, `test_usp_cambiar_estado_programa_academico`, `test_usp_consultar_{aforo_grupos_facultad, alerta_temprana_programa, bitacora_estudiante_programa, comparativa_facultades, comparativa_programas_facultad, ficha_estudiante_programa, historial_grupos_docente_programa, kpis_coordinador, kpis_decano, kpis_institucion, oferta_creacion_grupo_docente, oferta_grupos_estudiante, tendencia_ausentismo}`, `test_usp_guardar_horarios_grupo`, `test_usp_plan_estudio_estado_semestres`, `test_usp_precargar_sesiones_{concurrency.ps1, grupo}`, `test_usp_resolvers_{decano, institucion_admin}`, `test_usp_retirar_estudiante_grupo`, `test_uv_resumen_asistencia_estudiante_grupo` | El arrange usa `test/fixtures/culm001_b2nm_vincular_asignatura_plan.sql`; los fixtures con estudiantes de un programa reciben su `EstudiantePrograma` (R6). Las aserciones que cambian se listan en las filas siguientes |
+| `test_cruce_horario_docente.sql` l.15-16, `test_usp_cambiar_estado_docente_programa.sql` l.89-90 | Las consultas del arrange por `a.idSemestrePlanEstudio` pasan a `uv_asignatura_plan_estudio` |
+| `test_uv_resumen_asistencia_estudiante_grupo.sql` (incluida l.184 `uv_cumplimiento_sesion_grupo.idPrograma`) | Las aserciones sobre `idPrograma` pasan a `uv_resumen_asistencia_estudiante_programa_grupo` y a `EXISTS uv_grupo_programa` (la columna se movió). Porcentajes y horas de B intactos |
+| `test_hu008_regla_inscripcion_programa.sql` (RI-01..RI-04 de A) y T-07 de A | "INS/BAS no inscribe en `EstudiantePrograma`" se sustituye por R7, porque DEC-020 reemplaza la regla ESP: la matrícula de un estudiante sin vínculo crea el vínculo con el programa del grupo, tanto en la inserción como en la reactivación |
+| `test_consultas_transversales_hu112_hu157.sql` l.41 | Forma del resultset de `usp_buscar_asignaturas_paginado` (`planes`, `totalPlanes`) |
+| `test_contract_closure.sql` l.247-262 | Las listas de excepción de resultset incluyen los SP de consulta nuevos de §2.7.1 |
+| `test_consultas_coordinador_programa.sql`, `test_consultas_decano_facultad.sql`, `test_usp_consultar_grupos_paginado.sql`, `test_usp_consultar_sesiones_y_asistencias_paginado.sql`, `test_consolidado_auditoria_catalogos.sql` | Tablas temporales de `INSERT … EXEC` con las columnas nuevas o retiradas; el consolidado con el grano (grupo, programa) |
+| `test_uv_estudiante_programa_no_duplicates.sql` | La precondición de 3 filas en `uv_estudiante` se recalcula con el grano nuevo; la aserción "sin duplicados en `uv_estudiante_programa`" se mantiene |
+| Pruebas de B que fijan el resultset de la sábana y del resumen del estudiante | Sin `idPrograma` |
 
 ---
 
 ## 3. Backend
 
-### 3.1 Endpoints nuevos y modificados
+### 3.1 Endpoints (GREEN)
 
-Todos devuelven `ApiDataResponse<T>`, `ApiListResponse<T>` o `ApiPageResponse<T>` (`elementos`, `numeroPagina`, `tamanoPagina`, `totalElementos`, `totalPaginas`) y errores `ApiErrorResponse` con `X-Correlation-Id`. El ejecutor sale de `authenticatedUserResolver.requireAuthenticatedUserId()` y viaja al SP; ninguna regla de ámbito se decide solo en Java.
+Respuestas en `ApiDataResponse<T>`, `ApiListResponse<T>` o `ApiPageResponse<T>`; errores en `ApiErrorResponse` con `X-Correlation-Id`. El ejecutor sale de `authenticatedUserResolver.requireAuthenticatedUserId()` y viaja al SP.
 
 | Método y ruta | Estado | Caso de uso → SP | Respuesta / errores |
 | :--- | :--- | :--- | :--- |
-| `GET /api/v1/coordinador/planes-estudio?programaId&estaActivo&pagina&tamano` | modificado (paginado) | `ConsultarPlanesEstudioUseCase` → `usp_consultar_planes_estudio_programa_paginado` | `ApiPageResponse<PlanEstudioDTO>` (+ `totalObligatorias`, `totalOptativas`); 403 `COO_003` |
-| `GET /api/v1/coordinador/planes-estudio/{id}/asignaturas?semestre&caracter&busqueda&pagina&tamano` | modificado (paginado, 404) | `ConsultarAsignaturasPlanUseCase` → `usp_consultar_asignaturas_plan_paginado` | `ApiPageResponse<AsignaturaPlanDTO>`; 404 `PLA_002` (plan inexistente o ajeno) |
-| `POST /api/v1/coordinador/planes-estudio/{id}/asignaturas` | modificado | `GestionarAsignaturaUseCase.crear` → `usp_crear_asignatura` | Cuerpo `GuardarAsignaturaRequest` + `codigoCaracter` (requerido); 201; 409 `ASI_002`, `ASI_003`; 404 `PLA_004`; 400 `ASI_001`, `ASI_007` |
-| `PUT /api/v1/coordinador/planes-estudio/{planId}/asignaturas/{asigId}` | modificado | `GestionarAsignaturaUseCase.actualizar` → `usp_actualizar_asignatura` | + `codigoCaracter`; 409 `ASI_002`, `ASI_003`, `ASI_006`; 404 `ASI_004` |
-| `POST /api/v1/coordinador/planes-estudio/{planId}/asignaturas-asociadas` | **nuevo** | `AsociarAsignaturaPlanUseCase` → `usp_asociar_asignatura_plan` | Cuerpo `{ idAsignatura, semestreNumero, codigoCaracter }`; 201; 404 `PLA_002`, `PLA_004`, `GEN_001`; 409 `ASI_003`; 403 `SEC_002` |
-| `DELETE /api/v1/coordinador/planes-estudio/{planId}/asignaturas/{asigId}` | **reemplaza el 501** (`CoordinadorPortalController.java:136-137`) | `DesvincularAsignaturaPlanUseCase` → `usp_desvincular_asignatura_plan` | 200; 404 `ASI_004`; 409 `ASI_005` |
-| `GET /api/v1/coordinador/planes-estudio/{planId}/asignaturas-asociables?busqueda&pagina&tamano` | **nuevo** | `ConsultarAsignaturasAsociablesUseCase` → `usp_consultar_asignaturas_asociables_paginado` | `ApiPageResponse<AsignaturaAsociableDTO>`; 404 `PLA_002` |
-| `GET /api/v1/coordinador/caracteres-asignatura` | **nuevo** | `ConsultarCaracteresAsignaturaUseCase` → lectura de `uv_caracter_asignatura_plan` por adaptador JPA (catálogo sin ámbito, como los demás catálogos de solo consulta) | `ApiListResponse<CaracterAsignaturaDTO>` |
-| `GET /api/v1/coordinador/asignaturas?programaId&busqueda&estaActiva&pagina&tamano` | modificado (paginado) | `ConsultarAsignaturasUseCase` → `usp_consultar_asignaturas_coordinador_paginado` | `ApiPageResponse<AsignaturaPlanDTO>` (1 por asignatura y plan); 403 `COO_003` |
+| `GET /api/v1/coordinador/planes-estudio?programaId&estaActivo&pagina&tamano` | modificado | `ConsultarPlanesEstudioUseCase` → `usp_consultar_planes_estudio_programa_paginado` | `ApiPageResponse<PlanEstudioDTO>`; 403 `COO_003` |
+| `GET /api/v1/coordinador/planes-estudio/{id}/asignaturas?semestre&caracter&busqueda&pagina&tamano` | modificado | `ConsultarAsignaturasPlanUseCase` → `usp_consultar_asignaturas_plan_paginado` | `ApiPageResponse<AsignaturaPlanDTO>`; 404 `PLA_002` |
+| `POST /api/v1/coordinador/planes-estudio/{id}/asignaturas` | modificado | `GestionarAsignaturaUseCase.crear` → `usp_crear_asignatura` | + `codigoCaracter` (requerido); 409 `ASI_002/003`; 404 `PLA_004`; 400 `ASI_001/007` |
+| `PUT /api/v1/coordinador/planes-estudio/{planId}/asignaturas/{asigId}` | modificado | `usp_actualizar_asignatura` | + `codigoCaracter`; 409 `ASI_002/003/006`; 404 `ASI_004` |
+| `POST /api/v1/coordinador/planes-estudio/{planId}/asignaturas-asociadas` | nuevo | `AsociarAsignaturaPlanUseCase` → `usp_asociar_asignatura_plan` | `{ idAsignatura, semestreNumero, codigoCaracter }`; 201; 404 `PLA_002/004`, `GEN_001`; 409 `ASI_003`; 403 `SEC_002` |
+| `DELETE /api/v1/coordinador/planes-estudio/{planId}/asignaturas/{asigId}` | reemplaza el 501 (`CoordinadorPortalController.java:136-137`) | `DesvincularAsignaturaPlanUseCase` → `usp_desvincular_asignatura_plan` | 200; 404 `ASI_004`; 409 `ASI_005` |
+| `GET /api/v1/coordinador/planes-estudio/{planId}/asignaturas-asociables?busqueda&pagina&tamano` | nuevo | `ConsultarAsignaturasAsociablesUseCase` | `ApiPageResponse<AsignaturaAsociableDTO>`; 404 `PLA_002` |
+| `GET /api/v1/coordinador/caracteres-asignatura` | nuevo | `ConsultarCaracteresAsignaturaUseCase` → adaptador JPA sobre `uv_caracter_asignatura_plan` (catálogo sin ámbito, como los demás de solo consulta) | `ApiListResponse<CaracterAsignaturaDTO>` |
+| `GET /api/v1/coordinador/asignaturas?programaId&busqueda&estaActiva&pagina&tamano` | modificado | `usp_consultar_asignaturas_coordinador_paginado` | `ApiPageResponse<AsignaturaPlanDTO>`; 403 `COO_003` |
 | `PATCH /api/v1/coordinador/asignaturas/{id}/estado` | modificado | `usp_toggle_estado_asignatura` | 409 `ASI_006` |
-| `GET /api/v1/coordinador/estudiantes?programaId&busqueda&estaActivo&pagina&tamano` | modificado (paginado, SP) | `ConsultarEstudiantesProgramaUseCase` → `usp_consultar_estudiantes_programa_paginado` (deja `EstudianteProgramaJpaRepository.java:21-31`) | `ApiPageResponse<EstudianteProgramaDTO>` (+ `programas`, `gruposActivos`); 403 `COO_003` |
-| `GET /api/v1/coordinador/indicadores?programaId`, `/alertas-tempranas?programaId`, `/estudiantes/{id}/ficha?programaId`, `/estudiantes/{id}/bitacora?programaId`, `/consolidado-asistencia` | modificado (parámetro opcional) | SP de §2.7.2 | 400 `COO_002`, 403 `COO_003`, 404 `GEN_001` |
-| `GET /api/v1/grupos`, `/grupos/{id}/estudiantes`, `/grupos/{id}/asistencias`, `/sesiones/{id}/asistencias` (coordinador) | modificado (sobre A) | SP de grupos/sesiones con `ufn_estudiantes_grupo_visibles` | Coordinador: solo sus estudiantes (R6); grupo ajeno 404 (A) |
-| `GET /api/v1/grupos/{id}/programas` | **nuevo** | `ConsultarProgramasGrupoUseCase` → `usp_consultar_programas_grupo` | `ApiListResponse<ProgramaResumenDTO>`; 404 `GEN_001` |
-| `POST /api/v1/grupos/{id}/estudiantes` (docente) | modificado | `usp_registrar_estudiante_en_grupo` | + `idPrograma` opcional; 400 `EST_005`, `EST_006` |
-| `POST /api/v1/docente/grupos/{id}/ventana-matricula` (HU176B, ruta vigente) | modificado | `usp_abrir_ventana_matricula_grupo` | + `idProgramaPorDefecto` opcional; 400 `EST_006` |
-| `POST /api/v1/estudiante/matricula-qr` y la matrícula pública por token (rutas vigentes de HU176B) | modificado | `usp_matricular_estudiante_por_token`, `usp_registrar_estudiante_por_token_publico` | 409 `MQR_008`; la validación pública del token devuelve `requiereProgramaDocente` |
-| `GET /api/v1/decano/planes-estudio/{planId}/asignaturas?semestre&caracter&pagina&tamano` | modificado (SP, paginado, 404) | `usp_consultar_asignaturas_plan_paginado` (deja `canDecanoAccessPrograma` en el caso de uso) | `ApiPageResponse<AsignaturaPlanDTO>`; 404 `PLA_002` (cierra F-DEC-015) |
-| `GET /api/v1/decano/asignaturas` | modificado (columnas) | `usp_buscar_asignaturas_paginado` | `planes`, `totalPlanes` en lugar de `codigoSemestre`/`inpPlanEstudio`/`nombrePrograma` |
-| `GET /api/v1/decano/grupos?periodoId&programaId&busqueda&pagina&tamano` | modificado (SP, paginado) | `ConsultarGruposDecanoUseCase` → `usp_consultar_grupos_facultad_paginado` (deja `GrupoJpaRepository.java:85-90,193-199`) | `ApiPageResponse<GrupoFacultadDTO>` (cierra F-DEC-002) |
-| `GET /api/v1/decano/sesiones?idGrupo` | modificado | `usp_consultar_sesiones_facultad_paginado @idGrupo` (`DecanoFacultadConsultaController.java:66`) | 404 `GEN_001` (cierra F-DEC-014) |
-| `GET /api/v1/decano/indicadores` | modificado (campos) | `usp_consultar_kpis_decano` | + `sesionesEvaluadasPorMatricula`, `matriculasActivas` (F-DEC-013) |
+| `GET /api/v1/coordinador/indicadores`, `/alertas-tempranas`, `/estudiantes/{id}/ficha`, `/estudiantes/{id}/bitacora` | modificado | + `programaId` opcional | 400 `COO_002`, 403 `COO_003`, 404 `GEN_001` |
+| `GET /api/v1/estudiantes`, `GET /api/v1/estudiantes/{id}` | sobre A.2 | `usp_consultar_directorio_estudiantes_paginado` | `programaId` ajeno → 403 `COO_003` |
+| `GET /api/v1/grupos/{grupoId}/estudiantes` | sobre A.2 | `usp_consultar_estudiantes_grupo_ambito_paginado` | El coordinador recibe solo a sus estudiantes; grupo fuera de ámbito → 403 |
+| `GET /api/v1/grupos/{grupoId}/asistencias`, `POST /api/v1/asistencias/consultas/grupo` (legacy) | sobre A.2 | `usp_consultar_asistencias_grupo_ambito_paginado` | idem |
+| `GET /api/v1/grupos/{grupoId}/programas` | nuevo | `ConsultarProgramasGrupoUseCase` → `usp_consultar_programas_grupo` | `ApiListResponse<ProgramaResumenDTO>`; 403 `SEC_002` |
+| `POST /api/v1/grupos/{grupoId}/estudiantes` (docente) | modificado | `usp_registrar_estudiante_en_grupo` | + `idPrograma` opcional; 400 `EST_005/006` |
+| `POST /api/v1/grupos/{grupoId}/matricula-qr` (`GrupoMatriculaQrController.java:61`) | modificado (S3 mínimo) | `usp_abrir_ventana_matricula_grupo` | + `programaId` opcional; 400 `EST_005/006` |
+| `POST /api/v1/estudiante/matricular-grupo`, `POST /api/v1/public/matricula-qr/registro` | modificado | SP de token | 409 `MQR_008` |
+| `GET /api/v1/decano/planes-estudio/{planId}/asignaturas` | modificado | `usp_consultar_asignaturas_plan_paginado` | `ApiPageResponse<AsignaturaPlanDTO>`; 404 `PLA_002` (F-DEC-015) |
+| `GET /api/v1/decano/asignaturas` | modificado (columnas) | `usp_buscar_asignaturas_paginado` | `planes`, `totalPlanes` |
+| `GET /api/v1/decano/grupos` | modificado | `ConsultarGruposDecanoUseCase` → `usp_consultar_grupos_facultad_paginado` | `ApiPageResponse<GrupoFacultadDTO>` (F-DEC-002) |
 | `GET /api/v1/estudiante/oferta-academica` | modificado (campos) | `usp_consultar_oferta_grupos_estudiante` | + `codigoCaracter`, `nombreCaracter` |
 | `GET /api/v1/docente/oferta-creacion-grupos` | modificado (campos) | `usp_consultar_oferta_creacion_grupo_docente` | `programas: string[]` en lugar de `nombrePrograma` |
-| `GET /api/v1/estudiantes`, `GET /api/v1/estudiantes/{id}` | modificado sobre A | SP del directorio | §3.4 |
-
-Las rutas exactas de HU176B se toman del código vigente al empezar el GREEN; el contrato fija el parámetro y los errores, no renombra rutas.
 
 ### 3.2 Entidades, repositorios y DTOs
 
 | Capa | Archivos |
 | :--- | :--- |
-| Entidades de resultado de SP (`.../jpa/entity/`, patrón `SpKpisCoordinadorEntity`) | `SpAsignaturaPlanEntity`, `SpAsignaturaAsociableEntity`, `SpAsignaturaCoordinadorEntity`, `SpPlanEstudioProgramaEntity`, `SpEstudianteProgramaEntity`, `SpGrupoFacultadEntity`, `SpProgramaGrupoEntity`; `UvCaracterAsignaturaPlanEntity` (`@Immutable`) |
-| Entidades de vista modificadas | `UvAsignaturaEntity` (sin `idSemestrePlanEstudio`, `inp`, `nombrePrograma`, `codigoSemestre`; + `totalPlanesActivos`), `UvEstudianteEntity` y `UvEstudianteProgramaEntity` (cardinalidad nueva, §2.5), `UvDocenteEntity`, `SpKpisCoordinadorEntity`, `SpComparativaProgramaEntity`, `SpAforoGrupoEntity`, `SpEstructuraFacultadEntity`, `SpFichaEstudianteEntity` (campos de §2.7.2) |
-| Repositorios (`.../jpa/repository/`) | Nuevo `AsignaturaPlanEstudioJpaRepository` (EXEC asociar, desvincular, consultar plan, asociables, programas del grupo). Modificados: `AsignaturaJpaRepository` (quita `HQL_SELECT`/`HQL_POR_PROGRAMA`/`HQL_POR_FACULTAD`/`HQL_POR_PLAN`, l.61-73; EXEC crear/actualizar con `@codigoCaracter`, l.30-45), `PlanEstudioJpaRepository` (quita `HQL_TOTAL_SEMESTRES` y conteos, l.74-90), `GrupoJpaRepository` (quita `HQL_GRUPOS_POR_FACULTAD`), `EstudianteProgramaJpaRepository` (EXEC), `CoordinadorIndicadoresJpaRepository`, `DecanoIndicadoresJpaRepository`, `OfertaGruposEstudianteJpaRepository`, `OfertaCreacionGruposDocenteJpaRepository`, `ConsultasTransversalesJpaRepository`, `EstudianteJpaRepository` (SP del directorio, sobre A), `AsistenciaProgramaJpaRepository` (`@idPrograma`). `InstitutionalScopeJpaRepository` (l.84-97) y `CoordinadorJpaRepository` (l.97) ya usan `EXISTS`/conteos filtrados por programa sobre `uv_grupo_programa`: se revisan con la prueba de cardinalidad, sin cambio esperado |
-| Mapper/proyección | `AcademicViewJpaProjectionMapper.java:144` y `AsignaturaQueryRow` (sin `idSemestrePlanEstudio`); nuevas `AsignaturaPlanQueryRow`, `AsignaturaAsociableQueryRow` |
-| Aplicación (`BE/application/`) | Puertos primarios nuevos: `AsociarAsignaturaPlanInputPort`, `DesvincularAsignaturaPlanInputPort`, `ConsultarAsignaturasAsociablesInputPort`, `ConsultarCaracteresAsignaturaInputPort`, `ConsultarProgramasGrupoInputPort` con sus `*UseCaseImpl`. Puertos secundarios: `AsignaturaPlanCommandPort`, `AsignaturaPlanQueryPort`; `AsignaturaCommandPort`/`AsignaturaQueryPort`, `PlanEstudioQueryPort` cambian a resultados paginados |
-| DTOs | `AsignaturaDTO` (`features/coordinador/common/dto`) se divide: `AsignaturaDTO` (catálogo) y `AsignaturaPlanDTO` (`idAsignatura, codigo, nombre, credito, idArea, nombreArea, idComponente, nombreComponente, idPlanEstudio, inpPlanEstudio, idPrograma, nombrePrograma, idSemestrePlanEstudio, numeroSemestre, codigoSemestre, codigoCaracter, nombreCaracter, estaActivoVinculo, estaActivaAsignatura, compartida, programasCompartidos`); `GuardarAsignaturaDTO` + `codigoCaracter`; nuevos `AsociarAsignaturaPlanDTO`, `AsignaturaAsociableDTO`, `CaracterAsignaturaDTO`, `ProgramaResumenDTO`, `GrupoFacultadDTO`; dominio y mappers de `consultarasignaturas/**`, `consultarasignaturasplan/**`, `consultarplanesestudio/**`, `docente/consultarofertacreaciongrupos/**`, `estudiante/consultarestudianteporid/**` (`EstudianteContextoAcademico`), `consultarestudiantesprograma/**`, `consultarkpis/**`, `indicadores/rule/IndicadoresRules.java` |
+| Entidades de resultado de SP (patrón `SpKpisCoordinadorEntity`) | `SpAsignaturaPlanEntity`, `SpAsignaturaAsociableEntity`, `SpAsignaturaCoordinadorEntity`, `SpPlanEstudioProgramaEntity`, `SpGrupoFacultadEntity`, `SpProgramaGrupoEntity`; `UvCaracterAsignaturaPlanEntity` (`@Immutable`) |
+| Entidades de vista | `UvAsignaturaEntity` (sin `idSemestrePlanEstudio`, `inp`, `nombrePrograma`, `codigoSemestre`; + `totalPlanesActivos`); `UvEstudianteEntity` (+ `tieneVinculoPrograma`, grano nuevo); `UvEstudianteProgramaEntity` (+ `estaActivoUsuario`); `UvDocenteEntity`; las entidades de resultado de B para la sábana y el resumen del estudiante (sin `idPrograma`) |
+| Repositorios | Nuevo: `AsignaturaPlanEstudioJpaRepository` (EXEC). Modificados: `AsignaturaJpaRepository` (retira `HQL_SELECT` y `HQL_POR_PROGRAMA/FACULTAD/PLAN`, l.61-73; EXEC de crear/actualizar con `@codigoCaracter`, l.30-45), `PlanEstudioJpaRepository` (l.74-90), `GrupoJpaRepository` (`HQL_GRUPOS_POR_FACULTAD`), `OfertaGruposEstudianteJpaRepository` (mapeo posicional de 21 columnas), `OfertaCreacionGruposDocenteJpaRepository`, `ConsultasTransversalesJpaRepository`, `CoordinadorIndicadoresJpaRepository`, `DecanoIndicadoresJpaRepository`, `AsistenciaProgramaJpaRepository`, `MatriculaQr*` (parámetro `@idPrograma`) y los repositorios de A.2 (parámetros nuevos). Sin cambio: `InstitutionalScopeJpaRepository` (l.84-97) y `CoordinadorJpaRepository` (l.97), que ya usan `EXISTS` y conteos por programa; los cubre la prueba de cardinalidad |
+| Mapper/proyección | `AcademicViewJpaProjectionMapper.java:144` y `AsignaturaQueryRow`; nuevas `AsignaturaPlanQueryRow` y `AsignaturaAsociableQueryRow` |
+| Aplicación | Puertos primarios nuevos `AsociarAsignaturaPlanInputPort`, `DesvincularAsignaturaPlanInputPort`, `ConsultarAsignaturasAsociablesInputPort`, `ConsultarCaracteresAsignaturaInputPort` y `ConsultarProgramasGrupoInputPort`, con sus `*UseCaseImpl`. Secundarios `AsignaturaPlanCommandPort` y `AsignaturaPlanQueryPort`. `AsignaturaQueryPort` y `PlanEstudioQueryPort` pasan a paginados |
+| DTOs | `AsignaturaDTO` (catálogo) y `AsignaturaPlanDTO` (`idAsignatura, codigo, nombre, credito, idArea, nombreArea, idComponente, nombreComponente, idPlanEstudio, inpPlanEstudio, idPrograma, nombrePrograma, idSemestrePlanEstudio, numeroSemestre, codigoSemestre, codigoCaracter, nombreCaracter, estaActivoVinculo, estaActivaAsignatura, compartida`); `GuardarAsignaturaDTO` + `codigoCaracter`; nuevos `AsociarAsignaturaPlanDTO`, `AsignaturaAsociableDTO`, `CaracterAsignaturaDTO`, `ProgramaResumenDTO` y `GrupoFacultadDTO`; dominio y mappers de `consultarasignaturas/**`, `consultarasignaturasplan/**`, `consultarplanesestudio/**`, `docente/consultarofertacreaciongrupos/**`, `estudiante/consultarestudianteporid/**` y `consultarkpis/**` |
 
-### 3.3 Casos de uso que dejan el JPQL directo y pasan a SP
+### 3.3 Casos de uso que dejan el JPQL directo
 
-| Caso de uso | Hoy | Después | Hallazgo |
-| :--- | :--- | :--- | :--- |
-| `ConsultarEstudiantesProgramaUseCaseImpl` | JPQL sobre `uv_estudiante_programa` con ámbito en Application (`InstitutionalScopePort`) | `usp_consultar_estudiantes_programa_paginado` | F-COO-008 |
-| `ConsultarAsignaturasUseCaseImpl` (coordinador) | `AsignaturaJpaRepository.HQL_POR_PROGRAMA` | `usp_consultar_asignaturas_coordinador_paginado` | F-COO-008 |
-| `ConsultarAsignaturasPlanUseCaseImpl` (coordinador y decano) | `HQL_POR_PLAN` + `canDecanoAccessPrograma` | `usp_consultar_asignaturas_plan_paginado` | F-COO-008, F-DEC-015 |
-| `ConsultarPlanesEstudioUseCaseImpl` | `PlanEstudioJpaRepository.HQL_POR_PROGRAMA`/`HQL_TOTAL_SEMESTRES` | `usp_consultar_planes_estudio_programa_paginado` | F-COO-008 |
-| `ConsultarGruposDecanoUseCaseImpl` (l.35-37) | HQL sobre `uv_grupo` | `usp_consultar_grupos_facultad_paginado` | F-DEC-002 |
-| `ConsultarEstudiantesUseCaseImpl`, `ConsultarEstudiantePorIdUseCaseImpl` | A los pasa a SP | B2 ajusta la rama coordinador | F-COO-001/002 |
+| Caso de uso | Hoy | Después |
+| :--- | :--- | :--- |
+| `ConsultarAsignaturasUseCaseImpl` (coordinador) | `HQL_POR_PROGRAMA` | `usp_consultar_asignaturas_coordinador_paginado` |
+| `ConsultarAsignaturasPlanUseCaseImpl` (coordinador y decano) | `HQL_POR_PLAN` + `canDecanoAccessPrograma` | `usp_consultar_asignaturas_plan_paginado` |
+| `ConsultarPlanesEstudioUseCaseImpl` | `HQL_POR_PROGRAMA`, `HQL_TOTAL_SEMESTRES` | `usp_consultar_planes_estudio_programa_paginado` |
+| `ConsultarGruposDecanoUseCaseImpl` (l.35-37) | HQL sobre `uv_grupo` | `usp_consultar_grupos_facultad_paginado` |
+| Directorio, estudiantes de grupo, asistencias de grupo | Pasan a SP en A.2 | B2 solo pasa los parámetros nuevos |
 
-`InstitutionalScopePort` se conserva como defensa en profundidad (403 temprano), pero ya no es la fuente del ámbito de estas consultas.
+`InstitutionalScopePort` queda como defensa en profundidad, pero deja de ser la fuente del ámbito.
 
-### 3.4 OpenAPI golden path (WORM)
+### 3.4 Contratos WORM
 
-`AsistenciasUCO-Infra/docs/contracts/openapi/openapi-golden-path.yaml` (y su copia en el backend, que debe ser idéntica, DEC-005) pasa a **1.2.0 (CULM-001-B2)** con su `.sha256` regenerado en los dos repos. Cambios (solo descripción y respuestas; ningún schema de datos cambia):
+Cada archivo tiene dos copias idénticas, y cada copia su `.sha256` regenerado:
+- `openapi-golden-path.yaml`, en Infra `docs/contracts/openapi/` y en Backend `docs/contracts/openapi/`: pasa a **1.2.0 (CULM-001-B2NM)**, o a la menor siguiente si A ya publicó una 1.1.x.
+- `BACKEND_GOLDEN_PATH_CONTRACT.md`, en Infra `docs/contracts/openapi/` y en Backend `docs/contracts/`.
+
+Solo cambian descripciones; **ningún** schema ni conjunto de respuestas cambia:
 
 | Operación | Cambio |
 | :--- | :--- |
-| `consultarEstudiantes` (`GET /api/v1/estudiantes`, l.171-260) | Descripción: el ámbito se aplica en el SP; COORDINADOR → estudiantes con `EstudiantePrograma` en sus programas; ADMINISTRADOR → su institución. `programaId` (l.237-240): "El estudiante tiene vínculo `EstudiantePrograma` con el programa" (antes "Algún contexto académico del estudiante pertenece al programa"). `programaId` fuera del ámbito → 403. Sigue sin envoltorio `exitoso/datos` |
-| `consultarEstudiantesGrupo` (`GET /api/v1/grupos/{grupoId}/estudiantes`, l.124-170) | "Devuelve todos los estudiantes del grupo" pasa a: todos para DOCENTE titular y ADMINISTRADOR de la institución; para COORDINADOR, solo los que tienen `EstudiantePrograma` en sus programas. Se agrega `404` (grupo inexistente o fuera de ámbito, regla de A) |
-| `consultarAsistenciasGrupo` (`GET /api/v1/grupos/{grupoId}/asistencias`, l.317-) | Misma regla de visibilidad para COORDINADOR; `404` |
+| `consultarEstudiantes` (`GET /api/v1/estudiantes`, OpenAPI l.171-260) | El ámbito se aplica en el SP: COORDINADOR → estudiantes con `EstudiantePrograma` en sus programas; ADMINISTRADOR → su institución. `programaId` (l.237-240) pasa a decir "El estudiante tiene vínculo `EstudiantePrograma` con el programa". Un `programaId` fuera de ámbito devuelve `403`, que ya está en el conjunto de respuestas |
+| `consultarEstudiantesGrupo` (`GET /api/v1/grupos/{grupoId}/estudiantes`, l.124-170) y fila 3 de `BACKEND_GOLDEN_PATH_CONTRACT.md` (l.37) | "Devuelve todos los estudiantes del grupo" pasa a "todos para DOCENTE titular y ADMINISTRADOR de la institución; para COORDINADOR, solo los que tienen `EstudiantePrograma` en sus programas". Un grupo fuera de ámbito devuelve **403**, coherente con la l.27 ("titularidad ajena: 403"); no se agrega 404 |
+| `consultarAsistenciasGrupo` (`GET /api/v1/grupos/{grupoId}/asistencias`, l.317-) y fila 4 (l.20) | Misma regla para COORDINADOR; 403 |
 
-`BACKEND_GOLDEN_PATH_CONTRACT.md` y `DB_BASELINE_CONTRACT.md` no cambian (la firma de `usp_crear_grupo` se conserva). Si A ya publicó una versión 1.1.x con sus cambios, B2 parte de ella y sube a la siguiente menor. La prueba de conformidad OpenAPI del backend se actualiza solo en estas tres descripciones y en los `404` añadidos.
+`DB_BASELINE_CONTRACT.md` no cambia (`usp_crear_grupo` conserva la firma). Si el CONTRACT de A ya modifica estas descripciones, B2 parte de su texto.
 
 ### 3.5 Seguridad HTTP
 
-`SecurityConfig` no abre rutas nuevas a roles nuevos: las rutas `/coordinador/**` siguen en COORDINADOR (y la lectura del decano que ya existe en planes), `/grupos/{id}/programas` en DOCENTE, COORDINADOR y DECANO, y la matriz de acceso (`access-catalog.json`) se actualiza con las rutas nuevas. El PEP del Security Baseline recibe las rutas nuevas en su catálogo; si ese catálogo lo administra el equipo de seguridad, se entrega la lista en `PRS.md` (§6.4).
+`SecurityConfig` no abre rutas a roles nuevos; `/grupos/{id}/programas` queda para DOCENTE, COORDINADOR y DECANO. `access-catalog.json` y el catálogo del PEP reciben las rutas nuevas; si el PEP lo administra el equipo de seguridad, la lista va en `PRS.md`. Por DEC-022 punto 2, el administrador ya no está en `/coordinador/*` ni en `/decano/*`.
 
 ### 3.6 Observabilidad
 
-Los SP reciben `CorrelationIdContext.get()` como `@idCorrelacion`. Los casos de uso de asociar/desvincular registran un log estructurado `asignatura.plan.asociada` / `asignatura.plan.desvinculada` con `idAsignatura`, `idPlanEstudio`, `correlationId` (sin datos personales). La matrícula que crea un vínculo registra `estudiante.programa.vinculado` con el origen (`MANUAL`, `QR`).
+Todos los SP reciben `@idCorrelacion = CorrelationIdContext.get()`. Logs estructurados, sin datos personales:
+- `asignatura.plan.asociada` / `asignatura.plan.desvinculada` (`idAsignatura`, `idPlanEstudio`, `correlationId`);
+- `estudiante.programa.vinculado` (origen `MANUAL` o `QR`).
 
 ### 3.7 Pruebas backend (RED)
 
 | Tipo | Pruebas |
 | :--- | :--- |
-| Unitarias (100 % ramas en casos de uso y mappers nuevos) | `AsociarAsignaturaPlanUseCaseImplTest`, `DesvincularAsignaturaPlanUseCaseImplTest`, `ConsultarAsignaturasAsociablesUseCaseImplTest`, `ConsultarProgramasGrupoUseCaseImplTest`, `GestionarAsignaturaUseCaseImplTest` y `GestionarAsignaturaMapperTest` (+ `codigoCaracter`), `ConsultarAsignaturasPlan*Test`, `ConsultarPlanesEstudio*Test`, `ConsultarGruposDecanoUseCaseImplTest`, `ConsultarEstudiantesProgramaUseCaseImplTest`; `DbFailureClassifierAsignaturaPlanTest` (los 11 códigos de §2.8.1) |
-| Controladores | `CoordinadorPortalControllerTest`: `DELETE .../asignaturas/{id}` ya no es 501 (200, 404, 409); `POST .../asignaturas-asociadas` 201/404/409/403; listados paginados; `programaId` ajeno 403. `DecanoPlanEstudioControllerTest` 404 con plan inexistente; `DecanoGrupoControllerTest` paginado; `DecanoFacultadConsultaControllerTest` `idGrupo` ajeno 404; `EstudianteControllerTest` (sobre A) `programaId` ajeno 403; `GrupoControllerTest` `/grupos/{id}/programas` |
-| ArchUnit | Sin reglas nuevas: `JpaIsolationRulesTest`, `ControllersMustDependOnlyOnInputPortsTest` y `JpaRepositoryArchitectureRulesTest` deben pasar con los repositorios nuevos (ningún controlador ni clase de `application` importa `jpa/**`) |
-| Paridad JPA / oráculos | `AcademicUserParityFixture`, `AcademicUserJdbcBaselineOracle`, `baseline/AsignaturaJdbcBaseline`, `baseline/PlanEstudioJdbcBaseline` se actualizan por el cambio formal de contrato (columnas de `uv_asignatura`, firmas con `@codigoCaracter`, HQL retirados); `AcademicQueryJpaParityIT`, `AcademicUserCommandsSpParityIT`/`SuccessParityIT`, `CoreViewQueriesJpaParityIT`, `SqlStoredProcedureContractIT` (firmas nuevas), `ViewEntityProjectionMappingTest` (columnas de vistas = campos de entidad), `AcademicViewJpaProjectionBehaviorTest`, `AsignaturaJpaCommandPatternTest`, `PlanEstudioJpaCommandPatternTest`, `PlanEstudioJpaRepositoryTest`, `ConsultasTransversalesJpaRepositoryTest`, `FacultadDecanoJpaRepositoryTest`, `EstudianteJpaQueryContractTest`, `LecturaPorFacultadJpaPatternTest`, `JpaQueryAdapterContractTest`, `UsuarioPlanEstudioProvidersSqlServerIT`, `DbFailureClassifierPlanEstudioTest` |
-| Integración (`-Pintegration`) | `AsignaturaPlanEstudioSqlServerIT`: asociar/desvincular contra SQL Server con la semilla 34; `AmbitoGrupoMixtoSqlServerIT`: CA no recibe EB en `/grupos/{id}/estudiantes`, `/sesiones/{id}/asistencias`, `/coordinador/estudiantes`, KPIs |
-| OpenAPI | Prueba de conformidad del golden path con la versión 1.2.0 y el `.sha256` nuevo |
+| Unitarias (100 % de ramas en casos de uso y mappers nuevos) | `AsociarAsignaturaPlanUseCaseImplTest`, `DesvincularAsignaturaPlanUseCaseImplTest`, `ConsultarAsignaturasAsociablesUseCaseImplTest`, `ConsultarProgramasGrupoUseCaseImplTest`, `GestionarAsignaturaUseCaseImplTest`, `GestionarAsignaturaMapperTest`, `ConsultarAsignaturasPlan*Test`, `ConsultarPlanesEstudio*Test`, `ConsultarGruposDecanoUseCaseImplTest`; `DbFailureClassifierAsignaturaPlanTest` (11 códigos) |
+| Controladores | `CoordinadorPortalControllerTest` (DELETE 200/404/409; `asignaturas-asociadas` 201/404/409/403; paginados; `programaId` ajeno 403); `DecanoPlanEstudioControllerTest` (404); `DecanoGrupoControllerTest`; `GrupoControllerTest` (`/programas`, `idPrograma` en la matrícula); `GrupoMatriculaQrControllerTest` (`programaId`); `EstudianteControllerTest` y los controladores de A.2 (403 por `programaId` ajeno y por grupo fuera de ámbito) |
+| Seguridad | `RbacSecurityFilterChainTest` (rutas nuevas y sus roles); `SecurityPepEnforcementFilterTest` (rutas nuevas en el catálogo del PEP) |
+| OpenAPI | `OpenApiGoldenPathConformanceTest` (versión, l.111; conjuntos de respuestas sin cambio, l.80-81 y l.419-420), `OpenApiEstudiantesDirectoryConformanceTest` (descripción de `programaId`), `OpenApiGoldenPathValidationTest`. El `<include>openapi-golden-path.yaml</include>` del `pom.xml` (l.375) no cambia de ruta. `AsistenciasUCO-Infra/scripts/quality/verify-contracts.ps1` comprueba la paridad de las dos copias y de los `.sha256` |
+| ArchUnit | Sin reglas nuevas; `JpaIsolationRulesTest`, `ControllersMustDependOnlyOnInputPortsTest` y `JpaRepositoryArchitectureRulesTest` en verde con los repositorios nuevos |
+| Paridad JPA / oráculos (actualizados por el cambio formal de contrato) | `AcademicUserParityFixture`, `AcademicUserJdbcBaselineOracle`, `baseline/AsignaturaJdbcBaseline`, `baseline/PlanEstudioJdbcBaseline`, `AcademicQueryJpaParityIT`, `AcademicUserCommandsSpParityIT`/`SuccessParityIT`, `CoreViewQueriesJpaParityIT`, `SqlStoredProcedureContractIT`, `ViewEntityProjectionMappingTest`, `AcademicViewJpaProjectionBehaviorTest`, `AsignaturaJpaCommandPatternTest`, `PlanEstudioJpaCommandPatternTest`, `PlanEstudioJpaRepositoryTest`, `ConsultasTransversalesJpaRepositoryTest`, `FacultadDecanoJpaRepositoryTest`, `EstudianteJpaQueryContractTest`, `LecturaPorFacultadJpaPatternTest`, `JpaQueryAdapterContractTest`, `UsuarioPlanEstudioProvidersSqlServerIT`, `DbFailureClassifierPlanEstudioTest`. En `OfertaGruposEstudianteJpaRepositoryTest` (B-RED-04 de A), `OR08` pasa a 21 posiciones (`codigoCaracter` en 18, `nombreCaracter` en 19 y el total en 20) y `OR09` rechaza 19 |
+| Integración (`-Pintegration`) | `AsignaturaPlanEstudioSqlServerIT` (asociar y desvincular); `AmbitoGrupoMixtoSqlServerIT` (CA no recibe a EB en los tres endpoints de A.2, ni en sesiones ni en KPIs) |
 
 ---
 
-## 4. Frontend
+## 4. Frontend (GREEN)
 
 ### 4.1 Modelos y servicios
 
 | Archivo | Cambio |
 | :--- | :--- |
-| `core/models/role-management.model.ts:272-283` (`AsignaturaPlanItem`) | + `idSemestrePlanEstudio`, `codigoCaracter`, `nombreCaracter`, `compartida`, `programasCompartidos: string[]`, `estaActivoVinculo`; `semestre` = `numeroSemestre`; nuevos `AsignaturaAsociable`, `CaracterAsignatura`, `ProgramaResumen` |
-| `core/api/models/oferta-creacion-grupos-docente-api-dto.model.ts`, `asignatura-docente-api-dto.model.ts`, `estudiante-api-dto.model.ts`, `docente-api-dto.model.ts`, `core/models/consultas-transversales.model.ts` | Campos de §3.1 (`programas`, `planes`, `totalPlanes`, `codigoCaracter`); sin `any` |
-| `core/services/coordinator-management.service.ts` | `normalizarAsignaturaPlan` (l.78-88) y `aSolicitudAsignatura` (l.96-105, + `codigoCaracter`); nuevos `asociarAsignaturaPlan`, `buscarAsignaturasAsociables`, `getCaracteresAsignatura`; `desvincularAsignaturaPlan` (DELETE, l.352) ya existe y ahora responde 200; listados de planes, asignaturas y estudiantes paginados (`ApiPageResponse`) con `programaId` opcional; `getEstudiantes` del coordinador pasa de `/api/v1/estudiantes` (l.489) a `/coordinador/estudiantes` |
-| `core/services/dean-facultad.service.ts` | Malla paginada, grupos paginados, `idGrupo` en sesiones |
-| `core/services/oferta-academica.service.ts`, `group.service.ts`, `course.service.ts` | Carácter en la oferta; `getProgramasGrupo(idGrupo)`; `idPrograma` en la matrícula manual; `idProgramaPorDefecto` al abrir la ventana QR |
-| `core/interceptors/mock-backend.interceptor.ts`, `core/mocks/{role-management.mock, mock-consultas-transversales}.ts` | Datos de ejemplo con una asignatura compartida y carácter |
+| `core/models/role-management.model.ts:272-283` | `AsignaturaPlanItem` + `idSemestrePlanEstudio`, `codigoCaracter`, `nombreCaracter`, `compartida`; nuevos `AsignaturaAsociable`, `CaracterAsignatura`, `ProgramaResumen` |
+| `core/api/models/oferta-creacion-grupos-docente-api-dto.model.ts`, `asignatura-docente-api-dto.model.ts`, `estudiante-api-dto.model.ts`, `core/models/consultas-transversales.model.ts` | `programas`, `planes`, `totalPlanes`, `codigoCaracter`, `nombreCaracter`; sin `any` |
+| `core/services/coordinator-management.service.ts` | `normalizarAsignaturaPlan` (l.78-88) y `aSolicitudAsignatura` (l.96-105, + `codigoCaracter`); nuevos `asociarAsignaturaPlan`, `buscarAsignaturasAsociables` y `getCaracteresAsignatura`. `desvincularAsignaturaPlan` (l.352) ya existe y ahora responde 200. Los listados leen `ApiPageResponse` pidiendo una sola página grande (la paginación en la UI se difiere) |
+| `core/services/dean-facultad.service.ts`, `oferta-academica.service.ts`, `group.service.ts`, `course.service.ts` | `ApiPageResponse` en la malla y los grupos del decano; carácter en la oferta; `getProgramasGrupo`; `idPrograma` en la matrícula manual y `programaId` en la ventana QR |
+| `core/interceptors/mock-backend.interceptor.ts`, `core/mocks/*` | Datos de ejemplo con una asignatura compartida y carácter |
 
 ### 4.2 Componentes
 
-Todos `changeDetection: ChangeDetectionStrategy.OnPush`, `input()`/`output()`/`model()`, estado en `signal`/`computed`, sin `setInterval`, sin `localStorage`, errores por `getApiErrorMessage` (texto del backend), etiquetas accesibles en filtros nuevos (F-COO-010 en los controles que B2 toca).
+Todos OnPush, con `input()`/`output()`/`model()` y `signal`/`computed`, sin `setInterval` ni `localStorage`, y con los mensajes por `getApiErrorMessage`.
 
 | Componente | Cambio |
 | :--- | :--- |
-| `features/coordinator/coordinator-study-plans/coordinator-study-plans.component.ts`, `components/study-plans-list.component.ts` | Lista paginada (`PaginationComponent`); totales obligatorias/optativas |
-| `components/subject-form.component.ts` (+ `pages/subject-form-page.component.ts`) | Select **Carácter** requerido (catálogo); semestre del plan (l.39-59, 159-160) se conserva; en edición de una compartida muestra el aviso "Compartida con …" y deshabilita campos de catálogo si el backend responde `ASI_006` (se muestra el mensaje; no se infiere en cliente) |
-| `components/associate-subject-dialog.component.ts` (**nuevo**) | Flujo "Asociar asignatura existente": búsqueda paginada (`asignaturas-asociables`), elegir semestre del plan y carácter, confirmar; emite `asociada` |
-| `components/study-plan-mesh.component.ts`, `pages/study-plan-mesh-page.component.ts` | Por semestre: insignia Obligatoria/Optativa, chip "Compartida con N programas" (tooltip con `programasCompartidos`); botones "Nueva asignatura" y "Asociar asignatura existente"; "Quitar del plan" con el modal de confirmación del sistema de diseño en lugar de `confirm()` (l.187-200, F-COO-011) llamando al DELETE |
-| `features/coordinator/coordinator-subjects/coordinator-subjects.component.ts` | Una fila por (asignatura, plan); `irAMallaPlan(asig.planEstudioId)` (l.288) usa el plan de la fila; paginado; filtro por programa si coordina varios |
-| `features/coordinator/coordinator-students/coordinator-students.component.ts` (l.244) | Consume `/coordinador/estudiantes` paginado; filtro por programa (S4); columna "Programas" |
-| `features/coordinator/coordinator-groups`, pantallas de sesiones/asistencias del coordinador | Sin cambio de lógica: muestran lo que devuelve el backend (ya filtrado); rótulo "Estudiantes de tu programa: n de m" con `estudiantesPrograma`/`estudiantesGrupo` |
-| KPIs del coordinador | Selector de programa cuando el backend responde `COO_002` (el componente muestra el mensaje y el selector con los programas del coordinador) |
-| `features/dean/dean-plan-malla/dean-plan-malla.component.ts` | Malla paginada con carácter y chip de compartida; 404 → estado "Plan no encontrado" |
-| `features/dean/dean-asignaturas/dean-asignaturas.component.ts` (l.109) | "Plan {{ inpPlanEstudio }}" → lista de `planes` |
-| `features/dean/dean-grupos` / `dean-grupo-detalle` | Grupos paginados; sesiones filtradas por `idGrupo` en servidor (deja de filtrar en cliente, F-DEC-003/014) |
-| KPIs del decano (`features/dean/dean-indicators`) | Rótulos "Sesiones ejecutadas" vs "Sesiones evaluadas por matrícula" y "Matrículas activas" vs "Estudiantes" (F-DEC-013); comparativa por programa con la nota de R9 |
-| `features/student/student-group-offer/student-group-offer.component.ts` | Insignia Obligatoria/Optativa en "propias"; sin duplicados (lo garantiza el backend) |
-| `features/teacher/teacher-grupos/**/teacher-matricula-modal.component.ts`, `teacher-grupo-estudiantes.component.ts` | Si `getProgramasGrupo` devuelve más de uno, select **Programa del estudiante** (opcional; requerido cuando el backend responde `EST_005`) |
-| Modal de apertura de la ventana QR de matrícula (HU176B) | Select "Programa para estudiantes nuevos" visible solo si el grupo tiene varios programas |
-| Pantalla pública de matrícula por QR | Si `requiereProgramaDocente`, muestra el mensaje del backend antes del formulario |
-| Oferta de creación de grupos del docente (`teacher-grupo-form.component.ts`) | Muestra `programas` de la asignatura |
+| `features/coordinator/coordinator-study-plans/components/subject-form.component.ts` (y su página) | Select **Carácter** requerido |
+| `components/associate-subject-dialog.component.ts` (nuevo) | Buscar asignaturas asociables, elegir semestre y carácter, y asociar; emite `asociada` |
+| `components/study-plan-mesh.component.ts`, `pages/study-plan-mesh-page.component.ts` | Insignia Obligatoria/Optativa; botones "Nueva asignatura" y "Asociar asignatura existente"; "Quitar del plan" llama al DELETE (se conserva el `confirm()` actual; el modal se difiere) |
+| `features/coordinator/coordinator-subjects/coordinator-subjects.component.ts` | Una fila por (asignatura, plan); `irAMallaPlan` (l.288) usa el plan de la fila |
+| `features/dean/dean-plan-malla/dean-plan-malla.component.ts` | Insignia de carácter; un 404 muestra "Plan no encontrado" |
+| `features/dean/dean-asignaturas/dean-asignaturas.component.ts` (l.109) | `planes` en lugar de "Plan {{ inpPlanEstudio }}" |
+| `features/dean/dean-grupos` | Consume `ApiPageResponse` (una página) |
+| `features/student/student-group-offer/student-group-offer.component.ts` | Insignia de carácter en "propias" |
+| `features/teacher/teacher-grupos/**/teacher-matricula-modal.component.ts` | Select **Programa del estudiante**, visible si `getProgramasGrupo` devuelve más de un programa |
+| Modal de apertura de la ventana QR (HU176B, `teacher-grupos`) | Select **Programa**, visible y requerido solo si el grupo tiene más de un programa (S3 mínimo) |
+| `features/teacher/teacher-grupos/components/teacher-grupo-form.component.ts` | Muestra los `programas` de la asignatura |
 
-### 4.3 Flujos de usuario
+### 4.3 Flujos
 
-1. **Asociar asignatura existente a un plan (coordinador):** Malla del plan → "Asociar asignatura existente" → buscar por código o nombre (solo asignaturas de la institución no asociadas al plan) → elegir semestre del plan y carácter → Asociar → la malla se recarga y la asignatura aparece con el chip "Compartida". Errores: `ASI_003` (ya asociada), `PLA_004` (semestre inexistente).
-2. **Crear asignatura nueva:** Malla → "Nueva asignatura" → código, nombre, créditos, área, componente, semestre y **carácter** → Guardar. Si el código existe, el backend responde `ASI_002` y la UI muestra el mensaje; el botón "Asociar asignatura existente" está siempre visible al lado.
-3. **Cambiar carácter o semestre en un plan:** editar desde la malla; en una compartida solo cambian semestre y carácter de ese plan (S2).
-4. **Quitar del plan:** "Quitar del plan" → modal de confirmación → DELETE; `ASI_005` explica por qué no se puede.
+1. **Asociar una asignatura existente:** Malla → "Asociar asignatura existente" → buscar → elegir semestre y carácter → Asociar → la malla se recarga. Errores del backend: `ASI_003`, `PLA_004`.
+2. **Crear asignatura:** Malla → "Nueva asignatura" → datos y carácter → Guardar. Si responde `ASI_002`, la UI muestra el mensaje y el botón de asociar sigue visible.
+3. **Editar un vínculo:** se cambian semestre y carácter. En una compartida, tocar datos de catálogo devuelve `ASI_006` (mensaje del backend).
+4. **Quitar del plan:** confirmación → DELETE. `ASI_005` explica el bloqueo.
+5. **Matrícula en un grupo mixto:** el docente elige el programa en la matrícula manual y al abrir la ventana QR.
 
 ### 4.4 Rutas
 
-Sin rutas nuevas (`app.routes.ts` l.342-387 se conservan); el diálogo de asociación vive dentro de la malla. `decano/programas/:planId` (l.228) y `decano/asignaturas` (l.293) se conservan.
+No hay rutas nuevas (`app.routes.ts` l.342-387, l.228, l.293).
 
 ### 4.5 Pruebas frontend (RED)
 
-- Nuevas: `associate-subject-dialog.component.spec.ts` (búsqueda, paginación, selección, error 409, accesibilidad de etiquetas).
-- Actualizadas por el cambio de contrato (las 15 specs que citan `planEstudioId`/`idPlanEstudio`/`semestre`, investigación §4): `subject-form.component.spec.ts` (carácter requerido), `study-plan-mesh.component.spec.ts` (insignias, chip, modal en vez de `confirm`), `coordinator-study-plans.component.spec.ts`, `coordinator-subjects.component.spec.ts` (fila por plan), `coordinator-students.component.spec.ts` (endpoint y paginación), `dean-asignaturas.component.spec.ts`, `dean-plan-malla.component.spec.ts` (404), `student-group-offer.component.spec.ts`, `teacher-matricula-modal.component.spec.ts` (selector de programa), `coordinator-management.service.spec.ts` (l.690 y nuevos métodos), `mock-backend.interceptor.spec.ts`.
-- `npm run verify` en verde (incluye el gate realtime, que B2 no toca).
+- Nueva: `associate-subject-dialog.component.spec.ts` (búsqueda, selección, error 409, etiquetas accesibles).
+- Actualizadas por el cambio de contrato:
+  - `subject-form.component.spec.ts` (carácter requerido);
+  - `study-plan-mesh.component.spec.ts` (insignia, botones, DELETE 200 y 409);
+  - `coordinator-study-plans.component.spec.ts`, `coordinator-subjects.component.spec.ts`, `dean-asignaturas.component.spec.ts`;
+  - `dean-plan-malla.component.spec.ts` (404);
+  - `student-group-offer.component.spec.ts`;
+  - `teacher-matricula-modal.component.spec.ts` (selector de programa);
+  - spec del modal de la ventana QR (el selector solo aparece, y es requerido, con varios programas);
+  - `coordinator-management.service.spec.ts` (l.690 y métodos nuevos);
+  - `mock-backend.interceptor.spec.ts`.
+- `npm run verify` en verde.
 
 ---
 
@@ -508,91 +588,144 @@ Sin rutas nuevas (`app.routes.ts` l.342-387 se conservan); el diálogo de asocia
 
 | Documento | Cambio |
 | :--- | :--- |
-| `AsistenciasUCO-Infra/docs/user-stories/HU-CATALOG.md` | HU075, HU084, HU108, HU008, HU076B, HU085, HU087, HU065/066/070, HU068, HU102/106, HU144: estado y nota "N:M por `AsignaturaPlanEstudio`; ámbito por `EstudiantePrograma`" |
-| `AsistenciasUCO-Infra/docs/contracts/openapi/openapi-golden-path.yaml` + `.sha256` (Infra y Backend) | 1.2.0 (§3.4) |
-| `AsistenciasUCO-Infra/docs/baseline/TECHNICAL_DEBT.md` | TD nueva: reactivación de un vínculo conserva `fechaVinculacionUtc` (§6.3); TD nueva si queda algún `AMBIGUO` sin resolver |
-| `GestioAsistenciaDB/docs/contracts/DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` | Sin cambio (no se toca ningún archivo del manifiesto); se verifica con `freeze-manifest.ps1 -Mode Verify` |
-| `docs/arquitectura-integral.md` (workspace) | Modelo `Asignatura` ↔ `AsignaturaPlanEstudio` ↔ `SemestrePlanEstudio` y regla R6 |
-| `CULM-001-culminacion/DECISIONES.md` | Registrar S1–S4 si la revisión los aprueba (DEC-0xx, paquete B2) |
+| `AsistenciasUCO-Infra/docs/user-stories/HU-CATALOG.md` | HU075, HU084, HU108, HU008, HU076B, HU085, HU087, HU065/066/070, HU102/106, HU144 |
+| Contratos WORM | §3.4 (4 archivos + 4 `.sha256`) |
+| `AsistenciasUCO-Infra/docs/baseline/TECHNICAL_DEBT.md` | TD por cada uno de estos puntos: la reactivación de un vínculo conserva `fechaVinculacionUtc`; un grupo de un periodo que termina antes del vínculo queda sin programa (O-N10); cada `AMBIGUO`/`SIN_INTERSECCION` sin resolver; los diferibles de §7 |
+| `GestioAsistenciaDB/docs/contracts/DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` | Sin cambio; `freeze-manifest.ps1 -Mode Verify` |
+| `docs/arquitectura-integral.md` (workspace) | Modelo con la puente y R6 |
 
 ### 5.2 Orden de integración
 
-1. Requisitos: A y B mezclados en `integracion/CULM-001`. B2 rebasa sobre ellos y edita **sus** versiones de `usp_registrar_estudiante_en_grupo_interno` (A, DEC-009), del SP del directorio de estudiantes y de los casos de uso de grupos (A), y de `uv_resumen_asistencia_estudiante_grupo` / `uv_cumplimiento_sesion_grupo` (B, DEC-012/DEC-016).
-2. **DB** (`feature/CULM-001-B2-asignaturas-nm`): RED (pruebas nuevas fallando + arrange de las 31 actualizado) → GREEN (tablas, semillas, funciones, vistas, SPs, permisos, migración) → `infra.ps1 db-deploy` sobre BD limpia **y** `up` sobre la BD local con backup COPY_ONLY previo → `infra.ps1 db-test`.
-3. **Backend** (misma rama en su repo): entidades, repositorios, casos de uso, controladores, clasificador, OpenAPI → `mvnw verify` y `-Pintegration`.
-4. **Frontend**: modelos, servicios, componentes, specs → `npm run verify`.
-5. **Infra**: HU-CATALOG, contrato OpenAPI y hashes, deuda técnica → `.\AsistenciasUCO-Infra\infra.ps1 verify` (paridad cross-repo del golden path).
-6. AUDIT: matriz de fugas con la semilla 34 (dos programas) para coordinador, decano, docente y estudiante; recorrido de pantalla de la malla.
-7. PRs hacia `integracion/CULM-001`: DB y Backend en `johnjduque/gestion-asistencia-db` y `alejovh12/AsistenciasUCO` (DEC-002), Frontend en `shesho22/AsistenciasUCO-Frontend`, Infra en `AsistenciasUCO/AsistenciasUCO-Infra`; se registran en `PRS.md`. Se mezclan en el orden DB → Backend → Frontend → Infra; ningún despliegue mezcla un backend viejo con la BD nueva (las columnas retiradas de `uv_asignatura` lo romperían).
+1. **Requisitos:** A (incluida A.2) y B (B.1 y B.2) mezclados en `integracion/CULM-001`. B2 edita la versión de A o B de estos objetos:
+   - los tres SP de A.2;
+   - `usp_registrar_estudiante_en_grupo_interno` (inserción y reactivación);
+   - `usp_consultar_oferta_grupos_estudiante` (19 columnas);
+   - `uv_resumen_asistencia_estudiante_grupo` y `uv_cumplimiento_sesion_grupo`;
+   - `usp_consultar_resumen_asistencia_grupo_docente_paginado` y `usp_consultar_resumen_asistencia_estudiante`;
+   - las pruebas RI-04/T-07 y B-RED-04.
+2. **DB** (rama `feature/CULM-001-B2-asignaturas-nm`): inventario repetido (§2.7.4) → RED → GREEN → `db-deploy` sobre BD limpia y `up` sobre la BD local con backup COPY_ONLY previo → `db-test`.
+3. **Backend:** entidades, repositorios, casos de uso, controladores, clasificador y contratos WORM → `mvnw verify` y `-Pintegration`.
+4. **Frontend** → `npm run verify`.
+5. **Infra:** HU-CATALOG, contratos y hashes, deuda técnica → `.\AsistenciasUCO-Infra\infra.ps1 verify`.
+6. **AUDIT:** matriz de fugas con el fixture de dos programas, en T-SQL y `-Pintegration` (las cuentas Keycloak del segundo coordinador están en §7).
+7. **PRs** hacia `integracion/CULM-001`, registrados en `PRS.md` y mezclados en orden DB → Backend → Frontend → Infra, sin despliegue parcial:
+   - DB y Backend en `johnjduque/gestion-asistencia-db` y `alejovh12/AsistenciasUCO` (DEC-002);
+   - Frontend en `shesho22/AsistenciasUCO-Frontend`;
+   - Infra en `AsistenciasUCO/AsistenciasUCO-Infra`.
 
-### 5.3 Commits (Conventional Commits, atómicos por capa, `Refs:` de las HU)
+### 5.3 Commits (atómicos por capa)
 
 DB:
-1. `test(db): agregar pruebas red de asignatura en varios planes y ambito mixto` (T-B2-01..14; `Refs: HU075, HU084, HU108, HU008, HU087`)
-2. `test(db): actualizar arrange de pruebas al vinculo asignatura-plan` (31 archivos; cuerpo con la justificación de cambio formal de contrato)
+1. `test(db): agregar pruebas red de asignaturas por plan y ambito mixto`
+2. `test(db): actualizar fixtures al vinculo asignatura-plan` (el cuerpo justifica el cambio formal y lista las aserciones cambiadas)
 3. `feat(db/tables): agregar AsignaturaPlanEstudio y catalogo de caracter`
 4. `feat(db/views): resolver programa del grupo por la tabla puente`
 5. `feat(db/sp): asociar, desvincular y consultar asignaturas por plan`
-6. `fix(db/sp): resolver ambito del coordinador por EstudiantePrograma` (`Refs: F-COO-006, F-COO-008`)
+6. `fix(db/sp): resolver ambito del coordinador por EstudiantePrograma`
 7. `feat(db/sp): exigir vinculo de programa en la matricula manual y QR`
-8. `feat(db/seed): sembrar segundo programa con optativa compartida`
-9. `feat(db): migracion up/down de asignaturas N:M con backfill de vinculos` (`BREAKING CHANGE: se elimina Asignatura.semestrePlanEstudio y cambian las columnas de uv_asignatura`)
+8. `feat(db): migracion 16 de asignaturas N:M con backfill de vinculos` (`BREAKING CHANGE: se elimina Asignatura.semestrePlanEstudio y cambian columnas de uv_asignatura, uv_estudiante, uv_resumen_asistencia_estudiante_grupo y uv_cumplimiento_sesion_grupo`)
 
 Backend:
 1. `test(backend): agregar pruebas red de asignaturas por plan y ambito mixto`
 2. `feat(backend/adapter): repositorio de asignaturas por plan sobre SP`
 3. `feat(backend/usecase): asociar y desvincular asignaturas del plan`
-4. `refactor(backend/adapter): mover consultas del coordinador y decano a SP paginados` (`Refs: F-COO-008, F-DEC-002`)
-5. `feat(backend/controller): endpoints de asociacion, desvinculacion y paginacion` (`Refs: F-COO-005, F-DEC-014, F-DEC-015`)
-6. `docs(backend): sincronizar openapi golden path 1.2.0`
+4. `refactor(backend/adapter): mover consultas de malla y grupos del decano a SP`
+5. `feat(backend/controller): endpoints de asociacion y desvinculacion`
+6. `docs(backend): actualizar contratos golden path de CULM-001-B2NM`
 
 Frontend:
-1. `test(frontend): actualizar specs de malla y listados al contrato N:M`
+1. `test(frontend): actualizar specs de malla y matricula al contrato N:M`
 2. `feat(frontend/coordinador): asociar asignatura existente y caracter en la malla`
 3. `feat(frontend/decano): malla y asignaturas con planes compartidos`
 4. `feat(frontend/docente): seleccionar programa en matricula de grupos mixtos`
 5. `feat(frontend/estudiante): mostrar caracter en la oferta de grupos`
 
 Infra:
-1. `docs(contracts): publicar openapi golden path 1.2.0 de CULM-001-B2`
+1. `docs(contracts): publicar golden path de CULM-001-B2NM`
 2. `docs(hus): actualizar HUs de malla, oferta y ambito por relacion`
 
-Todos terminan con `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+Pie común: `Refs:` con las HU y los hallazgos, y `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ---
 
-## 6. Riesgos, rollback y puntos abiertos
+## 6. Riesgos, rollback, limitaciones y puntos abiertos
 
 ### 6.1 Riesgos
 
 | # | Riesgo | Mitigación |
 | :--- | :--- | :--- |
-| 1 | Duplicación de filas por el join 1:N (`uv_grupo_programa`) en KPIs, aforo, consolidado, paginación (`COUNT(*) OVER()`) | `uv_asignatura` queda como catálogo (1:1), `uv_cumplimiento_sesion_grupo` y `uv_resumen_asistencia_estudiante_grupo` pierden `idPrograma`; consumidores con `EXISTS`/`DISTINCT`; T-B2-03 y T-B2-07 fijan la cardinalidad con una asignatura compartida |
-| 2 | Vista congelada `uv_estudiante_grupo` alterada por cambio de cardinalidad | No se toca; depende de `uv_grupo`, que sigue 1:1; T-B2-03 + `freeze-manifest.ps1 -Mode Verify` |
-| 3 | Estudiantes invisibles para coordinadores (sin vínculo o `AMBIGUO`) | Backfill + R7 en matrícula; reporte y script de resolución; T-B2-11; el docente siempre los ve |
-| 4 | Fuga entre coordinadores en grupos mixtos por algún SP no revisado | Lista exhaustiva de §2.7.2 construida desde los consumidores de `uv_grupo_programa`, `uv_resumen_*` y `uv_estudiante`; AUDIT con la matriz de fugas sobre la semilla 34; `ufn_estudiantes_grupo_visibles` como único filtro |
-| 5 | Migración destructiva (`DROP COLUMN`) | Backup COPY_ONLY previo; `down` probado (T-B2-12); `down` aborta sin cambios si hay datos N:M |
-| 6 | Conflictos con A y B (mismos objetos) | B2 empieza después de mezclar A y B; §5.2 lista los objetos compartidos; los mensajes y números de migración se verifican antes del RED |
-| 7 | Desajuste BD nueva / backend viejo | Integración simultánea DB → Backend en la misma ventana; sin despliegue parcial |
-| 8 | Volumen del cambio (≈19 SP con join directo + ≈17 por vistas, ≈12 repositorios, ≈15 componentes) frente a la fecha del 2026-11-13 | Orden de prioridad del PLAN del work item: si falta tiempo, se entregan primero BD + backend del ámbito (R6–R9) y la asociación; la UI de asociación puede ir al final del paquete |
-| 9 | Un estudiante de A matriculado en una asignatura solo de B pasa a tener vínculo con B (R7) y aparece en el directorio de B | Consecuencia directa de DEC-020 ("exigen o crean el vínculo"); se documenta en HU-CATALOG; para evitarlo, la asignatura debe asociarse también al plan de A (flujo 4.3.1) |
+| 1 | Duplicación por el join 1:N en KPIs, aforo, consolidado y paginación | `uv_asignatura` 1:1; las dos vistas sin `idPrograma`; inventario completo (§2.7.4–§2.7.5); pruebas B2NM-03, 07, 15 y 20 |
+| 2 | Vista congelada `uv_estudiante_grupo` | No se toca; B2NM-03 + `freeze-manifest.ps1 -Mode Verify` |
+| 3 | Estudiantes invisibles para coordinador y decano (`AMBIGUO`, `SIN_INTERSECCION`) | Reporte + script con dos vías de resolución; R10 para administrador y docente (B2NM-19); una TD por cada fila sin resolver |
+| 4 | Fuga entre coordinadores en grupos mixtos | `ufn_estudiantes_grupo_visibles` como único filtro; extensión de los SP de A.2; AUDIT con dos programas |
+| 5 | Migración destructiva | Verificación y `DROP` en la misma transacción; SQL dinámico; backup COPY_ONLY; B2NM-12 |
+| 6 | Conflictos con A y B | B2 empieza después de A y B; §5.2 lista los objetos compartidos; prefijo `culm001_b2nm`; números de semilla y códigos verificados antes del RED |
+| 7 | BD nueva con backend viejo | Mezcla DB → Backend en la misma ventana; sin despliegue parcial |
+| 8 | Volumen frente al 2026-11-13 | GREEN acotado al alcance mínimo; §7 diferible |
+| 9 | Si un estudiante de A se matricula en una asignatura que solo está en B, la matrícula crea su vínculo con B (R7/DEC-020). Entonces aparece en el directorio, la ficha y la oferta "propias" de B, y el coordinador de B obtiene el derecho de corregir su identidad (`usp_corregir_identidad_usuario.sql:142`) | Es consecuencia de DEC-020; se documenta en HU-CATALOG. Para evitarlo, la asignatura se asocia también al plan de A (flujo §4.3.1) |
+| 10 | Un coordinador que no coordina todos los programas de un grupo compartido pierde la gestión de horarios y precarga (O-N7) | Mínimo privilegio explícito; B2NM-18. El titular y quien coordina todos los programas sí pueden |
 
 ### 6.2 Rollback
 
-- **BD:** `NN_..._down.sql` (precondición 1:1) o restauración del backup COPY_ONLY tomado justo antes del `up` (obligatorio en la BD local y en cualquier entorno compartido).
-- **Backend y frontend:** revertir los PRs de B2 en `integracion/CULM-001` (DB, Backend, Frontend e Infra juntos, en orden inverso).
-- **Contrato:** volver a la versión anterior del golden path y su `.sha256` en los dos repos.
+- BD: `16_culm001_b2nm_asignatura_plan_down.sql` (precondición 1:1) o el backup COPY_ONLY previo al `up`.
+- Backend, frontend e infra: revertir los PRs de B2 en orden inverso.
+- Contratos: volver a la versión anterior y su `.sha256` en las dos copias.
 
 ### 6.3 Limitaciones aceptadas
 
-- Reactivar un vínculo conserva su `fechaVinculacionUtc`: los grupos creados durante la baja se consideran del programa (TD nueva).
-- La comparativa por programa puede sumar más estudiantes que el total de la facultad (R9); se rotula.
-- `uv_estudiante.idPlanEstudio` elige de forma determinista el plan de mayor `inp` cuando el programa tiene varios planes activos con la asignatura.
+- Reactivar un vínculo conserva `fechaVinculacionUtc` (TD).
+- Un grupo creado para un periodo que terminó antes de la fecha del vínculo de su asignatura queda sin programa, invisible para coordinador y decano. `PlanEstudio.estado = 0` no saca grupos de `uv_grupo_programa` (O-N10, TD).
+- La comparativa por programa puede sumar más estudiantes que el total de la facultad (R9).
+- Cuando el programa tiene varios planes con la asignatura, el plan expuesto en `uv_estudiante` y `uv_docente` sigue una regla determinista: activo, mayor `inp`, menor `id`.
 
-### 6.4 Puntos abiertos para la revisión
+### 6.4 Puntos abiertos
 
-1. Aprobar S1–S4 (§1.2) o sustituirlos antes de congelar.
-2. ¿Un coordinador puede asociar una asignatura cuyo único vínculo es de otro programa de **otra facultad** de la misma institución? El contrato lo permite (catálogo institucional); alternativa: limitar a su facultad.
-3. Usuarios de prueba para el segundo coordinador y su estudiante en el realm `security-baseline` (`uco-coordinador-2`, `uco-estudiante-2`): el realm lo administra el equipo de seguridad; sin ellos, la matriz de fugas con dos programas se prueba por API con tokens de los usuarios existentes reasignados en BD solo en la semilla de pruebas, o se documenta como limitación.
-4. Catálogo del PEP (Security Baseline) con las rutas nuevas: confirmar si lo actualiza este equipo o se entrega al equipo de seguridad.
-5. Si el CONTRACT de A no mueve `/api/v1/estudiantes` a SP, B2 asume ese trabajo completo (aumenta el alcance).
+1. Separar el `DROP COLUMN` en una migración `17_*` dentro de la misma ventana (recomendación opcional de REVIEW-1 §3). No se adopta salvo indicación del orquestador, porque DEC-019 lo fija en la misma migración.
+2. Catálogo del PEP: confirmar quién lo actualiza (§3.5).
+
+---
+
+## 7. Diferible (post 2026-11-13)
+
+Nada de esta tabla entra en el GREEN de B2. Cada punto queda como TD en `TECHNICAL_DEBT.md` con referencia a este contrato.
+
+| # | Elemento | Por qué se puede diferir |
+| :--- | :--- | :--- |
+| D-01 | F-DEC-013: `sesionesEvaluadasPorMatricula`, `matriculasActivas` y rótulos del decano | Es una inconsistencia de nombres; no afecta al ámbito ni a DEC-019/020 |
+| D-02 | F-DEC-014: filtro `idGrupo` en el servidor para `GET /decano/sesiones` | Hoy filtra el cliente y no hay fuga (los datos ya son de su facultad) |
+| D-03 | Paginación en la UI (`PaginationComponent`) de planes, asignaturas y estudiantes del coordinador y de los grupos del decano | Los SP ya entregan `ApiPageResponse`; la UI pide una sola página |
+| D-04 | `usp_consultar_estudiantes_programa_paginado` para `GET /coordinador/estudiantes` (parte de F-COO-008) | `uv_estudiante_programa` ya parte de `EstudiantePrograma` y el ámbito por vínculo se cumple; solo queda el JPQL heredado sobre la vista |
+| D-05 | `totalObligatorias`/`totalOptativas` por plan, `estudiantesCompartidos` en la comparativa, `programasCompartidos`, chips "Compartida con N programas" y tooltips | Es información adicional; la marca `compartida` sí entra |
+| D-06 | Rótulo "n de m estudiantes de tu programa" en los grupos del coordinador | Presentación |
+| D-07 | F-COO-011: modal del sistema de diseño en lugar de `confirm()` al quitar del plan | Presentación (severidad baja) |
+| D-08 | Selector de programa en la UI de KPIs cuando el backend responde `COO_002` | Ningún coordinador de los datos actuales tiene más de un programa, y la API ya responde `COO_002`/`COO_003` |
+| D-09 | `requiereProgramaDocente` en la validación pública del token | Con S3 mínimo, la ventana de un grupo multiprograma siempre tiene programa; `MQR_008` cubre el caso residual |
+| D-10 | Cuentas Keycloak del segundo coordinador y su estudiante (`security-baseline`) | La matriz de dos programas se prueba en T-SQL y en `-Pintegration` (DEC-022 punto 9) |
+| D-11 | Columna extra `estudiantesGrupo` en el consolidado | El grano (grupo, programa) ya da los conteos correctos por programa |
+
+---
+
+## 8. Respuesta a REVIEW-1
+
+| Objeción | Cambio hecho / motivo |
+| :--- | :--- |
+| §1 (parcial) | Se resuelve con O-B1, O-B3, O-N3 y O-N4 (filas siguientes) |
+| **O-B1** Directorio, estudiantes y asistencias de grupo sin SP | Por decisión del orquestador, A.2 crea `usp_consultar_directorio_estudiantes_paginado`, `usp_consultar_estudiantes_grupo_ambito_paginado` y `usp_consultar_asistencias_grupo_ambito_paginado` con el ámbito dentro del SP. B2 los **extiende** a N:M sin redefinirlos (§1.4, §2.7.5, §3.1, §3.3), incluido el legacy `POST /asistencias/consultas/grupo`. Se retiraron el nombre provisional `usp_consultar_estudiantes_directorio_paginado` y el punto abierto 6.4.5. No se adoptan los nombres que propone el revisor (`usp_consultar_estudiantes_grupo`, `usp_consultar_asistencias_grupo`) para no duplicar los de A |
+| **O-B2** Consumidores rotos al retirar `idPrograma` | §2.7.4 indica línea y reemplazo de `usp_consultar_tendencia_ausentismo` (l.56-57), `usp_consultar_kpis_institucion` (l.64, 72, 78), `usp_consultar_comparativa_facultades` (l.34, 52), `usp_consultar_kpis_decano` (l.47, 55, 62) y `usp_consultar_bitacora_estudiante_programa` (l.79), además de los ya listados. §2.7.5 recoge los consumidores de B (sábana y resumen del estudiante) y sus entidades. Se añade la regla de repetir el inventario antes del RED y la prueba B2NM-15 con `sp_refreshsqlmodule` |
+| **O-B3** El grano de `uv_estudiante` rompe R10 | `uv_estudiante` pasa a (estudiante, grupo, programa del grupo) con `tieneVinculoPrograma`, que solo exigen las ramas coordinador y decano de `uv_auth_estudiante`. Se agrega `usp_buscar_estudiantes_institucion_paginado`. La institución en `usp_registrar_estudiante_en_programa_interno` se resuelve por matrícula → grupo → programa, y el SP que asegura el vínculo valida contra el programa elegido (§2.5, §2.7.2, §2.7.3). Pruebas B2NM-09 y B2NM-19 |
+| **O-B4** El paso 2 del backfill excede DEC-020 | El paso 1 se limita a estudiantes con matrícula activa y sin vínculo; el paso 2 solo reporta `SIN_INTERSECCION`. El script de resolución ofrece las dos vías. B2NM-11 admite `AMBIGUO` y `SIN_INTERSECCION`. El riesgo 9 se amplía (corrección de identidad y oferta "propias"). El script de depuración HU008 ya no se retira (§2.4) |
+| **O-B5** Pérdida de datos e idempotencia de la migración | La verificación y el `DROP` van en el último lote y en la misma transacción; las referencias a la columna van en `sp_executesql` con `COL_LENGTH`; `52902` cuenta vínculos activos e inactivos. B2NM-12 incluye el segundo `up` y el fallo forzado (§2.3). La separación en `17_*` queda como punto abierto opcional (§6.4.1) porque DEC-019 la fija en la misma migración |
+| **O-B6** Colisiones de nombres | Prefijo `culm001_b2nm` en la migración (`16_culm001_b2nm_*`), las pruebas, los permisos, el fixture, el reporte y el script; semillas `37`–`39`. El segundo programa sale del fixture de A (DEC-022 punto 9), no de una semilla propia |
+| **O-B7** WORM incompleto y 404 innecesario | 403 para un grupo fuera de ámbito, sin cambiar los conjuntos de respuesta. `BACKEND_GOLDEN_PATH_CONTRACT.md` (filas 3 y 4) se actualiza en las dos copias, con su `.sha256`. Pruebas nombradas: `OpenApiGoldenPathConformanceTest`, `OpenApiEstudiantesDirectoryConformanceTest`, `OpenApiGoldenPathValidationTest`, `RbacSecurityFilterChainTest`, `SecurityPepEnforcementFilterTest`, `pom.xml` l.375 y `verify-contracts.ps1` (§3.4, §3.7). Diverge del texto de DEC-021, que decía 404, por decisión del orquestador |
+| **O-N1** Lista de pruebas existentes | Tabla de §2.9 ampliada: `test_contract_closure`, `test_consultas_transversales_hu112_hu157` l.41, `test_uv_resumen_*` l.184, `test_consultas_coordinador_programa`, `test_consultas_decano_facultad`, `test_usp_consultar_grupos_paginado`, `test_usp_consultar_sesiones_y_asistencias_paginado`, `test_consolidado_auditoria_catalogos`, `test_uv_estudiante_programa_no_duplicates`, `test_cruce_horario_docente` l.15-16, `test_usp_cambiar_estado_docente_programa` l.89-90, RI-04/T-07 de A, B-RED-04 y las pruebas de B. Se eliminó "ninguna aserción" y se listan las aserciones que cambian |
+| **O-N2** Pruebas RED faltantes | B2NM-15 a B2NM-20: compilación, despliegue limpio, S2, R8/O-N7 en horarios y precarga, R10 del administrador, `usp_consultar_programas_grupo` y `totalRegistros`. Se agregan las specs de frontend del selector de matrícula y de la ventana QR. Las de `COO_002`, `requiereProgramaDocente` y "n de m" no aplican, porque esas piezas pasaron a §7 (D-06, D-08, D-09) |
+| **O-N3** TVF sobre vistas en BD limpia | Las cuatro funciones leen solo tablas base y `uv_grupo_programa` las usa; B2NM-16 (§2.6) |
+| **O-N4** `OBL` quemado | Columna `orden` en `CaracterAsignaturaPlan`; la oferta elige el de menor `orden` (§2.1, §2.7.4) |
+| **O-N5** `uv_docente.idPlanEstudio` | Misma regla determinista que `uv_estudiante`, calculada en `ufn_programas_grupo`/`uv_grupo_programa` (§2.5) |
+| **O-N6** `uv_auth_asistencia` | Queda declarada como no fuente de ámbito del coordinador; los consumidores futuros deben usar `ufn_estudiantes_grupo_visibles` (§2.5) |
+| **O-N7** Horarios y precarga en grupos compartidos | Se exige el titular o un coordinador de **todos** los programas del grupo (mínimo privilegio); B2NM-18; riesgo 10 (§2.7.2) |
+| **O-N8** Base de A | §2.7.3, §2.7.4 y §5.2: se parte de la oferta de 19 columnas de A (pasa a 21) y se elimina la regla ESP en inserción y reactivación; RI-04/T-07 cambian por cambio formal |
+| **O-N9** El `down` restaura B.2 | §2.3, paso 3 del `down`: restaura las versiones A+B (B.2 de las dos vistas y sus consumidores, A.2 de los SP de ámbito) |
+| **O-N10** Grupo sin programa por fecha y plan inactivo | §2.1 (un plan inactivo no saca grupos), §6.3 y TD |
+| §8 Alcance | Adoptado como GREEN; el resto pasa a §7. S3 se mantiene en su forma mínima (DEC-021 y decisión del orquestador): `programaId` opcional en `POST /grupos/{id}/matricula-qr`, obligatorio solo con varios programas |
+| §9 Puntos abiertos | 1 y 2 confirmados; 3 y 4 en §3.5 y §7 (D-10); 5 resuelto por O-B1 (A.2) |

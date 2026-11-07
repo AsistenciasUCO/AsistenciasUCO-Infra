@@ -1,7 +1,7 @@
 # CULM-001 · Paquete B2 — PLAN (asignaturas N:M y ámbito por relación)
 
 > Fecha: 2026-11-06. Fuentes: prompt de culminación §3.8–§3.9, `DECISIONES.md` (DEC-019, DEC-020), `RESEARCH-ASIGNATURA-PLAN.md`, `FINDINGS-{coordinador,docente,decano}.md`.
-> Contrato detallado: [`CONTRACT.md`](CONTRACT.md). Depende de A (matrícula, ámbito inmediato) y B (horas, sesiones canceladas).
+> Contrato detallado: [`CONTRACT.md`](CONTRACT.md) (versión 2, responde a REVIEW-1). Depende de A (matrícula y los tres SP de ámbito de A.2) y B (horas, sesiones canceladas). Alcance del GREEN: mínimo imprescindible; diferibles en CONTRACT §7. Prefijo de artefactos `culm001_b2nm`.
 
 ## Objetivo
 
