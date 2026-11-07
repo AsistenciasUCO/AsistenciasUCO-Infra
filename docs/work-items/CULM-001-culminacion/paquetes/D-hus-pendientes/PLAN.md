@@ -2,7 +2,7 @@
 
 > Alcance y diseño en [`CONTRACT.md`](CONTRACT.md) (v1, pendiente de la revisión 9.2). Decisiones: DEC-040 (alcance), DEC-022 §4/§8, DEC-028 (numeración), DEC-036 (precedente de manifiestos), DEC-037/DEC-038 (PDP, bloqueo B-01). Fecha: 2026-11-07.
 > Fases SDD por subpaquete: PLAN → CONTRACT (revisión 9.2 y congelación) → RED → GREEN → AUDIT → CLOSURE.
-> Numeración: migración `19 + x`, semilla `40 + x`, prefijo `culm001_d<x>` (D.1 = `20`/`41` … D.9 = `28`/`49`).
+> Numeración (DEC-044): migración `19 + x`, semilla `50 + x`, prefijo `culm001_d<x>` (D.1 = `20`/`51` … D.9 = `28`/`59`). Golden path de D: **1.6.0** (tras el 1.5.0 de C).
 
 ## Orden y paralelismo
 
@@ -12,10 +12,10 @@
 | 1 | **D.3 + D.6** `D36-parametros-auditoria` | D.1, D.4 | ya | Parámetros editables (lista blanca, rango, motivo, concurrencia, historial, invalidación) + auditoría de `/admin/**` con metadatos y prueba de arquitectura |
 | 1 | **D.4** `D4-admision-estudiantes` | D.1, D.3+D.6 | ya | Admisión HU156, `GET /admin/programas`, `AsegurarCuentaIdentidadService` |
 | 2 | **D.7** `D7-retiro-registro-individual` | D.2, D.8 | B.2 mezclado (backend y BD) | Retiro de `POST /asistencias`, `REVOKE`/`DROP` del SP autónomo, TD-009 |
-| 2 | **D.8** `D8-kpis-horas` | D.2, D.7 | B.2 (BD) mezclado | Comparativas, tendencia y consolidado por horas (F-COO-007) |
-| 2 | **D.2** `D2-soportes-categoria` | D.7, D.8 | D.1 mezclado | Varios soportes, FK de categoría, soporte obligatorio, TD-060/061, comprobación de TD-059 |
+| 2 | **D.8** `D8-kpis-horas` | D.2, D.7 | B.2 (BD) y B2 mezclados (D.8 escribe sobre la vista por programa de B2) | Comparativas, tendencia y consolidado por horas (F-COO-007) |
+| 2 | **D.2** `D2-soportes-categoria` | D.7, D.8 | D.1 mezclado (va antes que D.8: HU015 está en §3.6) | Varios soportes, FK de categoría, soporte obligatorio, TD-060/061, comprobación de TD-059 |
 | 3 | **D.5** `D5-carga-masiva` | D.9-a/b/d | D.4 y D.6 mezclados | Carga CSV por jerarquía: plantilla, validación previa, creación idempotente |
-| 3 | **D.9-a/b/d** `D9-hallazgos-medios` | D.5 | D.6 mezclado | Hallazgos de BD/backend (4xx, 404, seguridad), frontend y docs/infra |
+| 3 | **D.9-a/b/d** `D9-hallazgos-medios` | D.5 | D.6 y B2 mezclados (D.9-a toca `usp_consultar_sesiones_facultad_paginado` que B2 reescribe) | Hallazgos de BD/backend (4xx, 404, seguridad), frontend y docs/infra |
 | 4 | **D.9-c** (misma rama, segundo PR) | — | C mezclado | SSE: `status`/`emit`, 406, confirmación al abrir |
 
 Worktrees propios `C:\Proyectos\GestionAsistencia-CULM001-D<x>\<repo>` para las ramas de una misma ola; la BD local es compartida y cada D.x repite `infra.ps1 db-test` tras mezclar.
