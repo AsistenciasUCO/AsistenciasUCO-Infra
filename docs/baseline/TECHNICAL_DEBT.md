@@ -22,7 +22,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-006](#td-006) | Identificación numérica | ABIERTA | no, salvo alcance de identificación |
 | [TD-007](#td-007) | Códigos DB machine-readable | ABIERTA | sí, si bloquea contrato de errores LB-001/002 |
 | [TD-008](#td-008) | Validación runtime de sesión/asistencia | CLOSED — LB-003 | no |
-| [TD-009](#td-009) | Estados de asistencia y registro individual | ABIERTA | sí, para contrato afectado; individual fuera del Golden Path |
+| [TD-009](#td-009) | Estados de asistencia y registro individual | CLOSED (2026-11-07, CULM-001 D.7) | no |
 | [TD-010](#td-010) | Auditoría SQL con DML directo | ABIERTA | no para LB-000; revisar release DB |
 | [TD-011](#td-011) | Outbox y consistencia durable | ABIERTA | sí, LB-005 si exige durabilidad |
 | [TD-012](#td-012) | DataSource específico por provider | ABIERTA | no, salvo incorporar otro provider |
@@ -73,6 +73,14 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-CULM001-A-03](#td-culm001-a-03) | `SES_017` ausente de la tabla §G del Golden Path | ABIERTA / NON_BLOCKING | no |
 | [TD-055](#td-055) | MessageUcoLab: validación operacional extremo a extremo pendiente | ABIERTA / NON_BLOCKING | no |
 | [TD-056](#td-056) | MessageUcoLab: límites de código (10) y contenido (100) incompatibles con el catálogo canónico | DECISION_REQUIRED | no mientras `azure` sea el provider por defecto |
+| [TD-059](#td-059) | `DELETE` sobre `SolicitudRevisionAsistencia` falla con Msg 8624 (FK + índice filtrado LB-004D) | ABIERTA (comprobación D.2) | sí para borrado/fixture |
+| [TD-060](#td-060) | Categoría de radicación no se persistía en `SolicitudRevisionAsistencia` | CLOSED (2026-11-07, CULM-001 D.2) | no |
+| [TD-061](#td-061) | Literales `'ATTACHED'`/`'DRAFT'` quemados en SP de LB-004D | CLOSED (2026-11-07, CULM-001 D.2) | no |
+| [TD-CULM001-D-01](#td-culm001-d-01) | Propagación BD → Azure App Configuration de parámetros editados (`PUT /admin/parametros/{id}`) | ABIERTA / NON_BLOCKING | no |
+| [TD-CULM001-D-02](#td-culm001-d-02) | Invalidación distribuida de caché de parámetros en entornos multi-instancia | ABIERTA / NON_BLOCKING | no |
+| [TD-CULM001-D-03](#td-culm001-d-03) | Parámetros y auditoría particionados por institución [SUPUESTO-D-16] | DECISION_REQUIRED | no para monoinstitucional; sí multi-institución |
+| [TD-CULM001-D-04](#td-culm001-d-04) | Depuración y limpieza periódica de archivos soporte huérfanos (`DRAFT` / `ORPHAN`) | ABIERTA / NON_BLOCKING | no |
+| [TD-CULM001-D-05](#td-culm001-d-05) | Manejo paginado en sesiones de estudiante si total supera `PAGINACION/TAMANO_MAXIMO` | ABIERTA / NON_BLOCKING | no |
 
 ## TD-001
 
@@ -178,8 +186,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 - **Evidencia:** RegistroAsistenciaSesionDomain; [AsistenciaRepositorySqlServerAdapter](../../src/main/java/co/edu/uco/asistenciasuco/infrastructure/adapter/secondary/persistence/sqlserver/core/AsistenciaRepositorySqlServerAdapter.java); archive/pendientes-arquitectura.md.
 - **Motivo:** No extrapolar enum de lote al registro individual.
 - **Resolución esperada:** Contrato DB liberado y semántica individual acordada; paridad/negativos certificados. LB-001B añade el lado de **lectura**: `GET …/asistencias` devuelve `codigoRazonCausa` sin filtrar y el consumer solo admite AN/SJC/EX ([DR-006](../work-items/LB-001B-backend-frontend-asistencia/CONTRACT_MATRIX.md#dr-006--dominio-de-estado-en-lectura)).
-- **Bloquea línea base:** sí, para contrato afectado; individual fuera del Golden Path.
-- **Estado:** ABIERTA.
+- **Bloquea línea base:** no (resuelta).
+- **Estado:** **CLOSED (2026-11-07, CULM-001 D.7).** Se retiró el registro individual autónomo `POST /api/v1/asistencias` y el procedimiento almacenado `usp_registrar_asistencia_estudiante_autonomo` (migración 26). El registro de asistencia individual queda cubierto por lote y registro por toma (HU027).
 
 ## TD-010
 
@@ -774,3 +782,75 @@ GOLDEN PATH EFFECT:         NONE
 - **Evidencia:** contrato CULM-001 paquete A, §8.1 (nota para la próxima revisión formal).
 - **Resolución esperada:** añadir `SES_017` a la tabla §G en la próxima revisión formal del contrato (WORM: requiere nuevo hash).
 - **Bloquea línea base:** no. **Estado:** ABIERTA. **Work item:** CULM-001 A.
+
+## TD-059
+
+- **Fecha / responsable:** 2026-10-21 / fullstack-team (HU035-HU036, E2E y triage de `-Pintegration`).
+- **Clasificación:** `DB_ENGINE_PLAN_DEFECT`. **Prioridad:** ALTA.
+- **Descripción:** Cualquier `DELETE` sobre `dbo.SolicitudRevisionAsistencia` fallaba con `Msg 8624` (Internal Query Processor Error) por conflicto del optimizador entre la clave foránea `FK_ArchivoSoporte_SolicitudRevisionAsistencia` y el índice único filtrado `UX_ArchivoSoporte_Solicitud` (`WHERE solicitudRevisionAsistencia IS NOT NULL`) de LB-004D.
+- **Impacto:** Imposibilidad de eliminar reclamos desde SP, fixtures o scripts de limpieza.
+- **Resolución en CULM-001 D.2:** En el Paquete D (D.2) se reemplazó el índice único filtrado por el índice no único y no filtrado `IX_ArchivoSoporte_Solicitud` permitiendo 1:N soportes.
+- **Estado:** ABIERTA / PENDIENTE DE COMPROBACIÓN FORMAL EN DB (`BEGIN TRAN; DELETE FROM dbo.SolicitudRevisionAsistencia WHERE id = @x; ROLLBACK;` con FK habilitada, D2-14). **Work item:** CULM-001 Paquete D (D.2).
+
+## TD-060
+
+- **Fecha / responsable:** 2026-10-21 / fullstack-team (HU035-HU036, análisis AS-IS).
+- **Clasificación:** `DATA_LOSS_CONTRACT_GAP`. **Prioridad:** MEDIA.
+- **Descripción:** `dbo.usp_radicar_solicitud_revision_asistencia_v2` recibía `@categoria` pero no la persistía al no existir columna en `SolicitudRevisionAsistencia`.
+- **Impacto:** Pérdida de la causal/categoría normativa (médica, laboral, etc.) elegida por el estudiante al radicar.
+- **Resolución en CULM-001 D.2:** Se agregó la clave foránea `idCategoriaJustificacion` en `SolicitudRevisionAsistencia`, persistida por `usp_internal_radicar_solicitud_revision` y expuesta en vistas y DTOs (HU014/HU015).
+- **Estado:** **CLOSED (2026-11-07, CULM-001 D.2)**. **Work item:** CULM-001 Paquete D (D.2).
+
+## TD-061
+
+- **Fecha / responsable:** 2026-10-21 / fullstack-team.
+- **Clasificación:** `HARDCODED_STATE_LITERAL`. **Prioridad:** BAJA.
+- **Descripción:** `usp_consultar_solicitudes_revision_docente`, `usp_consultar_archivo_soporte_autorizado` y `usp_radicar_solicitud_revision_asistencia_v2` comparaban contra los literales de cadena `'ATTACHED'` y `'DRAFT'`.
+- **Impacto:** Vulneración de la regla arquitectural UCO "Cero Datos Quemados".
+- **Resolución en CULM-001 D.2:** Los SPs se refactorizaron para resolver los estados desde el catálogo de parámetros (`ARCHIVO.ESTADO_ADJUNTO`, `ARCHIVO.ESTADO_BORRADOR`).
+- **Estado:** **CLOSED (2026-11-07, CULM-001 D.2)**. **Work item:** CULM-001 Paquete D (D.2).
+
+## TD-CULM001-D-01
+
+- **Fecha / responsable:** 2026-11-07 / backend-team & ops (CULM-001 Paquete D §12).
+- **Clasificación:** `CONFIG_SYNC_DUAL_SOURCE`. **Prioridad:** MEDIA.
+- **Descripción:** Cuando el catálogo de parámetros del backend opera con el proveedor `azure` (Azure App Configuration) en lugar de `sqlserver`, la mutación `PUT /admin/parametros/{id}` actualiza la base de datos SQL Server (`CatalogoParametro`), pero no propaga automáticamente el cambio a Azure App Configuration.
+- **Impacto:** Posible inconsistencia entre el valor en BD y el valor en Azure App Configuration si no se ejecuta sincronización externa.
+- **Resolución esperada:** Implementar un publicador o proceso que propague el parámetro actualizado a Azure App Configuration vía SDK/CLI cuando el provider activo sea `azure`.
+- **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.3 (§12).
+
+## TD-CULM001-D-02
+
+- **Fecha / responsable:** 2026-11-07 / backend-team (CULM-001 Paquete D §12).
+- **Clasificación:** `CACHE_COHERENCE_MULTI_INSTANCE`. **Prioridad:** MEDIA.
+- **Descripción:** La invalidación de caché ante `PUT /admin/parametros/{id}` (`ParameterCatalogPort.invalidate()`) se ejecuta en la memoria local de la instancia Spring Boot que procesa la petición HTTP. En un despliegue multi-instancia (clúster/escalado horizontal), las demás réplicas retendrán el valor anterior hasta la expiración por TTL.
+- **Impacto:** Inconsistencia temporal entre instancias ante cambios en caliente de parámetros.
+- **Resolución esperada:** Integrar un canal distribuido de invalidación (Event Grid, Redis Pub/Sub o mensaje SSE/bus) para notificar a todas las réplicas activas.
+- **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.3 (§12).
+
+## TD-CULM001-D-03
+
+- **Fecha / responsable:** 2026-11-07 / architecture & database-team (CULM-001 Paquete D §12, [SUPUESTO-D-16]).
+- **Clasificación:** `MULTI_TENANCY_SCOPE_GAP`. **Prioridad:** MEDIA.
+- **Descripción:** `CatalogoParametro` y `AuditoriaEvento` no cuentan con columna `idInstitucion`: los parámetros de negocio y los registros de auditoría operan a nivel global de toda la instalación monoinstitucional. `usp_actualizar_parametro` y `usp_consultar_auditoria_eventos_paginado` validan defensivamente que exista exactamente una institución activa (`PRM_012` y `AUD_001`).
+- **Impacto:** Si la universidad decide activar un despliegue multi-institucional compartido en la misma base de datos, los parámetros y la auditoría requerirán aislamiento por institución.
+- **Resolución esperada:** Añadir `idInstitucion` a `CatalogoParametro` y `AuditoriaEvento` con filtrado estricto por ámbito institucional del administrador.
+- **Bloquea línea base:** No para despliegue monoinstitucional UCO. **Estado:** DECISION_REQUIRED. **Work item:** CULM-001 D.3/D.6 (§12, [SUPUESTO-D-16]).
+
+## TD-CULM001-D-04
+
+- **Fecha / responsable:** 2026-11-07 / backend-team & infra (CULM-001 Paquete D §12).
+- **Clasificación:** `STORAGE_HOUSEKEEPING`. **Prioridad:** BAJA.
+- **Descripción:** Cuando un estudiante sube un archivo soporte mediante `POST /api/v1/archivos/subir`, el archivo se almacena en MinIO/S3 y se registra en `ArchivoSoporte` con estado `DRAFT`. Si el estudiante no culmina la radicación del reclamo (`POST /asistencias/revisiones`), el soporte queda en estado borrador permanentemente (soporte huérfano).
+- **Impacto:** Acumulación progresiva de archivos no vinculados en el bucket MinIO y filas `DRAFT` en BD.
+- **Resolución esperada:** Implementar un job batch programado que identifique soportes en estado `DRAFT` con más de X días de antigüedad (definido por parámetro), elimine el objeto en MinIO y marque la fila como eliminada/expirada.
+- **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.2 (§12).
+
+## TD-CULM001-D-05
+
+- **Fecha / responsable:** 2026-11-07 / backend-team (CULM-001 Paquete D §12).
+- **Clasificación:** `API_CONTRACT_PAGINATION_CONSISTENCY`. **Prioridad:** BAJA.
+- **Descripción:** El endpoint `GET /api/v1/estudiante/materias/{materiaId}/sesiones` consulta el SP `usp_consultar_sesiones_materia_estudiante` con límite `PAGINACION/TAMANO_MAXIMO` (100). En la práctica académica ninguna materia supera 100 sesiones por semestre; sin embargo, si una materia atípica superara ese límite, el backend actualmente registra un log WARN con `correlationId` y devuelve únicamente la primera página para conservar el sobre no paginado histórico consumido por el frontend.
+- **Impacto:** Sesiones más allá de la 100 no serían visibles si una materia excede dicho umbral.
+- **Resolución esperada:** Evolucionar el contrato del endpoint y frontend hacia `ApiPageResponse` con controles de paginación explícitos si se requiere soportar materias con más de 100 sesiones.
+- **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.1 (§12, §2.3).
