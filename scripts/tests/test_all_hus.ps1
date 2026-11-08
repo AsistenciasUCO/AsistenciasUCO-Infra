@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # SUITE DE PRUEBAS INTEGRALES DE HISTORIAS DE USUARIO (HU001 - HU174)
 # Plataforma de Gestion de Asistencia - Universidad Catolica de Oriente (UCO)
 # Autenticacion: Security Baseline (realm security-baseline, cliente publico asistencias-uco-spa, Authorization Code + PKCE).
@@ -274,6 +274,8 @@ $script:grupoNuevoId = $null
 $script:docenteId = $null
 $script:asignaturaOfertaId = $null
 $script:periodoVigenteId = $null
+$script:tomaId = $null
+$script:tomaPin = $null
 
 # ==============================================================================
 # SECCION 1: MODULO ESTUDIANTE (HU001 - HU026)
@@ -449,8 +451,8 @@ Run-Test "HU046,HU048,HU049" "Reprogramar fecha/hora de sesion creada (PATCH v2,
     return "Sesion reprogramada: $($r.datos.nombre) -> $($r.datos.fechaHoraInicio)"
 }
 
-Run-Test "HU027,HU033" "Registrar marcacion individual de asistencia de estudiante en sesion" {
-    # ESPERADO-HASTA-B (tomas por horas): POST /asistencias responde 501 FEATURE_UNAVAILABLE.
+Run-Test "HU027,HU033" "Verificar retiro de endpoint individual de asistencia (POST /asistencias responde HTTP 404)" {
+    # D.7 (TD-009): POST /asistencias responde 404 tras su retiro formal
     $body = @{
         estudiante = $script:carlosId
         grupo = $script:grupoBaseId
@@ -458,9 +460,8 @@ Run-Test "HU027,HU033" "Registrar marcacion individual de asistencia de estudian
         presente = $true
         observacion = "CULM1-E2E llegada puntual a clase"
     }
-    $res = Invoke-Api POST "/asistencias" $hDoc $body
-    if (-not $res.exitoso) { throw "Respuesta no exitosa al registrar asistencia" }
-    return "Asistencia registrada con exito: $($res.mensaje)"
+    Expect-ApiStatus 404 { Invoke-Api POST "/asistencias" $hDoc $body }
+    return "Ruta individual retirada: POST /asistencias responde HTTP 404 conforme a TD-009 y paquete D"
 }
 
 Run-Test "HU056" "Registrar marcacion masiva 'Todos Presentes' en sesion de clase (POST /asistencias/lote)" {
@@ -488,21 +489,88 @@ Run-Test "HU029,HU040,HU041" "Consultar planilla de asistencia y estadisticas ac
     return "Registros de asistencia de la sesion: $(@($res.datos).Count). Estudiante: estado $($carlos[0].estado), presente=$($carlos[0].presente)"
 }
 
-Run-Test "HU020-HU025" "Generar token QR efimero con vigencia de 60 segundos para sesion" {
-    # ESPERADO-HASTA-B (QR de asistencia, HU175): GET /sesiones/{id}/qr-token responde 501.
-    $res = Invoke-Api GET "/sesiones/$($script:sesEnCurso.id)/qr-token" $hDoc
-    if (-not $res.exitoso) { throw "Respuesta no exitosa al generar QR" }
-    $script:globalQrToken = $res.datos.qrToken
-    return "Token QR generado con exito: " + $res.datos.qrToken.Substring(0, 16) + "... (Expira en: " + $res.datos.expiraEnSegundos + "s)"
+Run-Test "B.2-Tomas" "Gestion de tomas de asistencia en sesion (apertura y consulta de tomas)" {
+    if (-not $script:sesEnCurso) { throw "No hay sesion en curso (falla PREP-E2E)" }
+    # 1. Abrir toma de asistencia en modo QR
+    $bodyToma = @{ modo = "QR" }
+    $resToma = Invoke-Api POST "/sesiones/$($script:sesEnCurso.id)/tomas" $hDoc $bodyToma
+    if (-not $resToma.exitoso) { throw "Respuesta no exitosa al abrir toma" }
+    $script:tomaId = [string]$resToma.datos.idToma
+    if (-not $script:tomaId) { throw "La respuesta no entrego idToma" }
+    
+    # 2. Consultar tomas de la sesion
+    $tomasSes = Invoke-Api GET "/sesiones/$($script:sesEnCurso.id)/tomas" $hDoc
+    if (-not $tomasSes.exitoso) { throw "Respuesta no exitosa al consultar tomas" }
+    $tomasList = if ($null -ne $tomasSes.datos.tomas) { $tomasSes.datos.tomas } else { @($tomasSes.datos) }
+    
+    return "Toma QR abierta id=$($script:tomaId) (numero $($resToma.datos.numero)). Total tomas en sesion: $(@($tomasList).Count)"
 }
 
-Run-Test "HU020-HU025-Scan" "Registrar asistencia reactiva de estudiante mediante escaneo de token QR" {
-    # ESPERADO-HASTA-B: depende del codigo QR que entrega HU175.
-    if (-not $script:globalQrToken) { throw "No hay token QR" }
-    $body = @{ sesionId = $script:sesEnCurso.id; codigo = $script:globalQrToken }
+Run-Test "HU175" "Proyeccion y rotacion de codigo QR dinamico y PIN de asistencia para la toma (docente)" {
+    if (-not $script:tomaId) { throw "No hay toma abierta (falla B.2-Tomas)" }
+    # 1. Emitir QR/PIN
+    $resQr = Invoke-Api POST "/tomas/$($script:tomaId)/qr" $hDoc
+    if (-not $resQr.exitoso) { throw "Respuesta no exitosa al proyectar QR" }
+    $script:tomaPin = [string]$resQr.datos.pin
+    if (-not $script:tomaPin) { throw "La respuesta no entrego PIN de asistencia" }
+    
+    # 2. Rotar QR/PIN
+    $resRot = Invoke-Api POST "/tomas/$($script:tomaId)/qr/rotacion" $hDoc
+    if (-not $resRot.exitoso) { throw "Respuesta no exitosa al rotar QR" }
+    $script:tomaPin = [string]$resRot.datos.pin
+    
+    return "QR/PIN emitido y rotado exitosamente. PIN activo: $($script:tomaPin) (rotacion $($resRot.datos.rotacionSegundos)s)"
+}
+
+Run-Test "HU176" "Auto-registro de asistencia del estudiante mediante PIN o token QR de la toma" {
+    if (-not $script:tomaPin) { throw "No hay PIN activo (falla HU175)" }
+    $body = @{ pin = "$($script:tomaPin)" }
     $res = Invoke-Api POST "/estudiante/asistencia-qr" $hEst $body
-    if (-not $res.exitoso) { throw "Respuesta no exitosa al marcar asistencia QR" }
-    return "Asistencia QR confirmada"
+    if (-not $res.exitoso) { throw "Respuesta no exitosa al registrar asistencia con PIN" }
+    
+    # Idempotencia: segundo intento devuelve 200 con yaRegistrado=true
+    $resIdem = Invoke-Api POST "/estudiante/asistencia-qr" $hEst $body
+    if (-not $resIdem.exitoso) { throw "Respuesta no exitosa en reintento idempotente" }
+    
+    return "Asistencia registrada con PIN: $($res.datos.mensaje); idempotencia confirmada (yaRegistrado=$($resIdem.datos.yaRegistrado))"
+}
+
+Run-Test "B.2-Faltantes-Cierre" "Consultar faltantes, cerrar toma de asistencia y consultar planilla de la toma" {
+    if (-not $script:tomaId) { throw "No hay toma abierta (falla B.2-Tomas)" }
+    # 1. Consultar faltantes de la toma
+    $faltantes = Invoke-Api GET "/tomas/$($script:tomaId)/faltantes?pagina=1&tamano=50" $hDoc
+    if (-not $faltantes.exitoso) { throw "Respuesta no exitosa al consultar faltantes" }
+    $falElems = if ($null -ne $faltantes.elementos) { $faltantes.elementos } else { $faltantes.datos }
+    
+    # 2. Cerrar toma de asistencia marcando ausentes
+    $cierre = Invoke-Api POST "/tomas/$($script:tomaId)/cierre" $hDoc @{ marcarAusentes = $true }
+    if (-not $cierre.exitoso) { throw "Respuesta no exitosa al cerrar toma" }
+    
+    # 3. Consultar asistencias registradas en la toma
+    $asigsToma = Invoke-Api GET "/tomas/$($script:tomaId)/asistencias?pagina=1&tamano=50" $hDoc
+    if (-not $asigsToma.exitoso) { throw "Respuesta no exitosa al consultar asistencias de la toma" }
+    $asigElems = if ($null -ne $asigsToma.elementos) { $asigsToma.elementos } else { $asigsToma.datos }
+    
+    # 4. Dejar de proyectar QR (DELETE /tomas/{id}/qr)
+    try { Invoke-Api DELETE "/tomas/$($script:tomaId)/qr" $hDoc | Out-Null } catch { }
+    
+    return "Faltantes previos: $(@($falElems).Count). Toma cerrada (ausentes marcados: $($cierre.datos.totalAusentesMarcados)). Planilla toma: $(@($asigElems).Count) registros"
+}
+
+Run-Test "HU040,HU041-Horas" "Resumen analitico de asistencia por horas por grupo (docente) y por materia (estudiante)" {
+    # 1. Docente: resumen del grupo por horas (F-DOC-004)
+    $resDoc = Invoke-Api GET "/docente/grupos/$($script:grupoBaseId)/resumen-asistencia?pagina=1&tamano=50" $hDoc
+    if (-not $resDoc.exitoso) { throw "Respuesta no exitosa en resumen de grupo por horas" }
+    $resElems = if ($null -ne $resDoc.elementos) { $resDoc.elementos } else { $resDoc.datos }
+    
+    # 2. Estudiante: materias con indicadores por horas (F-EST-002)
+    $resEst = Invoke-Api GET "/estudiante/materias" $hEst
+    if (-not $resEst.exitoso) { throw "Respuesta no exitosa al consultar materias del estudiante" }
+    $mat = @($resEst.datos | Where-Object { $_.idGrupo -ieq $script:grupoBaseId })[0]
+    $ind = $mat.indicadores
+    $horasDictadas = if ($ind) { $ind.horasDictadas } else { "N/A" }
+    
+    return "Resumen docente: $(@($resElems).Count) estudiantes con calculo de horas. Indicadores estudiante horasDictadas=$horasDictadas"
 }
 
 Write-Host "`n -- Flujo de justificacion estudiante -> docente (HU010-HU012, HU035-HU042) --" -ForegroundColor DarkCyan
@@ -543,6 +611,18 @@ Run-Test "HU010-Anular" "Anulacion formal de solicitud de revision por desistimi
     $est = @($despues.datos | Where-Object { $_.id -ieq $mio[0].id })[0].estadoSolicitud
     if ($est -ne "RETIRADA") { throw "El reclamo debia quedar RETIRADA y esta $est" }
     return "Reclamo anulado correctamente (estado $est)"
+}
+
+Run-Test "HU026B" "Rechazo de radicacion de justificacion fuera del plazo reglamentario (HTTP 409)" {
+    if (-not $script:sesPasada) { throw "No hay sesion pasada de prueba (falla PREP-E2E)" }
+    $body = @{
+        sesionId = $script:sesPasada.id
+        categoria = "MED"
+        justificacion = "CULM1-E2E solicitud fuera de plazo reglamentario."
+        soporteArchivoId = $script:fileId
+    }
+    Expect-ApiStatus 409 { Invoke-Api POST "/asistencias/revisiones" $hEst $body }
+    return "Radicacion fuera de plazo rechazada con HTTP 409 (REV_020) para sesion pasada $($script:sesPasada.nombre)"
 }
 
 Run-Test "HU035,HU036,HU039" "Consultar solicitudes de revision, detalle y soporte adjunto pendientes del docente" {
@@ -650,12 +730,24 @@ Run-Test "HU057" "Selector tipificado de documentos de identificacion legal en a
     return "Documentos tipificados para altas academicas: $(@($res).Count) tipos disponibles"
 }
 
-Run-Test "HU047" "Cancelar sesion de clase con motivo justificativo" {
-    # ESPERADO-HASTA-B (estado de sesion cancelada): PATCH /docente/sesiones/{id}/cancelar responde 501.
-    $body = @{ motivoCancelacion = "Cancelacion autorizada por jornada academica institucional." }
+Run-Test "HU047" "Cancelar sesion de clase con motivo justificativo y verificar rechazo de registros en sesion cancelada" {
+    if (-not $script:sesFutura) { throw "No hay sesion futura de prueba (falla PREP-E2E)" }
+    $body = @{ motivo = "Cancelacion autorizada por jornada academica institucional." }
     $res = Invoke-Api PATCH "/docente/sesiones/$($script:sesFutura.id)/cancelar" $hDoc $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa al cancelar sesion" }
-    return "Sesion cancelada exitosamente"
+    if ($res.datos.estado -ne "CANCELADA") { throw "El estado de la sesion debia ser CANCELADA y es $($res.datos.estado)" }
+    
+    # Validar que una sesion cancelada rechaza registros con HTTP 409 (SES_010 / ERR_SESION_CANCELADA)
+    $regBody = @{
+        sesionId = $script:sesFutura.id
+        registros = @(@{ estudianteId = $script:carlosId; estado = "AN" })
+    }
+    Expect-ApiStatus 409 { Invoke-Api POST "/asistencias/lote" $hDoc $regBody }
+    
+    # Validar que cancelar dos veces responde HTTP 409 (SES_011)
+    Expect-ApiStatus 409 { Invoke-Api PATCH "/docente/sesiones/$($script:sesFutura.id)/cancelar" $hDoc $body }
+    
+    return "Sesion cancelada id=$($script:sesFutura.id) (estado $($res.datos.estado)). Registro en sesion cancelada rechazado con HTTP 409 (SES_010)"
 }
 
 # ==============================================================================
@@ -960,10 +1052,12 @@ Run-Test "HU122" "Conmutar estado activo/inactivo de coordinador adscrito a la f
 Run-Test "HU128,HU136" "Censo consolidado de profesores de la facultad y filtro por programa" {
     $docs = Invoke-Api GET "/decano/docentes" $hDec
     if (-not $docs.exitoso) { throw "Respuesta no exitosa" }
+    $docsElems = if ($null -ne $docs.elementos) { $docs.elementos } else { $docs.datos }
     $prog = (Invoke-Api GET "/decano/programas" $hDec).datos[0]
     $filtrado = Invoke-Api GET "/decano/docentes?idPrograma=$($prog.id)" $hDec
     if (-not $filtrado.exitoso) { throw "Respuesta no exitosa en el filtro por programa" }
-    return "Padron docente de la facultad: $(@($docs.datos).Count) profesores; del programa $($prog.nombre): $(@($filtrado.datos).Count)"
+    $filtradoElems = if ($null -ne $filtrado.elementos) { $filtrado.elementos } else { $filtrado.datos }
+    return "Padron docente de la facultad: $(@($docsElems).Count) profesores; del programa $($prog.nombre): $(@($filtradoElems).Count)"
 }
 
 Run-Test "HU099-HU101,HU131,HU132" "Catalogo institucional de tipos de programa, modalidades y jornadas de la facultad" {
@@ -998,7 +1092,8 @@ Run-Test "HU143-HU146" "Supervision transversal: busqueda de asignaturas, aforo 
     $aforo = Invoke-Api GET "/decano/aforo-grupos" $hDec
     $ses = Invoke-Api GET "/decano/sesiones" $hDec
     if (-not ($asigs.exitoso -and $aforo.exitoso -and $ses.exitoso)) { throw "Respuesta no exitosa" }
-    return "Supervision transversal: $($asigs.total) asignaturas, $(@($aforo.datos).Count) grupos con aforo, $(@($ses.datos).Count) sesiones"
+    $sesElems = if ($null -ne $ses.elementos) { $ses.elementos } else { $ses.datos }
+    return "Supervision transversal: $($asigs.total) asignaturas, $(@($aforo.datos).Count) grupos con aforo, $(@($sesElems).Count) sesiones"
 }
 
 Run-Test "HU066,HU102" "Generacion y descarga de reporte Excel de asistencia (coordinador), semaforo de alerta temprana y tablero del decano" {
@@ -1024,7 +1119,8 @@ Run-Test "HU022,HU130,HU147,HU148,HU150,HU155" "Consola de administracion genera
     $estados = Invoke-Api GET "/admin/estados" $hAdmin
     $comps = Invoke-Api GET "/coordinador/componentes-formacion" $hCoord
     if (-not ($audit.exitoso -and $areas.exitoso -and $estados.exitoso)) { throw "Respuesta no exitosa" }
-    return "Consola administrativa: $(@($audit.datos).Count) eventos en bitacora, $($areas.total) areas, $(@($estados.datos).Count) estados, $($comps.total) componentes formativos"
+    $auditElems = if ($null -ne $audit.elementos) { $audit.elementos } else { $audit.datos }
+    return "Consola administrativa: $(@($auditElems).Count) eventos en bitacora, $($areas.total) areas, $(@($estados.datos).Count) estados, $($comps.total) componentes formativos"
 }
 
 Run-Test "HU133,HU134,HU138,HU139" "Reporteria macro: KPI global de asistencia, tendencia de ausentismo y comparativa por facultad" {
@@ -1039,7 +1135,8 @@ Run-Test "HU135,HU136" "Censo poblacional universitario UCO: estudiantes matricu
     $ests = Invoke-Api GET "/admin/estudiantes" $hAdmin
     $docs = Invoke-Api GET "/admin/docentes" $hAdmin
     if (-not ($ests.exitoso -and $docs.exitoso)) { throw "Respuesta no exitosa" }
-    return "Censo general UCO: $(@($ests.datos).Count) estudiantes, $(@($docs.datos).Count) profesores"
+    $estsElems = if ($null -ne $ests.elementos) { $ests.elementos } else { $ests.datos }
+    return "Censo general UCO: $(@($estsElems).Count) estudiantes, $(@($docs.datos).Count) profesores"
 }
 
 Run-Test "HU143-HU145-Admin" "Busqueda transversal de asignaturas de la institucion (administrador)" {
@@ -1051,26 +1148,35 @@ Run-Test "HU143-HU145-Admin" "Busqueda transversal de asignaturas de la instituc
 Run-Test "HU157,HU158,HU159" "Padron y ficha unificada del estudiante UCO con historial completo" {
     $ests = Invoke-Api GET "/admin/estudiantes" $hAdmin
     if (-not $ests.exitoso) { throw "Respuesta no exitosa" }
+    $estsElems = if ($null -ne $ests.elementos) { $ests.elementos } else { $ests.datos }
     $his = Invoke-Api GET "/admin/estudiantes/$($script:carlosId)/historial" $hAdmin
     if (-not $his.exitoso) { throw "Respuesta no exitosa en el historial" }
     $pad = Invoke-Api GET "/coordinador/estudiantes" $hCoord
-    return "Padron institucional: $(@($ests.datos).Count) estudiantes; historial de $($his.datos.nombreCompleto); padron del programa: $(@($pad.datos).Count)"
+    return "Padron institucional: $(@($estsElems).Count) estudiantes; historial de $($his.datos.nombreCompleto); padron del programa: $(@($pad.datos).Count)"
 }
 
 Run-Test "HU156" "Admision demografica y creacion de usuario estudiante (administrador)" {
-    # ESPERADO-HASTA-D (HU pendiente): el endpoint /admin/estudiantes/admision no existe.
     $tipos = Invoke-Api GET "/tipos-identificacion" $hAdmin
+    $tipoId = @($tipos)[0].id
+    $progs = (Invoke-Api GET "/decano/programas" $hDec).datos
+    $progId = if ($progs.Count -gt 0) { $progs[0].id } else { $script:globalPlanId }
     $doc = Get-Random -Minimum 1090000000 -Maximum 1099999999
     $body = @{
-        tipoIdentificacionId = @($tipos)[0].id
+        tipoIdentificacionId = $tipoId
+        idPrograma = $progId
         numeroIdentificacion = $doc
         primerNombre = "CULME"
         primerApellido = "ADMISION"
         correo = "culm1-e2e-adm-$doc@uco.edu.co"
+        password = (New-Clave)
     }
     $res = Invoke-Api POST "/admin/estudiantes/admision" $hAdmin $body
-    if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    return "Estudiante admitido"
+    if (-not $res.exitoso) { throw "Respuesta no exitosa al admitir estudiante" }
+    
+    # Validacion E2E D.4: Repeticion rechazada con HTTP 409 (ADS_002)
+    Expect-ApiStatus 409 { Invoke-Api POST "/admin/estudiantes/admision" $hAdmin $body }
+    
+    return "Estudiante admitido idEstudiante=$($res.datos.idEstudiante) (201); reintento duplicado rechazado con HTTP 409 (ADS_002)"
 }
 
 Run-Test "HU163" "Consultar listado de instituciones de convenio (catalogo de solo consulta)" {
@@ -1118,20 +1224,68 @@ Run-Test "HU110,HU111,HU116,HU117" "Facultades: alta con decano nuevo, modificac
     return "Facultad creada id=$facId, actualizada, inactivada (queda inactiva como limpieza) y decano alternado"
 }
 
-Run-Test "HU168,HU169" "Consulta y actualizacion de Parametros Generales del Sistema" {
-    # ESPERADO-HASTA-D (HU168 PARCIAL / HU169 PENDIENTE): PUT /admin/parametros/{id} responde 501.
+Run-Test "B.1-Festivos" "Consulta y recarga de dias festivos institucionales (administrador)" {
+    $anio = [datetime]::UtcNow.Year
+    # 1. Consulta de festivos del anio
+    $festivos = Invoke-Api GET "/admin/festivos?anio=$anio&incluirInactivos=false" $hAdmin
+    if (-not $festivos.exitoso) { throw "Respuesta no exitosa al consultar festivos" }
+    
+    # 2. Recarga de festivos del anio
+    $recarga = Invoke-Api POST "/admin/festivos/$anio/recarga" $hAdmin
+    if (-not $recarga.exitoso) { throw "Respuesta no exitosa al recargar festivos" }
+    
+    # 3. Consulta de sesiones en festivo con asistencia
+    $sesConAsig = Invoke-Api GET "/admin/festivos/$anio/sesiones-con-asistencia?pagina=1&tamano=20" $hAdmin
+    if (-not $sesConAsig.exitoso) { throw "Respuesta no exitosa al consultar sesiones en festivo con asistencia" }
+    $sesElems = if ($null -ne $sesConAsig.elementos) { $sesConAsig.elementos } else { $sesConAsig.datos }
+    
+    return "Festivos anio $($anio): $($festivos.datos.totalFestivos) dias (fuente: $($festivos.datos.fuenteUltimaCarga)). Recarga exitosa (actualizados: $($recarga.datos.festivosActualizados)). Sesiones con asistencia en festivo: $(@($sesElems).Count)"
+}
+
+Run-Test "HU168" "Consulta y actualizacion de Parametros Generales del Sistema con validacion de rango, seguridad y concurrencia" {
     $params = Invoke-Api GET "/admin/parametros" $hAdmin
-    $p = @($params.datos | Where-Object { $_.clave -eq "TAMANIO_MAXIMO_BYTES" })[0]
-    if (-not $p) { $p = $params.datos[0] }
-    $body = @{ valor = "$($p.valor)"; descripcion = "Valor sin cambio (CULM1-E2E)" }
-    Invoke-Api PUT "/admin/parametros/$($p.id)" $hAdmin $body | Out-Null
-    return "Total parametros: $($params.total). Parametro $($p.clave) actualizado exitosamente."
+    $pList = if ($null -ne $params.elementos) { $params.elementos } else { $params.datos }
+    $p = @($pList | Where-Object { $_.grupo -eq "ASISTENCIA" -and $_.clave -eq "TOLERANCIA_MINUTOS" })[0]
+    if (-not $p) { $p = @($pList | Where-Object { $_.esEditable -eq $true })[0] }
+    if (-not $p) { $p = $pList[0] }
+    
+    # 1. Actualizacion exitosa (PUT 200)
+    $fechaEsperada = if ($p.fechaModificacion) { $p.fechaModificacion } else { (Format-Utc [datetime]::UtcNow) }
+    $bodyOk = @{
+        valor = "$($p.valor)"
+        fechaModificacionEsperada = $fechaEsperada
+        motivo = "Actualizacion controlada CULM1-E2E"
+    }
+    $resPut = Invoke-Api PUT "/admin/parametros/$($p.id)" $hAdmin $bodyOk
+    if (-not $resPut.exitoso) { throw "Respuesta no exitosa al actualizar parametro" }
+    
+    # 2. Rechazo por rango (HTTP 400) si tiene valorMaximo
+    if ($null -ne $p.valorMaximo) {
+        $valFuera = [int]$p.valorMaximo + 500
+        $bodyRango = @{ valor = "$valFuera"; fechaModificacionEsperada = $resPut.datos.fechaModificacion; motivo = "Valor fuera de rango" }
+        Expect-ApiStatus 400 { Invoke-Api PUT "/admin/parametros/$($p.id)" $hAdmin $bodyRango }
+    }
+    
+    # 3. Rechazo por grupo no editable RED/* (HTTP 403)
+    $pRed = @($pList | Where-Object { $_.grupo -eq "RED" })[0]
+    if ($pRed) {
+        $bodyRed = @{ valor = "10.0.0.0/8"; fechaModificacionEsperada = (Format-Utc [datetime]::UtcNow); motivo = "Intento no permitido" }
+        Expect-ApiStatus 403 { Invoke-Api PUT "/admin/parametros/$($pRed.id)" $hAdmin $bodyRed }
+    }
+    
+    # 4. Rechazo por concurrencia optimista / version obsoleta (HTTP 409)
+    $bodyObs = @{ valor = "$($p.valor)"; fechaModificacionEsperada = "2000-01-01T00:00:00.000Z"; motivo = "Version obsoleta" }
+    Expect-ApiStatus 409 { Invoke-Api PUT "/admin/parametros/$($p.id)" $hAdmin $bodyObs }
+    
+    return "Parametro $($p.grupo)/$($p.clave) validado: PUT 200, 400 rango, 403 RED/* y 409 version"
 }
 
 Run-Test "HU172" "Consulta de eventos y trazabilidad en bitacora de auditoria (AuditoriaEvento)" {
     $res = Invoke-Api GET "/admin/auditoria" $hAdmin
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    return "Total eventos de auditoria registrados: $(@($res.datos).Count)"
+    $resElems = if ($null -ne $res.elementos) { $res.elementos } else { $res.datos }
+    $conCorrelacion = @($resElems | Where-Object { $null -ne $_.idCorrelacion -or $null -ne $_.idTraza })
+    return "Total eventos de auditoria registrados: $(@($resElems).Count), eventos con trazabilidad: $(@($conCorrelacion).Count)"
 }
 
 if ($env:E2E_PERMITIR_CIERRE_MASIVO -eq "1") {
