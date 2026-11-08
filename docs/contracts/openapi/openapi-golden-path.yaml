@@ -2,7 +2,7 @@ openapi: 3.1.2
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: AsistenciasUCO — Golden Path API
-  version: 1.5.0
+  version: 1.6.0
   description: |
     Contrato canónico LB-001C.1 para el Golden Path del backend AsistenciasUCO.
     Sigue el estilo PRAGMATIC_RESOURCE_PLUS_BUSINESS_COMMAND. HTTP/DB es la fuente
@@ -16,6 +16,9 @@ info:
     vigente; 409 ERR_SESION_CANCELADA.
     1.4.0 (CULM-001-B2NM, DEC-032): solo descripciones; ambito por EstudiantePrograma y 403 de ambito.
     1.5.0 (CULM-001 C.1, DEC-022 §1): GET /api/v1/realtime/stream se abre a los cinco roles con ambito por grupo; solo cambia la descripcion.
+    1.6.0 (CULM-001-D D.9-c, F-TRX-016/F-TRX-019, DEC-044 (11)): GET /api/v1/realtime/stream declara 406 (Accept incompatible) y abre con el
+    comentario SSE ": conectado"; se publica POST /api/v1/realtime/emit (solo ADMINISTRADOR, cuerpo validado). GET /api/v1/realtime/status
+    tambien es solo ADMINISTRADOR (diagnostico del canal, fuera de este contrato). Sin cambios en schemas existentes.
 servers:
   - url: /
     description: Servidor que publica esta especificación
@@ -487,7 +490,9 @@ paths:
         event=type y data=RealtimeEventResponse. HTTP es la fuente de verdad: al recibir una
         señal o reconectar, el cliente vuelve a consultar asistencias. Sin replay,
         Last-Event-ID, durabilidad, exactly-once, orden global ni distribución multi-instancia.
-        El heartbeat es un comentario SSE cada 25 s y solo expresa liveness.
+        El heartbeat es un comentario SSE cada 25 s y solo expresa liveness. Al abrirse el stream se envia de inmediato el comentario
+        SSE ": conectado" (sin esperar el primer heartbeat). El grupoId es un GUID sin distinguir mayusculas; los eventos del grupo
+        se entregan en el formato canonico. Un Accept que no admite text/event-stream responde 406 (no 500) con ApiErrorResponse JSON.
       x-roles: [AUTHENTICATED]
       x-idempotency: NA
       x-event-data-schema: '#/components/schemas/RealtimeEventResponse'
@@ -511,6 +516,58 @@ paths:
                 id: 852355ea-7f39-4a64-9e12-c7fbe508e131
                 event: ASISTENCIAS_SESION_ACTUALIZADAS
                 data: {"eventId":"852355ea-7f39-4a64-9e12-c7fbe508e131","type":"ASISTENCIAS_SESION_ACTUALIZADAS","occurredAt":"2026-09-24T18:05:30Z","correlationId":"43ecb554-7527-45f5-8107-8ef896f63455","payload":{"grupo":"e38345e1-8b26-45ae-9ee0-07cf7ee535ad","sesion":"94ea3dc1-847a-4d4f-9222-d8bba0c6427c","totalRegistros":3}}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '406':
+          $ref: '#/components/responses/NotAcceptable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/realtime/emit:
+    post:
+      tags: [Realtime]
+      summary: Emitir un evento realtime de diagnostico
+      operationId: emitirEventoRealtime
+      description: |
+        Utilidad diagnostica restringida al ADMINISTRADOR (403 para cualquier otro rol); no sustituye la publicacion desde los casos de
+        uso y no es una API de negocio. El cuerpo se valida: tipo del catalogo de eventos, audiencia obligatoria y autorizada por la
+        politica de audiencia para ese tipo, y payload como objeto JSON. Un cuerpo vacio, un tipo desconocido, una audiencia ausente o no
+        autorizada o un payload que no es objeto responde 400 VALIDATION_ERROR. GET /api/v1/realtime/status (diagnostico del canal, fuera de
+        este contrato) tambien es solo ADMINISTRADOR.
+      x-roles: [ADMINISTRADOR]
+      x-idempotency: NOT_DEFINED
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmitirEventoRealtimeRequest'
+            example:
+              tipo: SESION_CANCELADA
+              audiencia: ESTUDIANTE_GRUPO
+              payload:
+                grupo: e38345e1-8b26-45ae-9ee0-07cf7ee535ad
+      responses:
+        '200':
+          description: Evento emitido a los suscriptores activos.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmitirEventoRealtimeResponse'
+              example:
+                exitoso: true
+                datos:
+                  mensajeUsuario: Evento reactivo emitido a 2 suscriptores.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1001,6 +1058,23 @@ components:
             message: No tiene permisos para realizar esta operación.
             path: /api/v1/grupos/e38345e1-8b26-45ae-9ee0-07cf7ee535ad/asistencias
             correlationId: 43ecb554-7527-45f5-8107-8ef896f63455
+    NotAcceptable:
+      description: El Accept del cliente no admite el formato que produce la operacion (text/event-stream en el stream SSE).
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+          example:
+            timestamp: '2026-11-08T18:10:00Z'
+            status: 406
+            error: Not Acceptable
+            code: INVALID_REQUEST
+            message: El formato de respuesta solicitado no esta disponible para este recurso.
+            path: /api/v1/realtime/stream
+            correlationId: 43ecb554-7527-45f5-8107-8ef896f63455
     NotFound:
       description: Sesión requerida por la operación no existe.
       headers:
@@ -1296,6 +1370,36 @@ components:
           const: true
         mensaje:
           type: string
+    EmitirEventoRealtimeRequest:
+      type: object
+      additionalProperties: false
+      required: [tipo, audiencia, payload]
+      properties:
+        tipo:
+          type: string
+          description: Tipo del catalogo de eventos realtime (igualdad exacta), por ejemplo SESION_CANCELADA o PARAMETER_UPDATED.
+        audiencia:
+          type: string
+          description: Audiencia autorizada por la politica para el tipo (DOCENTE_TITULAR, ESTUDIANTE_GRUPO, AMBITO_GRUPO, DESTINATARIO o ADMINISTRADOR).
+        payload:
+          type: object
+          additionalProperties: true
+          description: Objeto JSON con los datos del evento.
+    EmitirEventoRealtimeResponse:
+      type: object
+      additionalProperties: false
+      required: [exitoso, datos]
+      properties:
+        exitoso:
+          type: boolean
+          const: true
+        datos:
+          type: object
+          additionalProperties: false
+          required: [mensajeUsuario]
+          properties:
+            mensajeUsuario:
+              type: string
     ApiVoidResponse:
       type: object
       additionalProperties: false
