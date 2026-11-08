@@ -2,7 +2,7 @@ openapi: 3.1.2
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: AsistenciasUCO — Golden Path API
-  version: 1.3.0
+  version: 1.4.0
   description: |
     Contrato canónico LB-001C.1 para el Golden Path del backend AsistenciasUCO.
     Sigue el estilo PRAGMATIC_RESOURCE_PLUS_BUSINESS_COMMAND. HTTP/DB es la fuente
@@ -14,6 +14,7 @@ info:
     1.2.0 (CULM-001 A, DEC-027/DEC-032): DOCENTE se agrega a x-roles de GET /api/v1/estudiantes.
     1.3.0 (CULM-001 B, DEC-032): Sesion/SesionV2 + estado, cancelacion; lote escribe en la toma
     vigente; 409 ERR_SESION_CANCELADA.
+    1.4.0 (CULM-001-B2NM, DEC-032): solo descripciones; ambito por EstudiantePrograma y 403 de ambito.
 servers:
   - url: /
     description: Servidor que publica esta especificación
@@ -132,9 +133,9 @@ paths:
       summary: Consultar estudiantes de un grupo
       operationId: consultarEstudiantesGrupo
       description: |
-        Devuelve todos los estudiantes del grupo. El backend no filtra por codigoEstado.
-        Si el actor es DOCENTE, exige titularidad; COORDINADOR y ADMINISTRADOR conservan
-        el acceso definido por la seguridad vigente.
+        Devuelve todos los estudiantes del grupo para el DOCENTE titular y el ADMINISTRADOR de la
+        institucion; para el COORDINADOR, solo los estudiantes con EstudiantePrograma en sus programas.
+        El backend no filtra por codigoEstado. Un grupo fuera de ambito devuelve 403.
       x-roles: [DOCENTE, COORDINADOR, ADMINISTRADOR]
       x-idempotency: YES
       security:
@@ -243,7 +244,7 @@ paths:
         - name: programaId
           in: query
           required: false
-          description: Algún contexto académico del estudiante pertenece al programa.
+          description: El estudiante tiene vínculo `EstudiantePrograma` con el programa.
           schema:
             type: string
             format: uuid
@@ -330,6 +331,9 @@ paths:
         La lista es completa, sin paginación ni orden público garantizado.
         CULM-001 B: una fila por estudiante y sesión con el estado consolidado de las tomas de la
         sesión (SJC si alguna toma es SJC; si no, EX si alguna es EX; si no, AN). El esquema no cambia.
+        CULM-001-B2NM: devuelve todos los registros para el DOCENTE titular y el ADMINISTRADOR de la
+        institucion; para el COORDINADOR, solo los de estudiantes con EstudiantePrograma en sus
+        programas. Un grupo fuera de ambito devuelve 403.
       x-roles: [DOCENTE, COORDINADOR, ADMINISTRADOR]
       x-idempotency: YES
       security:
