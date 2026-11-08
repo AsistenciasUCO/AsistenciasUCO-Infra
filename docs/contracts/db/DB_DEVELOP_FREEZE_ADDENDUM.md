@@ -84,3 +84,12 @@ DB CONTRACT CHANGE REQUIRED:           TO_BE_DETERMINED_AFTER_BACKEND_AS_IS
 DB / BACKEND PRODUCTION CHANGE AUTHORIZED: NO / NO
 NEXT AUTHORIZED PHASE:                 LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANALYSIS (registrarEstudianteEnGrupo); no implica cambiar la DB
 ```
+
+## CULM-001 C.1 — cancelacion por inasistencia (HU026C)
+
+- `EstudianteGrupo` pasa a `CI` unicamente al aprobar una `RevisionCancelacion` (`usp_resolver_revision_cancelacion`); el cierre masivo (`usp_ejecutar_cierre_masivo_periodo`) ya no cancela por conteo de faltas.
+- Cierre masivo con el motor habilitado y umbrales validos: responde `RCN_012` (una sola fila) si hay revisiones que esperan al docente o al resolutor, o perdidas por horas sin revision; no crea revisiones ni evalua alertas (lo hace el backend antes). Con el motor apagado o umbrales invalidos no bloquea y `AuditoriaEvento` registra `motorHabilitado`, `umbralesValidos`, `perdidasSinRevision` y `revisionesPendientes`.
+- Unicidad: una `AlertaInasistencia` por (matricula, tipo) y una `RevisionCancelacion` por matricula.
+- Escalamiento: el resolutor es el coordinador activo del programa del estudiante (excluido quien propuso); sin coordinador, el decano de la facultad (`ufn_revision_cancelacion_resolutores`).
+- `Grupo.cantidadEstudiantesCancelaronAutomaticamente` significa "matriculas en CI al cierre".
+- Migracion 19 (`up|down`), semillas 40/41 y permisos `rol_asistencias_runtime_culm001_c.sql`.
