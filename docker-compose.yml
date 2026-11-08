@@ -48,7 +48,7 @@ services:
     restart: unless-stopped
     environment:
       ACCEPT_EULA: ${ACCEPT_EULA:-Y}
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-TuPasswordSeguro123}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD es requerida en .env o variables de entorno}
       MSSQL_PID: ${MSSQL_PID:-Developer}
       MSSQL_COLLATION: ${MSSQL_COLLATION:-Modern_Spanish_CI_AS}
     ports:
@@ -229,8 +229,7 @@ services:
     container_name: proxy_asistencias
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "8082:8080"
+      - "${HOST_BIND_IP:-127.0.0.1}:80:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./components/proxy/traefik.yml:/etc/traefik/traefik.yml:ro
