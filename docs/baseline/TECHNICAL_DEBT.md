@@ -854,3 +854,10 @@ GOLDEN PATH EFFECT:         NONE
 - **Impacto:** Sesiones más allá de la 100 no serían visibles si una materia excede dicho umbral.
 - **Resolución esperada:** Evolucionar el contrato del endpoint y frontend hacia `ApiPageResponse` con controles de paginación explícitos si se requiere soportar materias con más de 100 sesiones.
 - **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.1 (§12, §2.3).
+
+## TD-062 a TD-065 — Paquete C.1 (cancelación por inasistencia, HU026C)
+
+- **TD-062 — Avisos de alertas sin reintento previo al outbox.** `AvisoAlertasInasistenciaService` y `AvisoRevisionCancelacionService` encolan avisos de mejor esfuerzo; si el outbox falla el aviso se pierde (queda la alerta en BD y la página de alertas). **Prioridad:** BAJA. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 C.1.
+- **TD-063 — SSE `local-sse` de una JVM con audiencias por instantánea.** Las audiencias del canal de grupo se resuelven una vez al suscribirse; un cambio de ámbito (p. ej. matrícula a `CI`) se aplica en la siguiente suscripción. **Prioridad:** BAJA. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 C.1 (§3.6).
+- **TD-064 — Vista de revisiones del administrador diferida.** C.1 no expone las revisiones al administrador (DEC-022 §2). **Prioridad:** BAJA. **Estado:** ABIERTA / NON_BLOCKING.
+- **TD-065 — Revisión sin resolutor posible y marca de agua con solape.** Si el programa no tiene coordinador activo y su facultad no tiene decano activo, la propuesta se rechaza con `RCN_013` y el job audita `REVISION_CANCELACION_SIN_RESOLUTOR` una sola vez por cambio de huella; la marca de agua del job re-evalúa de forma idempotente hasta `SOLAPE_MARCA_SEGUNDOS` (120 s). **Prioridad:** BAJA. **Estado:** ABIERTA / NON_BLOCKING.

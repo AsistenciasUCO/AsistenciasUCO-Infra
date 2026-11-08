@@ -2,7 +2,7 @@ openapi: 3.1.2
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: AsistenciasUCO — Golden Path API
-  version: 1.4.0
+  version: 1.5.0
   description: |
     Contrato canónico LB-001C.1 para el Golden Path del backend AsistenciasUCO.
     Sigue el estilo PRAGMATIC_RESOURCE_PLUS_BUSINESS_COMMAND. HTTP/DB es la fuente
@@ -15,6 +15,7 @@ info:
     1.3.0 (CULM-001 B, DEC-032): Sesion/SesionV2 + estado, cancelacion; lote escribe en la toma
     vigente; 409 ERR_SESION_CANCELADA.
     1.4.0 (CULM-001-B2NM, DEC-032): solo descripciones; ambito por EstudiantePrograma y 403 de ambito.
+    1.5.0 (CULM-001 C.1, DEC-022 §1): GET /api/v1/realtime/stream se abre a los cinco roles con ambito por grupo; solo cambia la descripcion.
 servers:
   - url: /
     description: Servidor que publica esta especificación
@@ -480,7 +481,9 @@ paths:
       summary: Suscribirse a cambios de asistencia por grupo
       operationId: suscribirseCambiosGrupo
       description: |
-        Stream SSE best-effort y efímero. Cada evento de negocio usa id=eventId,
+        Stream SSE best-effort y efímero. Acceso por ámbito, resuelto una vez al suscribirse (403 sin ámbito): el docente titular, el
+        estudiante con matrícula activa, el coordinador o el decano con ámbito sobre el grupo y el administrador de la institución.
+        Cada tipo de evento se entrega solo a las audiencias que su política autoriza. Cada evento de negocio usa id=eventId,
         event=type y data=RealtimeEventResponse. HTTP es la fuente de verdad: al recibir una
         señal o reconectar, el cliente vuelve a consultar asistencias. Sin replay,
         Last-Event-ID, durabilidad, exactly-once, orden global ni distribución multi-instancia.
