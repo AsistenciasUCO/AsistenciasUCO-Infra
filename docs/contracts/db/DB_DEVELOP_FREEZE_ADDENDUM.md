@@ -84,3 +84,53 @@ DB CONTRACT CHANGE REQUIRED:           TO_BE_DETERMINED_AFTER_BACKEND_AS_IS
 DB / BACKEND PRODUCTION CHANGE AUTHORIZED: NO / NO
 NEXT AUTHORIZED PHASE:                 LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANALYSIS (registrarEstudianteEnGrupo); no implica cambiar la DB
 ```
+
+## Revisión post-freeze REC3 (2026-10-29)
+
+- **Objeto:** `schema/stored-procedures/usp_generar_sesiones_grupo.sql`, congelado en DB-GP-001C y ya reemplazado por UTC-D06.
+- **Aprobación:** explícita de John Duque (2026-10-29), para este único SP congelado. Los otros congelados que la auditoría señaló (`usp_registrar_asistencias_sesion`, `usp_clasificar_procedencia_sesion` y `usp_crear_sesion_interno`) **no se modifican**.
+- **Cambio:**
+  - `SET XACT_ABORT ON`;
+  - el CATCH pasa de `IF @@TRANCOUNT > 0 ROLLBACK` a `IF XACT_STATE() <> 0 ROLLBACK`.
+  - No cambian la firma, el resultset ni las reglas.
+- **Manifiesto:** `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` actualiza solo el hash de ese archivo, de `099a5cf4…` a `ef9de7e9…`. La cadena de reemplazo sigue apuntando al hash DB-GP-001C (`f4c71c7b…`).
+- **Prueba:** `test_rec3_falla_intermedia_transaccion.sql`, caso TX-04.
+- **Work item:** `docs/work-items/REC3-transacciones/PLAN.md`.
+
+## Revisión post-freeze SES-01 (2026-11-03) — EXCEPCIÓN AUTORIZADA
+
+- **Objeto:** `schema/stored-procedures/usp_registrar_asistencias_sesion.sql` (DB-GP-001C, Golden Path). La revisión REC3 dejó constancia de que este SP **no** se modificaba; SES-01 lo propone de nuevo por una decisión funcional posterior (2026-11-02: cierre estricto a la hora de fin).
+- **Aprobación:** excepción de congelamiento **autorizada expresamente por el responsable funcional del proyecto** (instrucción del 2026-11-03, «Finalización integral de SES-01 a SES-05»). La autorización cubre desarrollar, probar y proponer el cambio; la **revisión formal del owner DB (John Duque)** se solicita en el PR y es requisito para fusionar y para aplicarlo en bases compartidas, que se hace solo con el mecanismo oficial de despliegue.
+- **Cambio:**
+  - PASO 4.0: dentro de la transacción (propia o savepoint) llama a `usp_validar_sesion_ventana_registro_interno` antes de escribir;
+  - PASO 4.2: repite la validación antes del `COMMIT`;
+  - fuera de ventana devuelve `SES_007` / `SES_008` / `SES_009` y no escribe.
+  - No cambian la firma, el resultset, la prioridad de las validaciones previas ni el patrón savepoint/`XACT_STATE()` (sin `XACT_ABORT ON`, ver REC3).
+- **Manifiesto:** `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` agrega la supersesión de ese archivo, de `a0372fd6…` (DB-GP-001C) a `7217604b…`; `scripts/freeze-manifest.ps1` lo incluye en `$postFreezeSuperseded`.
+- **Prueba:** `test/test_ses01_ventana_asistencia.sql` (12 IDs `SES01_*`).
+- **Work item:** `docs/work-items/SES-01-cierre-estricto-asistencia/PLAN.md`.
+
+## CULM-001 D.4 — admisión de estudiantes por el administrador (HU156) (2026-11-07)
+
+- **Objetos nuevos:** `usp_admitir_estudiante`, `usp_consultar_programas_institucion_paginado`, mensajes `ADS_001`..`ADS_006`, parámetros `IDENTIDAD/PERFILES_CORRECCION_ESTUDIANTE` y `_DECANO`, permisos `rol_asistencias_runtime_culm001_d4.sql` y la migración `23_culm001_d4_admision_estudiantes`. Ningún archivo congelado cambia; las fuentes nuevas se registran como `WORK_ITEM` en `DB_CULM001_D_POST_FREEZE_MANIFEST.sha256`.
+- **Cambio de comportamiento:** `usp_corregir_identidad_usuario` lee los perfiles permitidos de los parámetros; el `ADMINISTRADOR` ahora corrige estudiantes con `EstudiantePrograma` en un programa de su institución (antes solo el `COORDINADOR` del programa). Coordinador y decano conservan su regla.
+- **Desviación del contrato:** el vínculo con el programa se inserta en `usp_admitir_estudiante` y no con `usp_registrar_estudiante_en_programa_interno` (resuelve la institución desde `uv_estudiante`, que exige un programa previo); `Programa` no tiene columna `codigo`, por eso la consulta de programas no la devuelve.
+- **Pruebas:** `test/test_culm001_d4_admision.sql` (D4-01..D4-11) y `test/test_culm001_d4.ps1` (D4-12 up→down→up).
+## CULM-001 D.1 — plazo de excusas (HU026B) (2026-11-07)
+
+- **Objetos nuevos:** `ufn_calcular_fecha_limite_justificacion`, `usp_internal_validar_plazo_justificacion`, `uv_sesion_estudiante_reclamo`, `usp_consultar_sesiones_materia_estudiante` y la migración `20_culm001_d1_plazo_justificacion`. Ningún archivo congelado cambia (`uv_sesion` no se toca, DEC-044 (2)); las fuentes nuevas se registran como `WORK_ITEM` en `DB_CULM001_D_POST_FREEZE_MANIFEST.sha256`.
+- **Radicación:** `usp_radicar_solicitud_revision_asistencia` (v1) y `_v2` rechazan con `REV_020` cuando `SYSUTCDATETIME() >= límite` y con `REV_025` cuando faltan `ASISTENCIA/DIAS_LIMITE_JUSTIFICACION` o `TIEMPO/ZONA_HORARIA_SQLSERVER`. El límite es la medianoche local del día `fecha local de fin + N + 1`. En la v2 el plazo se valida **después** de la reejecución idempotente por correlación (un reintento legítimo tras el vencimiento sigue devolviendo el éxito original) y antes de cualquier escritura.
+- **Fecha de radicación (F-EST-S16):** `SolicitudRevisionAsistencia.fecha` pasa de `CAST(CURRENT_TIMESTAMP AS DATE)` (fecha del servidor, UTC) a la **fecha local** (`TIEMPO/ZONA_HORARIA_SQLSERVER`). Las filas anteriores conservan su fecha (sin migración de datos).
+- **Cambio de comportamiento de lectura (DEC-022 §3):** la lista de sesiones de la materia del estudiante solo devuelve grupos con la matrícula `MATRICULA/ESTADO_INSCRITA`; con `I`, `CI`, `CVP` o `F` devuelve 0 filas.
+- **LB-004D:** cambian `usp_radicar_solicitud_revision_asistencia_v2.sql`, `test_lb004d_support_binding.sql` (la fixture usa «ayer» en lugar de una fecha fija ya vencida) y `test_lb004d_concurrency.ps1` (crea y elimina una sesión reciente propia); sus líneas del manifiesto se regeneran en el mismo commit (DEC-044 (11)).
+- **Pruebas:** `test/test_culm001_d1_plazo_justificacion.sql` (D1-01…D1-10, D1-12), `test/test_culm001_d1.ps1` (D1-11 up→down→up y D-RB-01).
+
+## CULM-001 — Sincronización y regeneración de drift previo post-freeze (2026-11-08)
+
+- **Objetos:** `schema/stored-procedures/usp_generar_sesiones_grupo.sql` y `schema/stored-procedures/usp_registrar_asistencias_sesion.sql`.
+- **Aprobación:** Decisiones DEC-036, DEC-042 y DEC-054 del proyecto CULM-001.
+- **Justificación:** Se armonizan y regeneran en `DB_DEVELOP_FREEZE_MANIFEST.sha256` las firmas criptográficas de los dos procedimientos almacenados con drift previo a CULM-001 provenientes de REC3 (`ef9de7e924642d1a1bdbc4ad99f5404f71e194493e6547f67c26d3b3dfbe1af3`, `XACT_STATE() <> 0` y `XACT_ABORT ON`) y SES-01 (`7217604b12e60c96cc1a212f579ff14e9334581a3b5ddcaf5ad353912d927a44`, ventana estricta de registro de asistencia), alineando el manifiesto base con la paridad cruzada verificada por `AsistenciasUCO-Infra/scripts/quality/verify-contracts.ps1`.
+- **Manifiesto:** `DB_DEVELOP_FREEZE_MANIFEST.sha256` actualiza:
+  - `schema/stored-procedures/usp_generar_sesiones_grupo.sql` -> `ef9de7e924642d1a1bdbc4ad99f5404f71e194493e6547f67c26d3b3dfbe1af3`
+  - `schema/stored-procedures/usp_registrar_asistencias_sesion.sql` -> `7217604b12e60c96cc1a212f579ff14e9334581a3b5ddcaf5ad353912d927a44`
+
