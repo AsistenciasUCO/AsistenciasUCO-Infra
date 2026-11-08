@@ -65,6 +65,12 @@
 | E | **E.2 parte 1 MEZCLADA** (PR shesho22/AsistenciasUCO-Frontend#58, 31/32 hallazgos COO/DEC/ADM/TRX; F-ADM-S12/S20/S16 y partes de S05/006/S07/DEC-004 requieren backend → D.9/CLOSURE). **E.2 parte 2 MEZCLADA** (PR shesho22/AsistenciasUCO-Frontend#60, 21 hallazgos DOC/EST: 16 corregidos, 2 ya resueltos, F-EST-S14/F-EST-S19/F-DOC-S07 requieren backend o navegador → D.9/CLOSURE). **E.1 (tokenización) hecha y mezclada** a `integracion/CULM-001` del frontend (`ba02d89`, PR shesho22/AsistenciasUCO-Frontend#54, DEC-026): `lint:tokens` en `npm run verify`, 806 clases + 15 hex migrados, fuentes en `styles.css`, `docs/sistema-diseno-tokens.md`. Pendiente E.2: pulido UX/UI y responsive por rol (53 hallazgos `paquete-E`) y la comprobación en pantalla del cambio de `primary` (escritorio y móvil) | |
 | Fase 3 | pendiente | |
 
+## Delegación al equipo humano (DEC-049, 2026-11-07)
+
+- Hechos y empujados: frontend D.3+D.6, frontend D.4, suite E2E B/D (Infra). Pendientes de PR/mezcla cuando su backend esté en integración.
+- En curso por el equipo: frontend D.2, D.5 y D.9-b. Worktree `-CULM001-E\GestioAsistenciaFrontend` reservado al equipo.
+- Agentes: BD+backend de B2 (BD propia `gestionasistenciadb_b2nm`), D.4, D.3+D.6; después D.7, D.2, C.1/C.2, D.5, D.8, D.9-a.
+
 ## Bloqueos
 
 - **B-01 (RESUELTO 2026-11-07 ~17:45 por autorización del responsable, DEC-046; repetir tras B2/C/D; `--prune` pendiente de autorización):** (texto original:) el PDP del laboratorio deniega toda ruta nueva del backend (`NO_APPLICABLE_POLICY`). El procedimiento oficial es `provision_asistencias.py pdp` (incremental) tras actualizar `access-catalog.json`, pero el clasificador de permisos de esta sesión lo denegó (DEC-037/DEC-038). **Acción del responsable:** en `GestioAsistenciaBackend` (rama `integracion/CULM-001` una vez mezclados los paquetes, o cada rama `feature/CULM-001-*`), con Python de Windows: `python -X utf8 -I infra\security-baseline\scripts\provision_asistencias.py pdp` y después `... verify` y `... verify-decisions`. Hasta entonces, en pantalla fallan con 403: búsqueda por documento (A), festivos del administrador (B.1), tomas/QR (B.2) y lo nuevo de C/D. Los gates de código no dependen de esto.
