@@ -19,7 +19,7 @@ Insumo para la verificación frontend y para LB-001C. **No es OpenAPI** ni conge
 | 3 | `GET /api/v1/grupos/{grupoId}/estudiantes` | DOCENTE, COORDINADOR, ADMINISTRADOR | docente: titularidad del grupo |
 | 4 | `GET /api/v1/grupos/{grupoId}/asistencias?sesionId=` | DOCENTE, COORDINADOR, ADMINISTRADOR | docente: titularidad del grupo; `sesionId` opcional |
 | 5 | `POST /api/v1/asistencias/lote` | DOCENTE | titularidad de la sesión (SP: `SEC_002`) |
-| 6 | `GET /api/v1/realtime/stream?grupoId=` | autenticado (capa HTTP) | el gateway exige titularidad docente sobre `grupoId` al suscribirse |
+| 6 | `GET /api/v1/realtime/stream?grupoId=` | autenticado (capa HTTP) | el gateway resuelve el ámbito por rol (SP `usp_consultar_audiencias_realtime_grupo`: docente titular, estudiante con matrícula activa, coordinador o decano con ámbito, administrador de la institución) al suscribirse y filtra por tipo con `RealtimeAudienciaPolicy`; sin ámbito 403 |
 | 7 | `POST /api/v1/sesiones` | DOCENTE | scope docente resuelto desde JWT (publicado hoy) |
 | 8 | `PUT /api/v1/sesiones/{sesionId}` (legacy, `deprecated`; coexiste con #9 hasta migrar consumidores, LB-001C.2A) | DOCENTE | scope docente resuelto desde JWT (publicado hoy) |
 | 9 | `PATCH /api/v1/sesiones/{sesionId}` (mismo caso de uso, request y respuesta que #8; `operationId=actualizarSesion`) | DOCENTE | scope docente resuelto desde JWT |
