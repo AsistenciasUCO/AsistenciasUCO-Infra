@@ -71,6 +71,10 @@
 - En curso por el equipo: frontend D.2, D.5 y D.9-b. Worktree `-CULM001-E\GestioAsistenciaFrontend` reservado al equipo.
 - Agentes: BD+backend de B2 (BD propia `gestionasistenciadb_b2nm`), D.4, D.3+D.6; después D.7, D.2, C.1/C.2, D.5, D.8, D.9-a.
 
+## Arranque mínimo del laboratorio tras un apagado (2026-11-08)
+
+Contenedores necesarios: `sql_server_asistencias`, `asistencias-files-minio-1`, `clamav_asistencias` y el laboratorio de seguridad 0.1.9 en orden `asistencias-security-lab-redis-1`, `-surrealdb-1`, `-opa-1`, `-keycloak-1`, `-pdp-1`, `-pep-1`. Se dejan apagados (ajenos o sin uso): `api-gateway-kong`, `keycloak_db_asistencias`/`asistencias-uco-security-keycloak-*` (Keycloak propio :8081), `messageucolab-app`, `redis`, `surrealdb`, `pulsar`, `loki`, `test_ci_clean`, `security-baseline-*` (0.1.7), observabilidad. Luego: `start-backend-baseline.ps1 -Provider baseline` sobre el jar de `integracion/CULM-001` y `npm start` en el frontend. `max server memory` = 2048 MB persiste (DEC-050). Si Docker Desktop falla con "Secrets Engine ... engine.sock", cerrar Docker, relanzarlo y no usar "Reset to factory defaults".
+
 ## Bloqueos
 
 - **B-01 (RESUELTO 2026-11-07 ~17:45 por autorización del responsable, DEC-046; repetir tras B2/C/D; `--prune` pendiente de autorización):** (texto original:) el PDP del laboratorio deniega toda ruta nueva del backend (`NO_APPLICABLE_POLICY`). El procedimiento oficial es `provision_asistencias.py pdp` (incremental) tras actualizar `access-catalog.json`, pero el clasificador de permisos de esta sesión lo denegó (DEC-037/DEC-038). **Acción del responsable:** en `GestioAsistenciaBackend` (rama `integracion/CULM-001` una vez mezclados los paquetes, o cada rama `feature/CULM-001-*`), con Python de Windows: `python -X utf8 -I infra\security-baseline\scripts\provision_asistencias.py pdp` y después `... verify` y `... verify-decisions`. Hasta entonces, en pantalla fallan con 403: búsqueda por documento (A), festivos del administrador (B.1), tomas/QR (B.2) y lo nuevo de C/D. Los gates de código no dependen de esto.
