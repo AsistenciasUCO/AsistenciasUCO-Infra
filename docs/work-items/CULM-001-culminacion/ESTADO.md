@@ -89,3 +89,10 @@ Contenedores necesarios: `sql_server_asistencias`, `asistencias-files-minio-1`, 
 - **Gates de CI de las PR finales (DEC-063):** Infra #36 verde; BD #113 verde (gate desde cero 697/698); backend #125 verde (SonarCloud OK); frontend #83 mezclable. **Las cuatro PR fueron mezcladas a `develop` por el responsable** (Infra `299ee9f9`, BD `90ace364`, backend `ad3347e7`, frontend `5b850b2b`).
 - **Documentación:** `CLOSURE.md` (§1–§6 completas, "Para revisar" y §6.6), `HU-CATALOG.md`, `TECHNICAL_DEBT.md` (TD-066..084), `DECISIONES.md` (DEC-001..DEC-063), `PRS.md`, `SCREEN-RESULTS-FASE3.md`.
 - Regla aprendida: nunca pulsar el cuadro de mezcla de GitHub en una PR bloqueada (activa auto-merge); todo con `gh pr merge --merge`.
+
+## Post-cierre (2026-11-09 tarde) — hallazgos del responsable en pruebas manuales (DEC-064)
+
+- Seis hallazgos atendidos en ramas desde `develop`, con PR abiertas a `develop` (mezcla por el responsable): nombre real en el pie + retiro de códigos HU + `admin/configuracion` unificada (frontend #86); rediseño de la toma de asistencia (frontend #85); datos de prueba ampliados y `infra.ps1 db-reset-qa` (BD #116, Infra #39); sesiones manuales notificadas y cancelables por el coordinador (BD #117, backend #129, Infra #40, frontend #87).
+- Orden sugerido de mezcla: Infra #39 y #40 → BD #116 y #117 → backend #129 → frontend #86, #85, #87 (re-integrar si GitHub marca conflicto entre las tres del frontend).
+- Pendiente de revisión visual por el responsable (los agentes validaron con specs): toma de asistencia a 375 px, pestañas de configuración, diálogo de cancelación del coordinador. Los usuarios `QA-*` del fixture existen solo en BD: para entrar con ellos hay que crearlos en el realm `security-baseline` (pasos en la sección 2.1 de `docs/CREDENCIALES_PRUEBAS_LOCAL.md`).
+- Guía de pruebas manuales: `GUIA-PRUEBAS-MANUALES.md` (sin commit, en el worktree de Infra).
