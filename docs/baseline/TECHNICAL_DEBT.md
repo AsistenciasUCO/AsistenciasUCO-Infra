@@ -22,7 +22,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-006](#td-006) | Identificación numérica | ABIERTA | no, salvo alcance de identificación |
 | [TD-007](#td-007) | Códigos DB machine-readable | ABIERTA | sí, si bloquea contrato de errores LB-001/002 |
 | [TD-008](#td-008) | Validación runtime de sesión/asistencia | CLOSED — LB-003 | no |
-| [TD-009](#td-009) | Estados de asistencia y registro individual | ABIERTA | sí, para contrato afectado; individual fuera del Golden Path |
+| [TD-009](#td-009) | Estados de asistencia y registro individual | CLOSED (2026-11-07, CULM-001 D.7) | no |
 | [TD-010](#td-010) | Auditoría SQL con DML directo | ABIERTA | no para LB-000; revisar release DB |
 | [TD-011](#td-011) | Outbox y consistencia durable | ABIERTA | sí, LB-005 si exige durabilidad |
 | [TD-012](#td-012) | DataSource específico por provider | ABIERTA | no, salvo incorporar otro provider |
@@ -73,6 +73,37 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-CULM001-A-03](#td-culm001-a-03) | `SES_017` ausente de la tabla §G del Golden Path | ABIERTA / NON_BLOCKING | no |
 | [TD-055](#td-055) | MessageUcoLab: validación operacional extremo a extremo pendiente | ABIERTA / NON_BLOCKING | no |
 | [TD-056](#td-056) | MessageUcoLab: límites de código (10) y contenido (100) incompatibles con el catálogo canónico | DECISION_REQUIRED | no mientras `azure` sea el provider por defecto |
+| [TD-059](#td-059) | `DELETE` sobre `SolicitudRevisionAsistencia` falla con Msg 8624 (FK + índice filtrado LB-004D) | CLOSED (2026-11-08, CULM-001 D.2) | no |
+| [TD-060](#td-060) | Categoría de radicación no se persistía en `SolicitudRevisionAsistencia` | CLOSED (2026-11-07, CULM-001 D.2) | no |
+| [TD-061](#td-061) | Literales `'ATTACHED'`/`'DRAFT'` quemados en SP de LB-004D | CLOSED (2026-11-07, CULM-001 D.2) | no |
+| [TD-CULM001-D-01](#td-culm001-d-01) | Propagación BD → Azure App Configuration de parámetros editados (`PUT /admin/parametros/{id}`) | ABIERTA / NON_BLOCKING | no |
+| [TD-CULM001-D-02](#td-culm001-d-02) | Invalidación distribuida de caché de parámetros en entornos multi-instancia | ABIERTA / NON_BLOCKING | no |
+| [TD-CULM001-D-03](#td-culm001-d-03) | Parámetros y auditoría particionados por institución [SUPUESTO-D-16] | DECISION_REQUIRED | no para monoinstitucional; sí multi-institución |
+| [TD-CULM001-D-04](#td-culm001-d-04) | Depuración y limpieza periódica de archivos soporte huérfanos (`DRAFT` / `ORPHAN`) | ABIERTA / NON_BLOCKING | no |
+| [TD-CULM001-D-05](#td-culm001-d-05) | Manejo paginado en sesiones de estudiante si total supera `PAGINACION/TAMANO_MAXIMO` | ABIERTA / NON_BLOCKING | no |
+| TD-062 | Avisos de alertas sin reintento previo al outbox (detalle en la sección TD-062 a TD-065) | ABIERTA / NON_BLOCKING | no |
+| TD-063 | SSE `local-sse` de una JVM con audiencias por instantánea | ABIERTA / NON_BLOCKING | no |
+| TD-064 | Vista de revisiones del administrador diferida | ABIERTA / NON_BLOCKING | no |
+| TD-065 | Revisión sin resolutor posible y marca de agua con solape | ABIERTA / NON_BLOCKING | no |
+| [TD-066](#td-066) | Prueba de la migración 19 sin comparación byte a byte del SP restaurado | ABIERTA / NON_BLOCKING | no |
+| [TD-067](#td-067) | Pruebas C-DB-50 y C-DB-46 sin ejecución en paralelo real | ABIERTA / NON_BLOCKING | no |
+| [TD-068](#td-068) | C-DB-62 (despliegue limpio) cubierta solo por el gate del lote | ABIERTA / NON_BLOCKING | no |
+| [TD-069](#td-069) | `CierreMasivoRcn012IT` pendiente de ejecución o ajuste | ABIERTA / NON_BLOCKING | no |
+| [TD-070](#td-070) | E2E PKCE de C (`test_culm001_c.ps1`) sin ejecutar | ABIERTA / NON_BLOCKING | no |
+| [TD-071](#td-071) | Manifiesto post-freeze de C sin modo en `freeze-manifest.ps1` (`DB_UTC_D06`) | ABIERTA / NON_BLOCKING | no |
+| [TD-072](#td-072) | `--prune` del PDP pendiente (concesiones sobrantes) | ABIERTA / NON_BLOCKING | no |
+| [TD-073](#td-073) | 32 recursos huérfanos en el PDP | ABIERTA / NON_BLOCKING | no |
+| [TD-074](#td-074) | Drift de dos SP congelados (`usp_generar_sesiones_grupo`, `usp_registrar_asistencias_sesion`) | ABIERTA / NON_BLOCKING | no |
+| [TD-075](#td-075) | Presupuesto del bundle frontend excedido en +7,6 kB | ABIERTA / NON_BLOCKING | no |
+| [TD-076](#td-076) | `horasDictadas` del consolidado sin multiplicar por activos | ABIERTA / NON_BLOCKING | no |
+| [TD-077](#td-077) | `codigo_programa` y `codigo_facultad` del CSV resueltos por nombre | ABIERTA / NON_BLOCKING | no |
+| [TD-078](#td-078) | `details[]` en inglés `{field, code, message}` | ABIERTA / NON_BLOCKING | no |
+| [TD-079](#td-079) | Bloque '2 tomas = 1 toma' de `test_culm001_b2_horas` diferido | ABIERTA / NON_BLOCKING | no |
+| [TD-080](#td-080) | Resultsets de tres SP excluidos del cierre canónico | ABIERTA / NON_BLOCKING | no |
+| [TD-081](#td-081) | Orden de despliegue de BD: migraciones antes de `deploy_schema` | ABIERTA / NON_BLOCKING | no |
+| [TD-082](#td-082) | Detalle `esParcial` por toma sin endpoint | ABIERTA / NON_BLOCKING | no |
+| [TD-083](#td-083) | HU042 por SSE y campana de notificaciones diferidas (C.2) | ABIERTA / NON_BLOCKING | no |
+| [TD-084](#td-084) | Regla escrita de seguridad web (cookies HttpOnly y CSRF) contradice la implementación Bearer | ABIERTA / NON_BLOCKING | no |
 
 ## TD-001
 
@@ -178,8 +209,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 - **Evidencia:** RegistroAsistenciaSesionDomain; [AsistenciaRepositorySqlServerAdapter](../../src/main/java/co/edu/uco/asistenciasuco/infrastructure/adapter/secondary/persistence/sqlserver/core/AsistenciaRepositorySqlServerAdapter.java); archive/pendientes-arquitectura.md.
 - **Motivo:** No extrapolar enum de lote al registro individual.
 - **Resolución esperada:** Contrato DB liberado y semántica individual acordada; paridad/negativos certificados. LB-001B añade el lado de **lectura**: `GET …/asistencias` devuelve `codigoRazonCausa` sin filtrar y el consumer solo admite AN/SJC/EX ([DR-006](../work-items/LB-001B-backend-frontend-asistencia/CONTRACT_MATRIX.md#dr-006--dominio-de-estado-en-lectura)).
-- **Bloquea línea base:** sí, para contrato afectado; individual fuera del Golden Path.
-- **Estado:** ABIERTA.
+- **Bloquea línea base:** no (resuelta).
+- **Estado:** **CLOSED (2026-11-07, CULM-001 D.7).** Se retiró el registro individual autónomo `POST /api/v1/asistencias` y el procedimiento almacenado `usp_registrar_asistencia_estudiante_autonomo` (migración 26). El registro de asistencia individual queda cubierto por lote y registro por toma (HU027).
 
 ## TD-010
 
@@ -774,3 +805,258 @@ GOLDEN PATH EFFECT:         NONE
 - **Evidencia:** contrato CULM-001 paquete A, §8.1 (nota para la próxima revisión formal).
 - **Resolución esperada:** añadir `SES_017` a la tabla §G en la próxima revisión formal del contrato (WORM: requiere nuevo hash).
 - **Bloquea línea base:** no. **Estado:** ABIERTA. **Work item:** CULM-001 A.
+
+## TD-059
+
+- **Fecha / responsable:** 2026-10-21 / fullstack-team (HU035-HU036, E2E y triage de `-Pintegration`).
+- **Clasificación:** `DB_ENGINE_PLAN_DEFECT`. **Prioridad:** ALTA.
+- **Descripción:** Cualquier `DELETE` sobre `dbo.SolicitudRevisionAsistencia` fallaba con `Msg 8624` (Internal Query Processor Error) por conflicto del optimizador entre la clave foránea `FK_ArchivoSoporte_SolicitudRevisionAsistencia` y el índice único filtrado `UX_ArchivoSoporte_Solicitud` (`WHERE solicitudRevisionAsistencia IS NOT NULL`) de LB-004D.
+- **Impacto:** Imposibilidad de eliminar reclamos desde SP, fixtures o scripts de limpieza.
+- **Resolución en CULM-001 D.2:** En el Paquete D (D.2) se reemplazó el índice único filtrado por el índice no único y no filtrado `IX_ArchivoSoporte_Solicitud` permitiendo 1:N soportes.
+- **Estado:** **CLOSED (2026-11-08, CULM-001 D.2).** La causa (Msg 8624 por FK + índice filtrado) quedó reclasificada y cerrada junto con TD-060/TD-061 al reemplazar el índice filtrado por `IX_ArchivoSoporte_Solicitud` (DEC-042, DEC-052). La comprobación formal D2-14 (`BEGIN TRAN; DELETE ...; ROLLBACK;` con FK habilitada) forma parte de la suite de BD del gate del lote (816 TEST_PASS, 0 fallos); su traza individual queda pendiente de verificar en Fase 3. **Work item:** CULM-001 Paquete D (D.2).
+
+## TD-060
+
+- **Fecha / responsable:** 2026-10-21 / fullstack-team (HU035-HU036, análisis AS-IS).
+- **Clasificación:** `DATA_LOSS_CONTRACT_GAP`. **Prioridad:** MEDIA.
+- **Descripción:** `dbo.usp_radicar_solicitud_revision_asistencia_v2` recibía `@categoria` pero no la persistía al no existir columna en `SolicitudRevisionAsistencia`.
+- **Impacto:** Pérdida de la causal/categoría normativa (médica, laboral, etc.) elegida por el estudiante al radicar.
+- **Resolución en CULM-001 D.2:** Se agregó la clave foránea `idCategoriaJustificacion` en `SolicitudRevisionAsistencia`, persistida por `usp_internal_radicar_solicitud_revision` y expuesta en vistas y DTOs (HU014/HU015).
+- **Estado:** **CLOSED (2026-11-07, CULM-001 D.2)**. **Work item:** CULM-001 Paquete D (D.2).
+
+## TD-061
+
+- **Fecha / responsable:** 2026-10-21 / fullstack-team.
+- **Clasificación:** `HARDCODED_STATE_LITERAL`. **Prioridad:** BAJA.
+- **Descripción:** `usp_consultar_solicitudes_revision_docente`, `usp_consultar_archivo_soporte_autorizado` y `usp_radicar_solicitud_revision_asistencia_v2` comparaban contra los literales de cadena `'ATTACHED'` y `'DRAFT'`.
+- **Impacto:** Vulneración de la regla arquitectural UCO "Cero Datos Quemados".
+- **Resolución en CULM-001 D.2:** Los SPs se refactorizaron para resolver los estados desde el catálogo de parámetros (`ARCHIVO.ESTADO_ADJUNTO`, `ARCHIVO.ESTADO_BORRADOR`).
+- **Estado:** **CLOSED (2026-11-07, CULM-001 D.2)**. **Work item:** CULM-001 Paquete D (D.2).
+
+## TD-CULM001-D-01
+
+- **Fecha / responsable:** 2026-11-07 / backend-team & ops (CULM-001 Paquete D §12).
+- **Clasificación:** `CONFIG_SYNC_DUAL_SOURCE`. **Prioridad:** MEDIA.
+- **Descripción:** Cuando el catálogo de parámetros del backend opera con el proveedor `azure` (Azure App Configuration) en lugar de `sqlserver`, la mutación `PUT /admin/parametros/{id}` actualiza la base de datos SQL Server (`CatalogoParametro`), pero no propaga automáticamente el cambio a Azure App Configuration.
+- **Impacto:** Posible inconsistencia entre el valor en BD y el valor en Azure App Configuration si no se ejecuta sincronización externa.
+- **Resolución esperada:** Implementar un publicador o proceso que propague el parámetro actualizado a Azure App Configuration vía SDK/CLI cuando el provider activo sea `azure`.
+- **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.3 (§12).
+
+## TD-CULM001-D-02
+
+- **Fecha / responsable:** 2026-11-07 / backend-team (CULM-001 Paquete D §12).
+- **Clasificación:** `CACHE_COHERENCE_MULTI_INSTANCE`. **Prioridad:** MEDIA.
+- **Descripción:** La invalidación de caché ante `PUT /admin/parametros/{id}` (`ParameterCatalogPort.invalidate()`) se ejecuta en la memoria local de la instancia Spring Boot que procesa la petición HTTP. En un despliegue multi-instancia (clúster/escalado horizontal), las demás réplicas retendrán el valor anterior hasta la expiración por TTL.
+- **Impacto:** Inconsistencia temporal entre instancias ante cambios en caliente de parámetros.
+- **Resolución esperada:** Integrar un canal distribuido de invalidación (Event Grid, Redis Pub/Sub o mensaje SSE/bus) para notificar a todas las réplicas activas.
+- **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.3 (§12).
+
+## TD-CULM001-D-03
+
+- **Fecha / responsable:** 2026-11-07 / architecture & database-team (CULM-001 Paquete D §12, [SUPUESTO-D-16]).
+- **Clasificación:** `MULTI_TENANCY_SCOPE_GAP`. **Prioridad:** MEDIA.
+- **Descripción:** `CatalogoParametro` y `AuditoriaEvento` no cuentan con columna `idInstitucion`: los parámetros de negocio y los registros de auditoría operan a nivel global de toda la instalación monoinstitucional. `usp_actualizar_parametro` y `usp_consultar_auditoria_eventos_paginado` validan defensivamente que exista exactamente una institución activa (`PRM_012` y `AUD_001`).
+- **Impacto:** Si la universidad decide activar un despliegue multi-institucional compartido en la misma base de datos, los parámetros y la auditoría requerirán aislamiento por institución.
+- **Resolución esperada:** Añadir `idInstitucion` a `CatalogoParametro` y `AuditoriaEvento` con filtrado estricto por ámbito institucional del administrador.
+- **Bloquea línea base:** No para despliegue monoinstitucional UCO. **Estado:** DECISION_REQUIRED. **Work item:** CULM-001 D.3/D.6 (§12, [SUPUESTO-D-16]).
+
+## TD-CULM001-D-04
+
+- **Fecha / responsable:** 2026-11-07 / backend-team & infra (CULM-001 Paquete D §12).
+- **Clasificación:** `STORAGE_HOUSEKEEPING`. **Prioridad:** BAJA.
+- **Descripción:** Cuando un estudiante sube un archivo soporte mediante `POST /api/v1/archivos/subir`, el archivo se almacena en MinIO/S3 y se registra en `ArchivoSoporte` con estado `DRAFT`. Si el estudiante no culmina la radicación del reclamo (`POST /asistencias/revisiones`), el soporte queda en estado borrador permanentemente (soporte huérfano).
+- **Impacto:** Acumulación progresiva de archivos no vinculados en el bucket MinIO y filas `DRAFT` en BD.
+- **Resolución esperada:** Implementar un job batch programado que identifique soportes en estado `DRAFT` con más de X días de antigüedad (definido por parámetro), elimine el objeto en MinIO y marque la fila como eliminada/expirada.
+- **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.2 (§12).
+
+## TD-CULM001-D-05
+
+- **Fecha / responsable:** 2026-11-07 / backend-team (CULM-001 Paquete D §12).
+- **Clasificación:** `API_CONTRACT_PAGINATION_CONSISTENCY`. **Prioridad:** BAJA.
+- **Descripción:** El endpoint `GET /api/v1/estudiante/materias/{materiaId}/sesiones` consulta el SP `usp_consultar_sesiones_materia_estudiante` con límite `PAGINACION/TAMANO_MAXIMO` (100). En la práctica académica ninguna materia supera 100 sesiones por semestre; sin embargo, si una materia atípica superara ese límite, el backend actualmente registra un log WARN con `correlationId` y devuelve únicamente la primera página para conservar el sobre no paginado histórico consumido por el frontend.
+- **Impacto:** Sesiones más allá de la 100 no serían visibles si una materia excede dicho umbral.
+- **Resolución esperada:** Evolucionar el contrato del endpoint y frontend hacia `ApiPageResponse` con controles de paginación explícitos si se requiere soportar materias con más de 100 sesiones.
+- **Bloquea línea base:** No. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 D.1 (§12, §2.3).
+
+## TD-062 a TD-065 — Paquete C.1 (cancelación por inasistencia, HU026C)
+
+- **TD-062 — Avisos de alertas sin reintento previo al outbox.** `AvisoAlertasInasistenciaService` y `AvisoRevisionCancelacionService` encolan avisos de mejor esfuerzo; si el outbox falla el aviso se pierde (queda la alerta en BD y la página de alertas). **Prioridad:** BAJA. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 C.1.
+- **TD-063 — SSE `local-sse` de una JVM con audiencias por instantánea.** Las audiencias del canal de grupo se resuelven una vez al suscribirse; un cambio de ámbito (p. ej. matrícula a `CI`) se aplica en la siguiente suscripción. **Prioridad:** BAJA. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 C.1 (§3.6).
+- **TD-064 — Vista de revisiones del administrador diferida.** C.1 no expone las revisiones al administrador (DEC-022 §2). **Prioridad:** BAJA. **Estado:** ABIERTA / NON_BLOCKING.
+- **TD-065 — Revisión sin resolutor posible y marca de agua con solape.** Si el programa no tiene coordinador activo y su facultad no tiene decano activo, la propuesta se rechaza con `RCN_013` y el job audita `REVISION_CANCELACION_SIN_RESOLUTOR` una sola vez por cambio de huella; la marca de agua del job re-evalúa de forma idempotente hasta `SOLAPE_MARCA_SEGUNDOS` (120 s). **Prioridad:** BAJA. **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-066 a TD-084 — Deudas de la certificación de CULM-001 (registradas 2026-11-08)
+
+Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de la Fase 3. Ninguna bloquea la línea base.
+
+## TD-066
+
+- **Título:** Prueba de la migración 19 sin comparación byte a byte del SP restaurado.
+- **Origen:** DEC-059 (C.1).
+- **Descripción:** La prueba de la migración 19 solo verifica la ausencia del motor y de la marca en el SP restaurado; no compara su texto con el original.
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Comparar el SP restaurado con el texto de origen (hash) en la prueba de migración.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-067
+
+- **Título:** Pruebas C-DB-50 y C-DB-46 sin ejecución en paralelo real.
+- **Origen:** DEC-059 (C.1).
+- **Descripción:** Las pruebas de concurrencia del motor de alertas y de la decisión de revisión no se ejecutaron con sesiones paralelas reales.
+- **Impacto:** Medio.
+- **Resolución esperada / propuesta:** Añadir un arnés PowerShell con dos o más sesiones SQL concurrentes (patrón de `test_lb004d_concurrency.ps1`).
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-068
+
+- **Título:** C-DB-62 (despliegue limpio) cubierta solo por el gate del lote.
+- **Origen:** DEC-059, DEC-060.
+- **Descripción:** El caso no tiene prueba propia; lo cubre el gate de BD con datos canónicos (migraciones 13–28 y luego `deploy_schema`).
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Convertir el orden del gate en una prueba automatizada de despliegue desde cero.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-069
+
+- **Título:** `CierreMasivoRcn012IT` pendiente de ejecución o ajuste.
+- **Origen:** DEC-059 (C.1).
+- **Descripción:** La prueba de integración del bloqueo `RCN_012` del cierre masivo (HU174) no está certificada; depende de la BD de integración y del perfil `-Pintegration` (línea base con fallos de integración sin analizar).
+- **Impacto:** Medio.
+- **Resolución esperada / propuesta:** Ejecutarla en la Fase 3 sobre BD canónica y corregir el código, no la prueba.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-070
+
+- **Título:** E2E PKCE de C (`test_culm001_c.ps1`) sin ejecutar.
+- **Origen:** DEC-059 (C.1).
+- **Descripción:** El script E2E de C en Infra usa el flujo PKCE (DEC-008); pendiente de verificar en Fase 3 contra el backend de integración.
+- **Impacto:** Medio.
+- **Resolución esperada / propuesta:** Ejecutarlo en la Fase 3 e incorporarlo a `test_all_hus.ps1`.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-071
+
+- **Título:** Manifiesto post-freeze de C sin modo en `freeze-manifest.ps1` (`DB_UTC_D06`).
+- **Origen:** DEC-059; PRs #105 (BD) y #29 (Infra).
+- **Descripción:** El script no tiene modo para generar el manifiesto post-freeze de C; las PR #105 y #29 (Antigravity) siguen abiertas, la de BD con conflicto, y requieren la confirmación de excepción del propietario.
+- **Impacto:** Medio.
+- **Resolución esperada / propuesta:** Re-integrar #105/#29 sobre `integracion/CULM-001`, añadir el modo y regenerar las líneas afectadas con registro en DECISIONES.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-072
+
+- **Título:** `--prune` del PDP pendiente (concesiones sobrantes).
+- **Origen:** DEC-046.
+- **Descripción:** La revocación de concesiones obsoletas (ADMINISTRADOR 76, COORDINADOR 10, ESTUDIANTE 5, DOCENTE 4, DECANO 2 en la última medición, 2026-11-07) solo ocurre con `provision_asistencias.py pdp --prune`, no ejecutado sin autorización del responsable.
+- **Impacto:** Medio (permisos mayores a los necesarios).
+- **Resolución esperada / propuesta:** Autorizar y ejecutar `--prune`; después `verify` y `verify-decisions`.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-073
+
+- **Título:** 32 recursos huérfanos en el PDP.
+- **Origen:** DEC-046; ESTADO.
+- **Descripción:** Rutas retiradas (solicitudes de ingreso, `qr-token`, catálogos admin; y `POST /asistencias` por D.7) siguen como recursos; `verify` queda `clean=false`.
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Se resuelve con el mismo `--prune` de TD-072.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-074
+
+- **Título:** Drift de dos SP congelados (`usp_generar_sesiones_grupo`, `usp_registrar_asistencias_sesion`).
+- **Origen:** Línea base (Fase 0).
+- **Descripción:** `verify-contracts.ps1` reporta `DB_OBJ_MISMATCH` entre `DB_DEVELOP_FREEZE_MANIFEST.sha256` y la BD de `develop` para ambos SP; conocido desde la línea base.
+- **Impacto:** Medio (gate de contratos no totalmente en verde).
+- **Resolución esperada / propuesta:** Regenerar las entradas con registro formal (relacionado con TD-071) o restaurar el texto congelado.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-075
+
+- **Título:** Presupuesto del bundle frontend excedido en +7,6 kB.
+- **Origen:** Gate de frontend.
+- **Descripción:** El build de producción supera el presupuesto del bundle en 7,6 kB tras los paquetes de CULM-001.
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Dividir módulos con carga diferida o subir el presupuesto con decisión registrada.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-076
+
+- **Título:** `horasDictadas` del consolidado sin multiplicar por activos.
+- **Origen:** DEC-056 (D.8).
+- **Descripción:** `horasDictadas` son las horas del grupo por estudiante; los porcentajes usan `D = horas × activos`. La columna no es la suma institucional.
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Aclarar la semántica en el contrato o exponer la suma real.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-077
+
+- **Título:** `codigo_programa` y `codigo_facultad` del CSV resueltos por nombre.
+- **Origen:** DEC-058 (D.5).
+- **Descripción:** `Programa` y `Facultad` no tienen columna `codigo`; la carga masiva resuelve por nombre exacto dentro del ámbito del ejecutor.
+- **Impacto:** Medio (fragilidad ante homónimos).
+- **Resolución esperada / propuesta:** Decidir si se añade `codigo` al modelo (semillas y pantallas) y migrar la plantilla CSV.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-078
+
+- **Título:** `details[]` en inglés `{field, code, message}`.
+- **Origen:** DEC-057 (D.9-a).
+- **Descripción:** El golden path WORM fija `details[]` con claves en inglés, distinto del idioma del resto de mensajes.
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Revisarlo en una próxima versión formal del golden path con nuevo hash.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-079
+
+- **Título:** Bloque '2 tomas = 1 toma' de `test_culm001_b2_horas` diferido.
+- **Origen:** DEC-056.
+- **Descripción:** El caso queda diferido por §9.2 del contrato de B.
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Reactivarlo cuando se defina el criterio de tomas equivalentes.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-080
+
+- **Título:** Resultsets de tres SP excluidos del cierre canónico.
+- **Origen:** DEC-055, DEC-060.
+- **Descripción:** `usp_consultar_cambios_parametro_paginado`, `usp_consultar_parametros_paginado` y `usp_validar_carga_masiva_usuarios` están en las excepciones de `PUBLIC_CANONICAL_RESULTSET` (error 11520 de `sp_describe_first_result_set`).
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Reescribir los SP para admitir descripción de metadatos o fijar su contrato por otra vía.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-081
+
+- **Título:** Orden de despliegue de BD: migraciones antes de `deploy_schema`.
+- **Origen:** DEC-060.
+- **Descripción:** Algunas migraciones re-crean SP con el texto de su época; con otro orden se pisan objetos de C.1 (SUPUESTO-C-15). La migración 24 requiere `:r $(MIGDIR)`.
+- **Impacto:** Medio.
+- **Resolución esperada / propuesta:** Documentarlo en `infra.ps1 db-deploy` o hacerlo cumplir en el script.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-082
+
+- **Título:** Detalle `esParcial` por toma sin endpoint.
+- **Origen:** ESTADO (B.2).
+- **Descripción:** La sábana del docente no puede mostrar `esParcial` por toma: ningún endpoint lo entrega.
+- **Impacto:** Bajo.
+- **Resolución esperada / propuesta:** Exponerlo en el resumen por grupo o en un detalle por toma.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-083
+
+- **Título:** HU042 por SSE y campana de notificaciones diferidas (C.2).
+- **Origen:** DEC-043.
+- **Descripción:** `SOLICITUD_REVISION_RESUELTA` (F-TRX-005) y la campana del frontend no se entregaron en C.1.
+- **Impacto:** Medio.
+- **Resolución esperada / propuesta:** Implementar C.2 (el SSE por ámbito ya existe desde C.1).
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+
+## TD-084
+
+- **Título:** Regla escrita de seguridad web (cookies HttpOnly y CSRF) contradice la implementación Bearer.
+- **Origen:** F-TRX-015.
+- **Descripción:** `AGENTS.md` 3.3.4 exige cookies HttpOnly, `withCredentials` y `X-XSRF-TOKEN`; el código usa Bearer en memoria y `SecurityConfig` no define CSP.
+- **Impacto:** Bajo (decisión defendible).
+- **Resolución esperada / propuesta:** Decidir: ajustar `AGENTS.md` o migrar el esquema de sesión; evaluar CSP.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+

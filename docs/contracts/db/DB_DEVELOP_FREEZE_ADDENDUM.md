@@ -84,3 +84,17 @@ DB CONTRACT CHANGE REQUIRED:           TO_BE_DETERMINED_AFTER_BACKEND_AS_IS
 DB / BACKEND PRODUCTION CHANGE AUTHORIZED: NO / NO
 NEXT AUTHORIZED PHASE:                 LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANALYSIS (registrarEstudianteEnGrupo); no implica cambiar la DB
 ```
+
+## CULM-001 C.1 — cancelacion por inasistencia (HU026C)
+
+- `EstudianteGrupo` pasa a `CI` unicamente al aprobar una `RevisionCancelacion` (`usp_resolver_revision_cancelacion`); el cierre masivo (`usp_ejecutar_cierre_masivo_periodo`) ya no cancela por conteo de faltas.
+- Cierre masivo con el motor habilitado y umbrales validos: responde `RCN_012` (una sola fila) si hay revisiones que esperan al docente o al resolutor, o perdidas por horas sin revision; no crea revisiones ni evalua alertas (lo hace el backend antes). Con el motor apagado o umbrales invalidos no bloquea y `AuditoriaEvento` registra `motorHabilitado`, `umbralesValidos`, `perdidasSinRevision` y `revisionesPendientes`.
+- Unicidad: una `AlertaInasistencia` por (matricula, tipo) y una `RevisionCancelacion` por matricula.
+- Escalamiento: el resolutor es el coordinador activo del programa del estudiante (excluido quien propuso); sin coordinador, el decano de la facultad (`ufn_revision_cancelacion_resolutores`).
+- `Grupo.cantidadEstudiantesCancelaronAutomaticamente` significa "matriculas en CI al cierre".
+- Migracion 19 (`up|down`), semillas 40/41 y permisos `rol_asistencias_runtime_culm001_c.sql`.
+
+## CULM-001 — Alineacion de la copia de Infra del manifiesto base (2026-11-09)
+
+- La copia `docs/contracts/db/DB_DEVELOP_FREEZE_MANIFEST.sha256` de Infra refleja, por precedente (`usp_crear_sesion`, `usp_actualizar_sesion`), el hash vigente de los objetos congelados supersedidos por trabajo autorizado. Se alinean del mismo modo `usp_generar_sesiones_grupo.sql` (`ef9de7e9…`) y `usp_registrar_asistencias_sesion.sql` (`7217604b…`, excepcion SES-01 autorizada por el responsable, `d2d951f` del repo de BD), cuyas supersesiones constan en `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` del repo de BD (`freeze-manifest.ps1 -Mode Verify` OK).
+- El manifiesto base WORM del repo de BD (`DB_DEVELOP_FREEZE_MANIFEST.sha256`) no se modifica: la trazabilidad del cambio vive en las lineas `SUPERSEDES` del manifiesto post-freeze. Sustituye a las PR #105 (BD) y #29 (Infra) del equipo, que editaban el manifiesto base (TD-074).

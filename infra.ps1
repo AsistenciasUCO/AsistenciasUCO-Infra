@@ -183,6 +183,47 @@ function Invoke-TargetScript {
     exit $LASTEXITCODE
 }
 
+# Cargar / aportar MSSQL_SA_PASSWORD si falta (OBS-16 / F-TRX-011)
+if (-not $env:MSSQL_SA_PASSWORD) {
+    $infraEnv = Join-Path $infraRoot ".env"
+    if (Test-Path $infraEnv) {
+        Get-Content $infraEnv | ForEach-Object {
+            $line = $_.Trim()
+            if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+                $p = $line.Split("=", 2)
+                if ($p[0].Trim() -eq "MSSQL_SA_PASSWORD") {
+                    $env:MSSQL_SA_PASSWORD = $p[1].Trim()
+                }
+            }
+        }
+    }
+    if (-not $env:MSSQL_SA_PASSWORD) {
+        $dbEnvCandidates = @(
+            (Join-Path (Join-Path $repoRoot "GestioAsistenciaDB") ".env"),
+            "C:\Proyectos\GestionAsistencia\GestioAsistenciaDB\.env"
+        )
+        foreach ($cand in $dbEnvCandidates) {
+            if (Test-Path $cand) {
+                Get-Content $cand | ForEach-Object {
+                    $l = $_.Trim()
+                    if ($l -and -not $l.StartsWith("#") -and $l.Contains("=")) {
+                        $p = $l.Split("=", 2)
+                        if ($p[0].Trim() -in @("MSSQL_SA_PASSWORD", "SA_PASSWORD")) {
+                            $env:MSSQL_SA_PASSWORD = $p[1].Trim()
+                        }
+                    }
+                }
+                if ($env:MSSQL_SA_PASSWORD) { break }
+            }
+        }
+    }
+    if (-not $env:MSSQL_SA_PASSWORD) {
+        # Valor de laboratorio documentado en AGENTS.md §7 / OBS-16
+        $labDefaultSaPassword = "TuPasswordSeguro123"
+        $env:MSSQL_SA_PASSWORD = $labDefaultSaPassword
+    }
+}
+
 # Enrutamiento de subcomandos
 switch ($Command.ToLowerInvariant()) {
     { $_ -in "help", "-help", "--help", "-h", "/?" } {
@@ -470,7 +511,7 @@ switch ($Command.ToLowerInvariant()) {
         Write-Host " PRE-FLIGHT CHECK: VERIFICACION INTEGRAL DE HARDENING Y CONTRATOS" -ForegroundColor Cyan
         Write-Host "==============================================================================" -ForegroundColor Cyan
 
-        Write-Host "`n[1/2] Auditoria de Higiene y Secretos..." -ForegroundColor Yellow
+        Write-Host "`n[1/3] Auditoria de Higiene y Secretos..." -ForegroundColor Yellow
         $secScript = Join-Path $infraRoot "scripts\security\check-secrets.ps1"
         & $secScript -InfraOnly
         if ($LASTEXITCODE -ne 0) {
@@ -478,11 +519,19 @@ switch ($Command.ToLowerInvariant()) {
             exit 1
         }
 
-        Write-Host "`n[2/2] Verificacion de Contratos WORM y Paridad Cross-Repo..." -ForegroundColor Yellow
+        Write-Host "`n[2/3] Verificacion de Contratos WORM y Paridad Cross-Repo..." -ForegroundColor Yellow
         $contrScript = Join-Path $infraRoot "scripts\quality\verify-contracts.ps1"
         & $contrScript
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Fallo en la verificacion de contratos WORM."
+            exit 1
+        }
+
+        Write-Host "`n[3/3] Verificacion de Rutas por Rol (Access Catalog F-ADM-020)..." -ForegroundColor Yellow
+        $rutasScript = Join-Path $infraRoot "scripts\docs\generar-rutas-por-rol.ps1"
+        & $rutasScript -Check
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Fallo en la verificacion de rutas por rol."
             exit 1
         }
 
