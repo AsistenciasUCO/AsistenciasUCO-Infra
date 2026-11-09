@@ -82,6 +82,22 @@ Si el resultado es `[PASS]`, tu rama está certificada para commit.
 > [!IMPORTANT]
 > Recuerda que `FRONTEND_DIRECT_STORAGE_ACCESS: FORBIDDEN`: el Frontend Angular **nunca** accede a MinIO ni recibe presigned URLs; el Backend Spring Boot media todas las operaciones de carga/descarga y ClamAV escanea los archivos en memoria antes de la persistencia S3.
 
+### 2.7 "¿Cómo reinicio la BD al estado base de pruebas ampliado (o vuelvo a una foto)?"
+```powershell
+# Foto del estado actual (no detiene nada; deja /var/opt/mssql/backup/gestionasistenciadb_QA_<fecha>.bak)
+.\AsistenciasUCO-Infra\infra.ps1 db-reset-qa -Mode Snapshot
+
+# Estado base: respaldo canonico CULM001 + migraciones 13-28 + deploy_schema + fixture datos_prueba_ampliados.sql + su prueba
+.\AsistenciasUCO-Infra\infra.ps1 db-reset-qa -Mode Base -StopBackend -Yes
+
+# Volver a una foto
+.\AsistenciasUCO-Infra\infra.ps1 db-reset-qa -Mode Restore -Backup gestionasistenciadb_QA_20261109-101500.bak -StopBackend -Yes
+```
+- **Destructivo:** `Base` y `Restore` reemplazan la base; exigen `-Yes` y el **backend detenido** (puerto 8080). Con `-StopBackend` el script detiene el `java.exe` que escucha en 8080; si es otro proceso, aborta. Reinicie el backend al terminar.
+- La clave de SQL Server se lee de `GestioAsistenciaDB/.env` (`SQL_CONTAINER_PASSWORD`); `-Password` es opcional. Para ensayar sin tocar la base en uso: `-Database gestionasistenciadb_qa` (se crea o reemplaza esa base).
+- `-DbRepo <ruta>` apunta a otro checkout de `GestioAsistenciaDB`; `-Backup` en modo `Base` cambia el respaldo de partida; `-SkipFixture` deja solo la base canonica migrada.
+- El fixture (`test/fixtures/datos_prueba_ampliados.sql`) y su prueba (`test/test_datos_prueba_ampliados.sql`) están **fuera del gate de CI** (`test_suite.sql` corre sobre un despliegue limpio). Los usuarios QA (`qa.*@uco.edu.co`) viven solo en la BD: para ingresar hay que crearlos en el realm de Keycloak (ver `docs/CREDENCIALES_PRUEBAS_LOCAL.md`).
+
 ---
 
 ## 🌳 3. Árbol Rápido de Solución de Problemas (Troubleshooting)
@@ -160,6 +176,7 @@ o contenedor previo colgado?         (OpenAPI, DB, Eventos)?             con rea
 | **Desplegar Esquema SQL Server** | `.\AsistenciasUCO-Infra\infra.ps1 db-deploy` |
 | **Sembrar 11 Usuarios en DB** | `.\AsistenciasUCO-Infra\infra.ps1 db-seed` |
 | **Suite de Pruebas T-SQL** | `.\AsistenciasUCO-Infra\infra.ps1 db-test` |
+| **Estado Base de Pruebas Ampliado / Foto / Restaurar** | `.\AsistenciasUCO-Infra\infra.ps1 db-reset-qa -Mode Base\|Snapshot\|Restore` (ver 2.7) |
 | **Obtener JWT de Docente** | `.\AsistenciasUCO-Infra\infra.ps1 kc-token -Role Docente` |
 | **Obtener JWT de Estudiante** | `.\AsistenciasUCO-Infra\infra.ps1 kc-token -Role Estudiante` |
 | **Auditar Configuración Keycloak** | `.\AsistenciasUCO-Infra\infra.ps1 kc-diagnose` |
