@@ -20,9 +20,12 @@ jobs:
 
       - name: Validate Compose syntax without starting services
         shell: bash
+        # F-TRX-011 (CULM-001 D.9): MSSQL_SA_PASSWORD es obligatoria en docker-compose.yml; la validacion
+        # de sintaxis usa el valor de ejemplo de .env.example (no es un secreto) sin arrancar servicios.
         run: |
           test -f docker-compose.yml
-          docker compose -f docker-compose.yml config --quiet
+          test -f .env.example
+          docker compose --env-file .env.example -f docker-compose.yml config --quiet
 
       - name: Validate Compose referenced files
         shell: bash
