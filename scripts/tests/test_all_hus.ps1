@@ -269,6 +269,7 @@ $script:fileBytes = $null
 $script:sesEnCurso = $null
 $script:sesFutura = $null
 $script:sesPasada = $null
+$script:sesPasadaEnPlazo = $null
 $script:reclamoId = $null
 $script:grupoNuevoId = $null
 $script:docenteId = $null
@@ -421,8 +422,11 @@ Run-Test "PREP-E2E" "Preparar sesiones de prueba CULM1-E2E (en curso, pasada y f
     $idEn = New-SesionV2 $script:grupoBaseId $nombreEn $ahora.AddMinutes(-2) $ahora.AddMinutes(25)
     $script:sesEnCurso = @{ id = $idEn; nombre = $nombreEn }
     $script:sesPasada = New-SesionLibre $script:grupoBaseId "CULM1-E2E-Pasada" -90 -8
+    # CULM-001 D.1 (HU026B, SUPUESTO-D-01): sesion terminada hace 1-3 dias, DENTRO del plazo de ASISTENCIA/DIAS_LIMITE_JUSTIFICACION
+    # (N=5 dias calendario). La radicacion/anulacion legitima usa esta; la rechazada por plazo usa $script:sesPasada (8-90 dias).
+    $script:sesPasadaEnPlazo = New-SesionLibre $script:grupoBaseId "CULM1-E2E-PasadaPlazo" -3 -1
     $script:sesFutura = New-SesionLibre $script:grupoBaseId "CULM1-E2E-Futura" 30 300
-    return "EnCurso=$idEn Pasada=$($script:sesPasada.id) Futura=$($script:sesFutura.id)"
+    return "EnCurso=$idEn Pasada=$($script:sesPasada.id) PasadaEnPlazo=$($script:sesPasadaEnPlazo.id) Futura=$($script:sesFutura.id)"
 }
 
 Run-Test "HU028,HU030,HU045" "Crear/abrir y programar sesiones de clase (v2, instantes UTC) para registro de asistencia" {
@@ -599,11 +603,12 @@ Run-Test "HU012,HU015" "Consultar historial de solicitudes de revision de asiste
 }
 
 Run-Test "HU010-Anular" "Anulacion formal de solicitud de revision por desistimiento del estudiante" {
-    if (-not $script:sesPasada) { throw "No hay sesion pasada de prueba (falla PREP-E2E)" }
-    $body = @{ sesionId = $script:sesPasada.id; categoria = "OTR"; justificacion = "CULM1-E2E solicitud que sera retirada." }
+    # CULM-001 D.1 (HU026B): radicar y anular exigen una sesion dentro del plazo; la de 8-90 dias responde 409 ERR_PLAZO_JUSTIFICACION_VENCIDO.
+    if (-not $script:sesPasadaEnPlazo) { throw "No hay sesion pasada dentro del plazo de prueba (falla PREP-E2E)" }
+    $body = @{ sesionId = $script:sesPasadaEnPlazo.id; categoria = "OTR"; justificacion = "CULM1-E2E solicitud que sera retirada." }
     Invoke-Api POST "/asistencias/revisiones" $hEst $body | Out-Null
     $lista = Invoke-Api GET "/estudiante/reclamos" $hEst
-    $mio = @($lista.datos | Where-Object { $_.sesionId -ieq $script:sesPasada.id })
+    $mio = @($lista.datos | Where-Object { $_.sesionId -ieq $script:sesPasadaEnPlazo.id })
     if ($mio.Count -ne 1) { throw "El reclamo a anular no aparece en el historial" }
     $res = Invoke-Api DELETE "/estudiante/reclamos/$($mio[0].id)" $hEst
     if (-not $res.exitoso) { throw "Respuesta no exitosa al anular reclamo" }
@@ -765,13 +770,14 @@ $script:asigCodigo = $null
 $script:tempPeriodoId = $null
 
 Run-Test "HU060,HU061,HU068,HU069,HU070" "Consultar directorio de estudiantes del programa, consolidado y permanencia" {
-    $res = Invoke-Api GET "/coordinador/estudiantes" $hCoord
-    if (-not $res.exitoso) { throw "Respuesta no exitosa" }
+    # CULM-001 B2 §3.1 (O2-B2): el directorio del coordinador es ApiPageResponse<EstudianteProgramaDTO> (elementos).
+    $res = Invoke-Api GET "/coordinador/estudiantes?pagina=1&tamano=100" $hCoord
+    if (-not $res.exitoso -or $null -eq $res.elementos) { throw "Respuesta no exitosa o sin ApiPageResponse" }
     $cons = Invoke-Api GET "/coordinador/consolidado-asistencia" $hCoord
     if (-not $cons.exitoso) { throw "Respuesta no exitosa en el consolidado" }
     $fic = Invoke-Api GET "/coordinador/estudiantes/$($script:carlosId)/ficha" $hCoord
     if (-not $fic.exitoso) { throw "Respuesta no exitosa en la ficha" }
-    return "Estudiantes adscritos al programa: $(@($res.datos).Count). Grupos en el consolidado: $(@($cons.datos).Count)"
+    return "Estudiantes adscritos al programa: $($res.totalElementos). Grupos en el consolidado: $(@($cons.datos).Count)"
 }
 
 Run-Test "HU064" "Consultar catalogo de grupos academicos abiertos adscritos al programa" {
@@ -845,11 +851,13 @@ Run-Test "HU093" "Alternar estado activo/inactivo de profesor del programa" {
 }
 
 Run-Test "HU072,HU075,HU076,HU079,HU080" "Consultar, asociar y gestionar planes de estudio del programa academico" {
-    $res = Invoke-Api GET "/coordinador/planes-estudio" $hCoord
+    # CULM-001 B2 §3.1: GET /coordinador/planes-estudio responde ApiPageResponse (elementos, totalElementos...); pagina >= 1.
+    $res = Invoke-Api GET "/coordinador/planes-estudio?pagina=1&tamano=100" $hCoord
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    if (@($res.datos).Count -lt 1) { throw "El programa no tiene planes de estudio" }
-    $script:globalPlanId = [string]$res.datos[0].id
-    return "Planes de estudio vigentes: $(@($res.datos).Count). Plan 1: INP $($res.datos[0].inp) (Semestres: $($res.datos[0].totalSemestres))"
+    if ($null -eq $res.elementos -or $null -eq $res.totalElementos -or $null -eq $res.numeroPagina) { throw "La respuesta no es un ApiPageResponse (elementos/totalElementos/numeroPagina)" }
+    if (@($res.elementos).Count -lt 1) { throw "El programa no tiene planes de estudio" }
+    $script:globalPlanId = [string]@($res.elementos)[0].id
+    return "Planes de estudio vigentes: $($res.totalElementos). Plan 1: INP $(@($res.elementos)[0].inp) (Semestres: $(@($res.elementos)[0].totalSemestres))"
 }
 
 Run-Test "HU081" "Conmutar estado activo/inactivo de plan de estudio" {
@@ -860,10 +868,10 @@ Run-Test "HU081" "Conmutar estado activo/inactivo de plan de estudio" {
 }
 
 Run-Test "HU077,HU082" "Anadir nivel semestral al plan de estudios (POST .../semestres)" {
-    $antes = @((Invoke-Api GET "/coordinador/planes-estudio" $hCoord).datos | Where-Object { $_.id -ieq $script:globalPlanId })[0].totalSemestres
+    $antes = @((Invoke-Api GET "/coordinador/planes-estudio?pagina=1&tamano=100" $hCoord).elementos | Where-Object { $_.id -ieq $script:globalPlanId })[0].totalSemestres
     $res = Invoke-Api POST "/coordinador/planes-estudio/$($script:globalPlanId)/semestres" $hCoord
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    $despues = @((Invoke-Api GET "/coordinador/planes-estudio" $hCoord).datos | Where-Object { $_.id -ieq $script:globalPlanId })[0].totalSemestres
+    $despues = @((Invoke-Api GET "/coordinador/planes-estudio?pagina=1&tamano=100" $hCoord).elementos | Where-Object { $_.id -ieq $script:globalPlanId })[0].totalSemestres
     if ($despues -ne ($antes + 1)) { throw "El total de semestres debia pasar de $antes a $($antes + 1) y es $despues" }
     $script:nuevoSemNumero = $despues
     return "Semestre anadido con exito: nivel $despues"
@@ -879,7 +887,11 @@ Run-Test "HU078,HU083" "Quitar nivel semestral vacio del plan de estudios (DELET
 Run-Test "HU084,HU085" "Registrar nueva asignatura curricular en plan de estudios (usp_crear_asignatura)" {
     $areas = Invoke-Api GET "/admin/areas" $hCoord
     $comps = Invoke-Api GET "/coordinador/componentes-formacion" $hCoord
-    $plan = @((Invoke-Api GET "/coordinador/planes-estudio" $hCoord).datos | Where-Object { $_.id -ieq $script:globalPlanId })[0]
+    # CULM-001 B2 R1/R3: el vinculo asignatura-plan exige codigoCaracter (catalogo OBL|OPT, GET /coordinador/caracteres-asignatura).
+    $caracteres = Invoke-Api GET "/coordinador/caracteres-asignatura" $hCoord
+    $codCaracter = [string]@($caracteres.datos | Where-Object { $_.codigo -eq "OBL" })[0].codigo
+    if (-not $codCaracter) { throw "El catalogo de caracteres no contiene OBL" }
+    $plan = @((Invoke-Api GET "/coordinador/planes-estudio?pagina=1&tamano=100" $hCoord).elementos | Where-Object { $_.id -ieq $script:globalPlanId })[0]
     $rand = Get-Random -Minimum 100000 -Maximum 999999
     $script:asigCodigo = "CE$rand"
     $body = @{
@@ -889,21 +901,28 @@ Run-Test "HU084,HU085" "Registrar nueva asignatura curricular en plan de estudio
         semestreNumero = $plan.totalSemestres
         nombreArea = $areas.datos[0].nombre
         nombreComponente = $comps.datos[0].nombre
+        codigoCaracter = $codCaracter
     }
     $res = Invoke-Api POST "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas" $hCoord $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    $lista = Invoke-Api GET "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas" $hCoord
-    $nueva = @($lista.datos | Where-Object { $_.codigo -eq $script:asigCodigo })
+    # CULM-001 B2 §3.1: la malla es ApiPageResponse<AsignaturaPlanDTO> (idAsignatura, credito, codigoCaracter, estaActivaAsignatura).
+    $lista = Invoke-Api GET "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas?pagina=1&tamano=100" $hCoord
+    $nueva = @($lista.elementos | Where-Object { $_.codigo -eq $script:asigCodigo })
     if ($nueva.Count -ne 1) { throw "La asignatura creada no aparece en el plan" }
-    $script:asigId = [string]$nueva[0].id
-    return "Asignatura creada id=$($script:asigId) ($($script:asigCodigo)); asignaturas del plan: $(@($lista.datos).Count)"
+    if ($nueva[0].codigoCaracter -ne $codCaracter) { throw "El caracter del vinculo debia ser $codCaracter y es $($nueva[0].codigoCaracter)" }
+    $script:asigId = [string]$nueva[0].idAsignatura
+    return "Asignatura creada id=$($script:asigId) ($($script:asigCodigo), caracter $($nueva[0].codigoCaracter)); asignaturas del plan: $($lista.totalElementos)"
 }
 
 Run-Test "HU086,HU087" "Modificar informacion y creditos de asignatura curricular (usp_actualizar_asignatura)" {
     if (-not $script:asigId) { throw "Falta asigId (falla HU085)" }
     $areas = Invoke-Api GET "/admin/areas" $hCoord
     $comps = Invoke-Api GET "/coordinador/componentes-formacion" $hCoord
-    $plan = @((Invoke-Api GET "/coordinador/planes-estudio" $hCoord).datos | Where-Object { $_.id -ieq $script:globalPlanId })[0]
+    # CULM-001 B2 R1/R3: el vinculo asignatura-plan exige codigoCaracter (catalogo OBL|OPT, GET /coordinador/caracteres-asignatura).
+    $caracteres = Invoke-Api GET "/coordinador/caracteres-asignatura" $hCoord
+    $codCaracter = [string]@($caracteres.datos | Where-Object { $_.codigo -eq "OBL" })[0].codigo
+    if (-not $codCaracter) { throw "El catalogo de caracteres no contiene OBL" }
+    $plan = @((Invoke-Api GET "/coordinador/planes-estudio?pagina=1&tamano=100" $hCoord).elementos | Where-Object { $_.id -ieq $script:globalPlanId })[0]
     $body = @{
         codigo = $script:asigCodigo
         nombre = "CULM1-E2E Asignatura Actualizada"
@@ -911,11 +930,12 @@ Run-Test "HU086,HU087" "Modificar informacion y creditos de asignatura curricula
         semestreNumero = $plan.totalSemestres
         nombreArea = $areas.datos[0].nombre
         nombreComponente = $comps.datos[0].nombre
+        codigoCaracter = $codCaracter
     }
     $res = Invoke-Api PUT "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas/$($script:asigId)" $hCoord $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    $lista = Invoke-Api GET "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas" $hCoord
-    $act = @($lista.datos | Where-Object { $_.id -ieq $script:asigId })[0]
+    $lista = Invoke-Api GET "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas?pagina=1&tamano=100" $hCoord
+    $act = @($lista.elementos | Where-Object { $_.idAsignatura -ieq $script:asigId })[0]
     if ($act.credito -ne 4) { throw "Los creditos no se actualizaron (credito=$($act.credito))" }
     return "Asignatura actualizada: $($act.nombre), creditos $($act.credito)"
 }
@@ -924,13 +944,13 @@ Run-Test "HU074" "Alternar estado activo/inactivo de asignatura curricular (usp_
     if (-not $script:asigId) { throw "No hay asigId (falla HU085)" }
     $res = Invoke-Api PATCH "/coordinador/asignaturas/$($script:asigId)/estado" $hCoord
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    $lista = Invoke-Api GET "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas" $hCoord
-    $act = @($lista.datos | Where-Object { $_.id -ieq $script:asigId })[0]
+    $lista = Invoke-Api GET "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas?pagina=1&tamano=100" $hCoord
+    $act = @($lista.elementos | Where-Object { $_.idAsignatura -ieq $script:asigId })[0]
     return "Asignatura de prueba inactivada (queda inactiva como limpieza): estaActiva=$($act.estaActivaAsignatura)"
 }
 
 Run-Test "HU085-Eliminar" "Eliminar asignatura curricular sin grupos dependientes (usp_eliminar_asignatura)" {
-    # ESPERADO-HASTA-B2 (asignaturas en varios planes): el DELETE se retiro y B2 lo recrea con usp_desvincular_asignatura_plan.
+    # CULM-001 B2 §3.1: el DELETE (antes 501) desvincula el vinculo asignatura-plan (usp_desvincular_asignatura_plan; 404 ASI_004, 409 ASI_005).
     if (-not $script:asigId) { throw "Falta asigId (falla HU085)" }
     $res = Invoke-Api DELETE "/coordinador/planes-estudio/$($script:globalPlanId)/asignaturas/$($script:asigId)" $hCoord
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
@@ -941,7 +961,7 @@ Run-Test "HU071,HU073,HU088" "Consultar catalogo de asignaturas del programa, in
     $res = Invoke-Api GET "/coordinador/asignaturas" $hCoord
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
     $comps = Invoke-Api GET "/coordinador/componentes-formacion" $hCoord
-    return "Asignaturas en catalogo: $($res.total). Componentes de formacion: $($comps.total)"
+    return "Asignaturas en catalogo: $($res.totalElementos). Componentes de formacion: $($comps.total)"
 }
 
 Run-Test "HU096,HU142" "Consultar y registrar nuevo periodo academico institucional (alta: administrador)" {
@@ -989,11 +1009,13 @@ Write-Host "====================================================================
 $script:tempCoordId = $null
 
 Run-Test "HU104,HU105,HU124,HU137" "Consultar directorio y censo consolidado de coordinadores de la facultad" {
-    $res = Invoke-Api GET "/decano/coordinadores" $hDec
-    if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    $ests = Invoke-Api GET "/decano/estudiantes?busqueda=Carlos" $hDec
+    # CULM-001 D.9-a F-ADM-023 / contrato D §11.3: los listados del decano son ApiPageResponse (elementos); pagina >= 1, 1 <= tamano <= PAGINACION/TAMANO_MAXIMO (400 PAG_001).
+    $res = Invoke-Api GET "/decano/coordinadores?pagina=1&tamano=100" $hDec
+    if (-not $res.exitoso -or $null -eq $res.elementos) { throw "Respuesta no exitosa o sin elementos (ApiPageResponse)" }
+    $ests = Invoke-Api GET "/decano/estudiantes?busqueda=Carlos&pagina=1&tamano=100" $hDec
+    if ($null -eq $ests.elementos) { throw "La busqueda de estudiantes no devolvio un ApiPageResponse" }
     $dec = Invoke-Api GET "/admin/decanos" $hAdmin
-    return "Coordinadores adscritos a la facultad: $(@($res.datos).Count). Busqueda de estudiantes: $(@($ests.datos).Count). Decanos: $(@($dec.datos).Count)"
+    return "Coordinadores adscritos a la facultad: $($res.totalElementos). Busqueda de estudiantes: $($ests.totalElementos). Decanos: $(@($dec.datos).Count)"
 }
 
 Run-Test "HU120" "Registrar y vincular nuevo coordinador con programa de la facultad (usp_crear_coordinador)" {
@@ -1013,8 +1035,9 @@ Run-Test "HU120" "Registrar y vincular nuevo coordinador con programa de la facu
     try {
         $res = Invoke-Api POST "/decano/coordinadores" $hDec $body
         if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-        $lista = Invoke-Api GET "/decano/coordinadores" $hDec
-        $nuevo = @($lista.datos | Where-Object { $_.numeroIdentificacion -eq "$doc" })
+        # CULM-001 D.9-a / D.5: directorio paginado (elementos); usp_crear_coordinador acepta tipoIdentificacionId opcional (se omite).
+        $lista = Invoke-Api GET "/decano/coordinadores?pagina=1&tamano=100" $hDec
+        $nuevo = @($lista.elementos | Where-Object { $_.numeroIdentificacion -eq "$doc" })
         if ($nuevo.Count -ne 1) { throw "El coordinador creado no aparece en el directorio" }
         $script:tempCoordId = [string]$nuevo[0].id
     } finally {
@@ -1032,8 +1055,8 @@ Run-Test "HU120" "Registrar y vincular nuevo coordinador con programa de la facu
 
 Run-Test "HU121,HU123" "Busqueda predictiva y actualizacion de datos de coordinadores de la facultad" {
     if (-not $script:tempCoordId) { throw "No hay coordinador (falla HU120)" }
-    $coords = Invoke-Api GET "/decano/coordinadores" $hDec
-    $c = @($coords.datos | Where-Object { $_.id -ieq $script:tempCoordId })[0]
+    $coords = Invoke-Api GET "/decano/coordinadores?pagina=1&tamano=100" $hDec
+    $c = @($coords.elementos | Where-Object { $_.id -ieq $script:tempCoordId })[0]
     $body = @{ primerNombre = "CULME"; primerApellido = "AUTOMATIZADO"; correo = $c.correo }
     $res = Invoke-Api PUT "/decano/coordinadores/$($script:tempCoordId)" $hDec $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
@@ -1072,11 +1095,14 @@ Run-Test "HU107-HU109,HU112,HU119" "Estructura organica de decanatura: facultad,
     $est = Invoke-Api GET "/decano/estructura" $hDec
     if (-not $est.exitoso) { throw "Respuesta no exitosa en estructura" }
     $progs = Invoke-Api GET "/decano/programas" $hDec
-    $cred = Invoke-Api GET "/decano/programas-creditos" $hDec
+    # CULM-001 D.9-a (contrato D §11.3) y B2 §3.1: programas-creditos y la malla del plan son ApiPageResponse (elementos).
+    $cred = Invoke-Api GET "/decano/programas-creditos?pagina=1&tamano=100" $hDec
     $facs = Invoke-Api GET "/admin/facultades" $hAdmin
-    $planId = $cred.datos[0].idPlanEstudio
-    $asigs = Invoke-Api GET "/decano/planes-estudio/$planId/asignaturas" $hDec
-    return "Estructura: $(@($est.datos).Count) facultad(es) del decano, $(@($progs.datos).Count) programas, $(@($cred.datos).Count) filas de creditos, $(@($asigs.datos).Count) asignaturas del plan. Facultades de la institucion: $($facs.total)"
+    if (@($cred.elementos).Count -lt 1) { throw "programas-creditos no devolvio elementos" }
+    $planId = @($cred.elementos)[0].idPlanEstudio
+    $asigs = Invoke-Api GET "/decano/planes-estudio/$planId/asignaturas?pagina=1&tamano=100" $hDec
+    if ($null -eq $asigs.elementos) { throw "La malla del plan no devolvio un ApiPageResponse" }
+    return "Estructura: $(@($est.datos).Count) facultad(es) del decano, $(@($progs.datos).Count) programas, $($cred.totalElementos) filas de creditos, $($asigs.totalElementos) asignaturas del plan. Facultades de la institucion: $($facs.total)"
 }
 
 Run-Test "HU103,HU106" "Analitica ejecutiva: retencion estudiantil y comparativa de inasistencia entre programas" {
@@ -1092,8 +1118,10 @@ Run-Test "HU143-HU146" "Supervision transversal: busqueda de asignaturas, aforo 
     $aforo = Invoke-Api GET "/decano/aforo-grupos" $hDec
     $ses = Invoke-Api GET "/decano/sesiones" $hDec
     if (-not ($asigs.exitoso -and $aforo.exitoso -and $ses.exitoso)) { throw "Respuesta no exitosa" }
-    $sesElems = if ($null -ne $ses.elementos) { $ses.elementos } else { $ses.datos }
-    return "Supervision transversal: $($asigs.total) asignaturas, $(@($aforo.datos).Count) grupos con aforo, $(@($sesElems).Count) sesiones"
+    # CULM-001 D.9-a F-ADM-023 / contrato D §11.3: /decano/asignaturas y /decano/sesiones son ApiPageResponse (elementos, totalElementos).
+    if ($null -eq $asigs.elementos -or $null -eq $ses.elementos) { throw "Los listados del decano no devolvieron un ApiPageResponse" }
+    $sesElems = $ses.elementos
+    return "Supervision transversal: $($asigs.totalElementos) asignaturas, $(@($aforo.datos).Count) grupos con aforo, $(@($sesElems).Count) sesiones"
 }
 
 Run-Test "HU066,HU102" "Generacion y descarga de reporte Excel de asistencia (coordinador), semaforo de alerta temprana y tablero del decano" {
@@ -1135,14 +1163,17 @@ Run-Test "HU135,HU136" "Censo poblacional universitario UCO: estudiantes matricu
     $ests = Invoke-Api GET "/admin/estudiantes" $hAdmin
     $docs = Invoke-Api GET "/admin/docentes" $hAdmin
     if (-not ($ests.exitoso -and $docs.exitoso)) { throw "Respuesta no exitosa" }
-    $estsElems = if ($null -ne $ests.elementos) { $ests.elementos } else { $ests.datos }
-    return "Censo general UCO: $(@($estsElems).Count) estudiantes, $(@($docs.datos).Count) profesores"
+    # CULM-001 D.9-a F-ADM-023: /admin/estudiantes y /admin/docentes son ApiPageResponse (elementos, totalElementos).
+    if ($null -eq $ests.elementos -or $null -eq $docs.elementos) { throw "Los censos de administracion no devolvieron un ApiPageResponse" }
+    return "Censo general UCO: $($ests.totalElementos) estudiantes, $($docs.totalElementos) profesores"
 }
 
 Run-Test "HU143-HU145-Admin" "Busqueda transversal de asignaturas de la institucion (administrador)" {
     $asigs = Invoke-Api GET "/admin/asignaturas" $hAdmin
     if (-not $asigs.exitoso) { throw "Respuesta no exitosa" }
-    return "Asignaturas de la institucion: $($asigs.total)"
+    # CULM-001 D.9-a F-ADM-023: /admin/asignaturas es ApiPageResponse.
+    if ($null -eq $asigs.elementos) { throw "/admin/asignaturas no devolvio un ApiPageResponse" }
+    return "Asignaturas de la institucion: $($asigs.totalElementos)"
 }
 
 Run-Test "HU157,HU158,HU159" "Padron y ficha unificada del estudiante UCO con historial completo" {
@@ -1151,8 +1182,10 @@ Run-Test "HU157,HU158,HU159" "Padron y ficha unificada del estudiante UCO con hi
     $estsElems = if ($null -ne $ests.elementos) { $ests.elementos } else { $ests.datos }
     $his = Invoke-Api GET "/admin/estudiantes/$($script:carlosId)/historial" $hAdmin
     if (-not $his.exitoso) { throw "Respuesta no exitosa en el historial" }
-    $pad = Invoke-Api GET "/coordinador/estudiantes" $hCoord
-    return "Padron institucional: $(@($estsElems).Count) estudiantes; historial de $($his.datos.nombreCompleto); padron del programa: $(@($pad.datos).Count)"
+    # CULM-001 B2 §3.1 (O2-B2): /coordinador/estudiantes es ApiPageResponse<EstudianteProgramaDTO>.
+    $pad = Invoke-Api GET "/coordinador/estudiantes?pagina=1&tamano=100" $hCoord
+    if ($null -eq $pad.elementos) { throw "/coordinador/estudiantes no devolvio un ApiPageResponse" }
+    return "Padron institucional: $(@($estsElems).Count) estudiantes; historial de $($his.datos.nombreCompleto); padron del programa: $($pad.totalElementos)"
 }
 
 Run-Test "HU156" "Admision demografica y creacion de usuario estudiante (administrador)" {
