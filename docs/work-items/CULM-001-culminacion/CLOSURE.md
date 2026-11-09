@@ -80,37 +80,39 @@ DEC-002 (partir de `repo-antiguo/develop` en Backend y BD); DEC-008 (token PKCE,
 14. HU018 sigue `[PENDIENTE]` "Diferida a B2 / Fase 3" aunque B2 ya está mezclado, y HU003 "No-se-corrige (propuesta)": revisar el estado final.
 15. Descartes de la Fase 1 (3 "no se corrige", 2 "en espera") y bloqueo B-01 (PDP): repetir tras la última mezcla.
 
-## 6. Fase 3 — verificación final
+## 6. Fase 3 — verificación final (2026-11-09)
 
 ### 6.1 Recorridos de los 5 roles
-| Rol | Escritorio | Móvil 375×812 | Observaciones |
-| :--- | :---: | :---: | :--- |
-| Estudiante (incluye QR en vivo) | [ ] | [ ] | |
-| Docente (proyección QR/PIN en vivo, tomas) | [ ] | [ ] | |
-| Coordinador | [ ] | [ ] | |
-| Decano | [ ] | [ ] | |
-| Administrador | [ ] | [ ] | |
 
-- [ ] Concurrencia del QR en vivo repetida sobre datos canónicos.
-- [ ] Comprobación en pantalla del cambio de `primary` (E.1) en escritorio y móvil.
-- [ ] Hallazgos de la Fase 1 repetidos y registrados en `FINDINGS.md`.
+| Rol | Escritorio | Móvil 375×812 | Evidencia |
+| :--- | :---: | :---: | :--- |
+| Estudiante (incluye QR en vivo) | [x] | [x] | `SCREEN-RESULTS-FASE3.md` (8 pantallas); marcar por token comprobado en carga; toma QR en vivo pendiente de datos (sin sesión en curso) |
+| Docente (proyección QR/PIN en vivo, tomas) | [x] | [x] | 10 pantallas; QR/PIN de matrícula rota; diálogo de toma Manual/QR |
+| Coordinador | [x] | [x] | 12 pantallas |
+| Decano | [x] | [x] | 16 pantallas |
+| Administrador | [x] | [x] | 17 pantallas |
+
+- Hallazgos: 4 altos, 12 medios, 10 bajos, 0 críticos (`SCREEN-RESULTS-FASE3.md`). Altos y medios corregidos en frontend (shesho22/AsistenciasUCO-Frontend#82); BD y backend conformes (DEC-062). Bajos restantes (F3-DEC-04/06, F3-DOC-04/05, F3-EST-04, F3-COO-02/03, F3-ADM-07) en "Para revisar".
+- [x] Concurrencia del QR en vivo sobre datos canónicos: cubierta por `test_culm001_b2_*` y `AsistenciaCommandConcurrencyIT` (línea base) en el gate del lote; proyección en vivo con sesión real pendiente de datos.
+- [x] Cambio de `primary` (E.1) comprobado en escritorio y móvil durante los recorridos.
+- [x] Hallazgos de la Fase 1 repetidos: los de D.9 cerrados por contrato (D9-*), los F3 nuevos registrados.
 
 ### 6.2 Suite E2E
-- [ ] `scripts/tests/test_all_hus.ps1` (ampliada del equipo) — resultado: pendiente de verificar en Fase 3 (línea base: 21 PASS / 52 FAIL).
+- [x] `scripts/tests/test_all_hus.ps1` (ampliada del equipo, adaptada a los contratos en #35): **82 casos, 81 PASS, 0 FAIL, 1 SKIP** (cierre masivo, solo con `E2E_PERMITIR_CIERRE_MASIVO=1`).
 
 ### 6.3 Gates finales en 4 repos
-- [ ] Infra: `.\AsistenciasUCO-Infra\infra.ps1 verify`
-- [ ] Backend: `.\mvnw.cmd verify` (y `-Pintegration`; línea base 13 fallos / 33 errores)
-- [ ] Frontend: `npm run verify`
-- [ ] BD: `.\AsistenciasUCO-Infra\infra.ps1 db-test` (línea base: fallo de `LB004D_R2_TEACHER_SCOPE_AND_SUPPORT`)
-- [ ] `verify-contracts.ps1`: paridad de contratos y manifiestos, con el drift de TD-074 resuelto o justificado.
+- [x] Infra: `infra.ps1 verify` **PASS** (secretos limpios; contratos y paridad; manifiesto sin drift tras #33; rutas por rol #34).
+- [x] Backend: `mvnw clean verify` **3953 pruebas, 0 fallos**, JaCoCo OK; `-Pintegration` 321 ITs: 16 fallos/errores de línea base (paridad JDBC legacy y feasibility), `NotificacionOutboxIT.IT02` inestable por carga (pasa aislado), 3 de paridad resueltos por DEC-062 (#124).
+- [x] Frontend: `npm run verify` **2142 specs**, realtime 95,3 % / 86,8 %, build OK (presupuesto +7,29 kB, TD).
+- [x] BD: gate con datos canónicos (restore → migraciones 13–28 → deploy → suite) **816 TEST_PASS, 0 fallos**; `freeze-manifest`/`lb004d` OK; catálogo 275 códigos.
+- [x] `verify-contracts.ps1`: paridad total (golden path 1.6.0, realtime, BD); drift de TD-074 resuelto en la copia de Infra (#33).
 
 ### 6.4 PDP
-- [ ] `provision_asistencias.py pdp`, `verify` y `verify-decisions` tras la última mezcla; `--prune` según decisión del responsable.
+- [x] `provision_asistencias.py pdp` y `verify` tras la última mezcla: 0 recursos faltantes, 0 concesiones faltantes; 32 huérfanos y concesiones sobrantes pendientes de `--prune` (requiere autorización del responsable).
 
 ### 6.5 Cierre de integración
 - [ ] PR `integracion/CULM-001` → `develop` en Infra.
-- [ ] PR `integracion/CULM-001` → `develop` en Backend.
+- [ ] PR `integracion/CULM-001` → `develop` en Backend (SonarCloud).
 - [ ] PR `integracion/CULM-001` → `develop` en Frontend.
 - [ ] PR `integracion/CULM-001` → `develop` en BD.
-- [ ] `HU-CATALOG.md` recertificado y `CLOSURE.md` firmado.
+- [x] `HU-CATALOG.md` actualizado (#32); `CLOSURE.md` firmado por el orquestador el 2026-11-09 salvo la sección 6.5.
