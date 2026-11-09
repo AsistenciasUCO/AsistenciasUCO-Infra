@@ -82,9 +82,10 @@ Contenedores necesarios: `sql_server_asistencias`, `asistencias-files-minio-1`, 
 - Ninguno todavía.
 - Límite de uso de la API alcanzado el 2026-11-07 ~00:50 (5 h): los subagentes de contratos A/B/B2 y E.1 se interrumpieron y se reanudaron a la 01:00.
 
-## Estado al 2026-11-09 ~14:00 (sesión 3) — retomar aquí
+## Estado final (2026-11-09 ~20:00) — CULM-001 listo para mezclar a develop
 
-- **Fase 3 verificada** (ver `CLOSURE.md` §6): gates de los 4 repos en verde en local, E2E 81/82 (#35), recorridos de los 5 roles con altos y medios corregidos (#82), paridad JDBC↔JPA (#124, DEC-062), develop del frontend sincronizado en integración (#84: PR #72–#80 del equipo).
-- **PR finales `integracion/CULM-001` → `develop` abiertas:** Infra #36 (CI verde tras #37; **el clasificador de permisos de la sesión bloquea mezclar a develop: la mezcla la hace el responsable**), BD #113 (CI `Database Deployment & Quality Gate` **falla**: suite cortada en una BD desplegada desde cero, 173/527, y pruebas de migración de B1/B2/D1/D5 no componibles; agente corrigiéndolo en `feature/CULM-001-F3-quality-gate-bd`), backend #125 (SonarCloud **falla**: 14 issues en código nuevo —NPE en controladores de revisión, records con arrays, condiciones redundantes en cargas, CORS de matrícula QR— y `new_coverage` 75,3 % < 80 %; agente corrigiéndolo en `feature/CULM-001-F3-sonar`), frontend #83 (mezclable, sin checks requeridos).
-- **Después:** mezclar las ramas de corrección a integración, esperar CI de #113 y #125, y entregar al responsable las 4 PR para mezclar; completar §6.5 de CLOSURE.
+- **Alcance completo e integrado** en `integracion/CULM-001` de los 4 repos (A, B.1, B.2, B2, C.1, D.1–D.9 incl. D.9-c, E.2; C.2 diferida por DEC-043). Develop de cada repo sincronizado en integración (frontend #84, BD #115, backend #127).
+- **Gates locales:** BD con datos canónicos 823 TEST_PASS / 0 fallos; backend 4110 pruebas / 0 fallos; frontend 2225 specs, realtime 95,3 %/86,8 %; `infra.ps1 verify` PASS; E2E 81/82; recorridos de los 5 roles con altos y medios corregidos; PDP sincronizado (0 faltantes; `--prune` pendiente de autorización).
+- **Gates de CI de las PR finales (DEC-063):** Infra #36 verde; BD #113 verde (gate desde cero 697/698); backend #125 verde (SonarCloud OK); frontend #83 mezclable. **Las cuatro PR están listas; la mezcla a `develop` la hace el responsable** (bloqueada para el orquestador por el clasificador de permisos).
+- **Documentación:** `CLOSURE.md` (§1–§6 completas, "Para revisar" y §6.6), `HU-CATALOG.md`, `TECHNICAL_DEBT.md` (TD-066..084), `DECISIONES.md` (DEC-001..DEC-063), `PRS.md`, `SCREEN-RESULTS-FASE3.md`.
 - Regla aprendida: nunca pulsar el cuadro de mezcla de GitHub en una PR bloqueada (activa auto-merge); todo con `gh pr merge --merge`.

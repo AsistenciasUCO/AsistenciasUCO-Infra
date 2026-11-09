@@ -110,9 +110,13 @@ DEC-002 (partir de `repo-antiguo/develop` en Backend y BD); DEC-008 (token PKCE,
 ### 6.4 PDP
 - [x] `provision_asistencias.py pdp` y `verify` tras la última mezcla: 0 recursos faltantes, 0 concesiones faltantes; 32 huérfanos y concesiones sobrantes pendientes de `--prune` (requiere autorización del responsable).
 
-### 6.5 Cierre de integración
-- [ ] PR `integracion/CULM-001` → `develop` en Infra.
-- [ ] PR `integracion/CULM-001` → `develop` en Backend (SonarCloud).
-- [ ] PR `integracion/CULM-001` → `develop` en Frontend.
-- [ ] PR `integracion/CULM-001` → `develop` en BD.
-- [x] `HU-CATALOG.md` actualizado (#32); `CLOSURE.md` firmado por el orquestador el 2026-11-09 salvo la sección 6.5.
+### 6.5 Cierre de integración (2026-11-09 ~20:00)
+- [x] PR `integracion/CULM-001` → `develop` en Infra: AsistenciasUCO/AsistenciasUCO-Infra#36 — CI verde (`Validate official Infra contents`), mezclable.
+- [x] PR `integracion/CULM-001` → `develop` en BD: johnjduque/gestion-asistencia-db#113 — CI verde (`Database Deployment & Quality Gate` 697/698, SonarCloud), mezclable.
+- [x] PR `integracion/CULM-001` → `develop` en Backend: alejovh12/AsistenciasUCO#125 — CI verde (Backend CI, SonarCloud Quality Gate OK, CodeQL, Trivy, ArchUnit), mezclable.
+- [x] PR `integracion/CULM-001` → `develop` en Frontend: shesho22/AsistenciasUCO-Frontend#83 — mezclable (develop #72–#80 integrado en #84).
+- [ ] **Mezcla a `develop`: la realiza el responsable** (el clasificador de permisos de la sesión del orquestador bloquea mezclar a `develop`); orden sugerido Infra → BD → backend → frontend, con merge commit (sin squash).
+- [x] `HU-CATALOG.md` actualizado (#32); `CLOSURE.md` firmado por el orquestador el 2026-11-09.
+
+### 6.6 Gates de CI de los repositorios (DEC-063)
+Además de los gates locales, la certificación exige los gates del repositorio: el Quality Gate de BD de CI despliega desde cero y corre `test_summary.ps1` (pruebas de migración componibles, `test/lib_componible.ps1`); SonarCloud del backend exige código nuevo sin bugs/vulnerabilidades y ≥ 80 % de cobertura; Infra valida `docker compose config` con `.env.example`. Los tres quedaron en verde en las PR finales.
