@@ -967,3 +967,36 @@ Vista institucional de revisiones del administrador; reintento de notificaciones
 | O-13 huecos de prueba | No bloqueante | C-DB-46 (dos resolutores concurrentes); textos `RCN_011`/`RCN_004` alineados en el cliente; revisión con pérdida ya superada en C-DB-40 y en el texto de `RCN_012` (§2.7, §2.13.1, §4.5) |
 | O-14 detalles menores | No bloqueante | Vista de historial retirada; auditoría `ALERTA_INASISTENCIA_ACTUALIZADA`; significado del contador de `Grupo` en el addendum ([SUPUESTO-C-20]); `totalRegistros` en grupos mixtos documentado (§3.6.3); p95 ≤ 300 ms o ejecución tras responder (§2.14) |
 | §3 alcance frente al plazo | Recomendación | Adoptada como C.1/C.2 por DEC-043 (§1.1). A diferencia de la sugerencia, C.1 conserva la bandeja del decano (necesaria para el escalamiento) y las suscripciones de grupo de coordinador y decano (cierran F-TRX-006) |
+
+---
+
+## Adenda DEC-065 (2026-11-09)
+
+Segunda ronda de hallazgos del responsable (DEC-065 (1)): la decisión final de la cancelación de matrícula por inasistencia es del **coordinador del programa**; se retira el escalamiento al decano. Esta adenda **supersede** [SUPUESTO-C-09] (en lo relativo al escalamiento y a la resolución por el decano) y las pruebas **C-DB-29**, **C-DB-33** y **C-DB-34** de §2.13.1; el resto del contrato sigue vigente. Implementación en la migración `31_mrm_coordinador_decide_cancelacion` de `GestioAsistenciaDB` (rama `feat/mejoras-revision-manual`).
+
+### A.1 Regla de negocio (sustituye a [SUPUESTO-C-09])
+
+| Aspecto | Comportamiento vigente |
+| :--- | :--- |
+| Resolutores | Coordinadores activos titulares (`Programa.coordinador`) de los programas que están a la vez en `EstudiantePrograma` del estudiante y entre los programas vigentes del grupo, **excluido el proponente**. `ufn_revision_cancelacion_resolutores` ya no devuelve decanos; `esEscalamiento` se conserva por compatibilidad y es siempre `0`. |
+| Proponer sin coordinador disponible | `usp_decidir_revision_cancelacion` responde `RCN_013` (409) sin cambios de estado ni historial: «El programa no tiene coordinador activo para resolver la revisión; solicite su asignación al decano.». Ya no hay `RCN_015`, ni evento `ESCALAR`, ni auditoría `ESCALAR_REVISION_CANCELACION`; `codigoPerfilResolutorActual` es siempre `COORDINADOR` y `fechaEscalamientoUtc` siempre `NULL`. La salida conserva `codigoPerfilResolutor` y `esEscalamiento` (`0`). |
+| Decano resuelve | `usp_resolver_revision_cancelacion` responde `RCN_016` (el código HTTP lo fija el clasificador del backend): «La resolución de la revisión corresponde al coordinador del programa.», sin cambios de estado. La ruta de auditoría `/api/v1/decano/revisiones-cancelacion/{revisionId}` desaparece (solo `/coordinador/`). El decano conserva solo lectura y auditoría. |
+| Job de resolutores | `usp_actualizar_resolutores_revisiones_cancelacion` solo `REASIGNAR` (a otro coordinador) o deja la revisión sin resolutor (`REVISION_CANCELACION_SIN_RESOLUTOR`, una vez por cambio de huella); `revisionesEscaladas` es siempre `0`. Las revisiones escaladas antes de la migración se reasignan al coordinador en la primera corrida (huella distinta). |
+| Mensajes | `RCN_013` con el texto nuevo; `RCN_015` queda **en desuso** (no se emite); `RCN_016` nuevo (`BUSINESS_ERROR`, `MEDIO`). |
+
+### A.2 Consultas (§2.5.7)
+
+| SP | Cambio |
+| :--- | :--- |
+| `usp_consultar_revisiones_cancelacion_decano_paginado` | Solo consulta: **todas** las revisiones (cualquier estado) de los grupos que tienen algún programa de la facultad del decano (`ufn_programas_ambito_ejecutor`, rol `DECANO`). Filtros y resultset sin cambios (`@soloPendientes` = las que esperan al coordinador, `@codigoEstado`, `@idPrograma` → `COO_003` si es de otra facultad); `esResolutorActual` siempre `0` y `accionesPermitidas` siempre vacío. |
+| `usp_consultar_revisiones_cancelacion_docente_paginado` (nuevo) | `(@idUsuario, @idCorrelacion, @soloPendientes BIT = 1, @idGrupo = NULL, @estado = NULL, @numeroPagina = 1, @tamanoPagina = 20)`. RBAC `DOCENTE`; revisiones de los grupos donde es titular, mismas columnas que el SP del coordinador (`uv_revision_cancelacion` + `idPrograma`, `nombrePrograma`, `porcentajeActual`, `horasFaltaActual`, `horasDictadasActual`, `umbralPerdida`, `esResolutorActual` = 0, `accionesPermitidas` = vacío, `totalRegistros`). «Pendiente» = estado con `requiereAccionDocente` (`PENDIENTE_DOCENTE`). Orden: fecha de cruce (creación) descendente. `@idGrupo` que no es suyo → `SEC_002`; `@estado` inexistente → `RCN_002`. `EXECUTE` para `rol_asistencias_runtime`. |
+
+### A.3 Pruebas que se superseden
+
+| ID | Nuevo comportamiento esperado |
+| :--- | :--- |
+| C-DB-29 | T es además el único coordinador de PA: `PROPONER` sobre EA → `RCN_013` (mensaje de usuario con «solicite su asignación al decano»), `estadoResultado = 0`, estado y historial sin cambios, sin `ESCALAR` ni auditoría de escalamiento; la función no devuelve decanos ni `esEscalamiento = 1`. |
+| C-DB-33 | El decano lista **todas** las revisiones de su facultad (EA, EB y E0), con `esResolutorActual = 0` y sin acciones; filtros `soloPendientes`, `estado` y `programa`; `@idPrograma` de otra facultad → `COO_003`; si intenta resolver una propuesta recibe `RCN_016` sin cambios de estado ni auditoría `/decano/`. |
+| C-DB-34 | El job, al desactivar al coordinador, deja la propuesta sin resolutor (`revisionesEscaladas = 0`, `revisionesSinResolutor ≥ 1`, perfil `NULL`, nunca `ESCALAR`/`DECANO`); sin cambios de huella no genera novedades; al volver el coordinador `REASIGNAR` a `COORDINADOR`. |
+| C-DB-35 (nuevo) | SP del docente: mismas columnas que el del coordinador; el titular ve todas las revisiones de su grupo con `totalRegistros`; `soloPendientes` deja solo `PENDIENTE_DOCENTE`; filtro de estado; paginación; un docente sin grupos no ve revisiones ajenas; `@idGrupo` ajeno → `SEC_002`. |
+| MRC_MIG | Migración 31 up → down → up componible y `MRC_SEG_01` (permiso del SP del docente). |
