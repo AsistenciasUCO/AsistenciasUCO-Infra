@@ -47,6 +47,8 @@ Historial golden path: 1.4.0 (CULM-001-B2NM): solo descripciones (ámbito por `E
 
 Historial golden path: 1.6.0 (CULM-001-D, D.9-c, F-TRX-016/F-TRX-019, DEC-044 (11)): `GET /api/v1/realtime/stream` declara la respuesta 406 (`Accept` incompatible, `ApiErrorResponse` JSON, no 500), abre con el comentario SSE `: conectado` y acepta `grupoId` sin distinguir mayúsculas; se publica `POST /api/v1/realtime/emit` (solo ADMINISTRADOR; cuerpo `{tipo, audiencia, payload}` validado contra el catálogo y la política de audiencia: 200, 400 `VALIDATION_ERROR`, 401, 403). `GET /api/v1/realtime/status` también es solo ADMINISTRADOR (fuera de este contrato). Sin cambios de schemas existentes.
 
+Historial golden path: 1.7.0 (DEC-065 (2), HU030/HU047): `Sesion` y `SesionV2` agregan `estadoSolicitud` (`PENDIENTE`|`APROBADA`|`RECHAZADA`; `null` si la sesión no nació como solicitud) y `pendienteAprobacion` (boolean). Cambio aditivo en respuestas: la sesión que crea el docente queda pendiente del aval del coordinador y no admite tomas ni asistencia hasta su aprobación. Los endpoints del coordinador (`GET /api/v1/coordinador/sesiones/solicitudes`, `POST .../aprobacion`, `POST .../rechazo`) quedan fuera de este contrato.
+
 ## D. AttendanceStatus
 
 Dominio cerrado `AN | SJC | EX` (`RegistroAsistenciaSesionDomain.ESTADOS_VALIDOS`; DB: `RC_001` para códigos inexistentes). Escritura: otro valor → 400 `VALIDATION_ERROR`/`ERR_ESTADO_ASISTENCIA_INVALIDO` sin escrituras. Lectura: `AsistenciaConsultadaEntity` **falla cerrado** ante estado legacy/desconocido/ausente (DR-006, Opción A); no se traduce ni se oculta. Riesgo registrado: `RazonCausa` conserva códigos históricos (`CPI`, `CPVP`) que harían fallar el listado completo ([TD-045](../baseline/TECHNICAL_DEBT.md#td-045)).

@@ -104,6 +104,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-082](#td-082) | Detalle `esParcial` por toma sin endpoint | ABIERTA / NON_BLOCKING | no |
 | [TD-083](#td-083) | HU042 por SSE y campana de notificaciones diferidas (C.2) | ABIERTA / NON_BLOCKING | no |
 | [TD-084](#td-084) | Regla escrita de seguridad web (cookies HttpOnly y CSRF) contradice la implementación Bearer | ABIERTA / NON_BLOCKING | no |
+| [TD-085](#td-085) | Código aleatorio de sesión en `usp_generar_sesiones_grupo` colisiona con `UX_Sesion_Grupo_Codigo` (CI de BD intermitente) | ABIERTA / NON_BLOCKING | no |
 
 ## TD-001
 
@@ -1060,3 +1061,11 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Resolución esperada / propuesta:** Decidir: ajustar `AGENTS.md` o migrar el esquema de sesión; evaluar CSP.
 - **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
 
+## TD-085
+
+- **Título:** Código aleatorio de sesión en `usp_generar_sesiones_grupo` colisiona con `UX_Sesion_Grupo_Codigo` (CI de BD intermitente).
+- **Origen:** CI de la PR #118 de BD (revisión 2, 2026-11-10): `Msg 3915 Cannot use the ROLLBACK statement within an INSERT-EXEC statement` en `usp_generar_sesiones_grupo` línea 339, dentro de `CULM001_B1_FES_08C` (generación v2 de 730 sesiones), con la suite abortada después (186 casos sin ejecutar).
+- **Descripción:** El generador congelado v1 asigna a cada sesión `codigo = UPPER(LEFT(REPLACE(NEWID(), '-', ''), 6))` (6 hexadecimales, 16,7 M valores) y `UX_Sesion_Grupo_Codigo` exige unicidad por grupo. Con 730 sesiones por grupo la probabilidad de colisión es ≈ 1,6 % por grupo (paradoja del cumpleaños); la suite genera tres grupos así, ≈ 5 % de fallo por ejecución de la CI. Reproducido en local: 2 de 150 ejecuciones directas de la v1 devuelven `2601 Cannot insert duplicate key row in object 'dbo.Sesion' with unique index 'UX_Sesion_Grupo_Codigo'`. Como `usp_generar_sesiones_grupo_v2` invoca a la v1 con `INSERT ... EXEC`, el `ROLLBACK` del CATCH de la v1 se convierte en el 3915 que enmascara la causa, y con `sqlcmd -b` la suite se detiene.
+- **Impacto:** Medio para la CI (falsos negativos intermitentes, reintento manual); bajo en producción (un grupo real rara vez supera 100 sesiones: ≈ 0,03 %), pero una generación fallida deja la tupla `SYS_001` sin filas.
+- **Resolución esperada / propuesta:** Sustituir la v1 congelada mediante supersesión autorizada en un manifiesto post-freeze (`scripts/freeze-manifest.ps1`, mecanismo `SUPERSEDES`) con un código determinista por grupo (p. ej. derivado de `numero`) o un reintento acotado ante colisión; actualizar `test_golden_path_immutability.sql` y el contrato B1 (§2.7.6) que fijan su texto. No se corrige dentro de la revisión 2 porque exige cambio de contrato WORM.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 (revisión 2).
