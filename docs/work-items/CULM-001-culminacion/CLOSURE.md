@@ -115,7 +115,7 @@ DEC-002 (partir de `repo-antiguo/develop` en Backend y BD); DEC-008 (token PKCE,
 - [x] PR `integracion/CULM-001` → `develop` en BD: johnjduque/gestion-asistencia-db#113 — CI verde (`Database Deployment & Quality Gate` 697/698, SonarCloud), mezclable.
 - [x] PR `integracion/CULM-001` → `develop` en Backend: alejovh12/AsistenciasUCO#125 — CI verde (Backend CI, SonarCloud Quality Gate OK, CodeQL, Trivy, ArchUnit), mezclable.
 - [x] PR `integracion/CULM-001` → `develop` en Frontend: shesho22/AsistenciasUCO-Frontend#83 — mezclable (develop #72–#80 integrado en #84).
-- [ ] **Mezcla a `develop`: la realiza el responsable** (el clasificador de permisos de la sesión del orquestador bloquea mezclar a `develop`); orden sugerido Infra → BD → backend → frontend, con merge commit (sin squash).
+- [x] **Mezcla a `develop` realizada por el responsable el 2026-11-09 19:48 UTC**: Infra `299ee9f9`, BD `90ace364`, backend `ad3347e7`, frontend `5b850b2b` (merge commits). CULM-001 cerrado.
 - [x] `HU-CATALOG.md` actualizado (#32); `CLOSURE.md` firmado por el orquestador el 2026-11-09.
 
 ### 6.6 Gates de CI de los repositorios (DEC-063)
