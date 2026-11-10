@@ -99,6 +99,13 @@ Un registro por PR: repo, rama, base, URL (o URL de comparación si no se pudo a
 | shesho22/AsistenciasUCO-Frontend | `feat/ux-pulido-densidad` | `develop` | https://github.com/shesho22/AsistenciasUCO-Frontend/pull/89 | feat(frontend/ui): reducir la densidad de botones e informacion (menus de accion, filtros plegables, pestanas) | mezclada por el responsable |
 | shesho22/AsistenciasUCO-Frontend | `feat/ux-simplificacion` | `develop` | https://github.com/shesho22/AsistenciasUCO-Frontend/pull/90 | feat(frontend): simplificar las vistas por rol y unificar la presentacion de la informacion | mezclada por el responsable |
 
-## Revisión 2 del responsable (DEC-065, 2026-11-09/10) — sin PR todavía
+## Revisión 2 del responsable (DEC-065, 2026-11-09/10)
 
-Por DEC-065 (6) el trabajo de esta ronda vive en una sola rama local por repo, `feat/mejoras-revision-manual`, creada desde `develop` (Infra `62af197`, BD `a44d4e6`, backend `1bef135d`, frontend `7f22cc2`) y servida en `:4200`/`:8080` para revisión en pantalla. Cuando el responsable la considere madura se abre **una PR a `develop` por repo** (Infra, BD, backend, frontend) en ese orden. Ramas de lote mezcladas en ella: frontend `feat/mrm-lote1-frontend`, `-lote2-`, `-lote3a-`, `-lote3b-`; backend `feat/mrm-lote1-backend`, `-lote2-`, `-lote3-`; BD con commits directos (lotes 2, 1 y 3b).
+Por DEC-065 (6) el trabajo de esta ronda vive en una sola rama local por repo, `feat/mejoras-revision-manual`, creada desde `develop` (Infra `62af197`, BD `a44d4e6`, backend `1bef135d`, frontend `7f22cc2`) y servida en `:4200`/`:8080` para revisión en pantalla. El 2026-11-10, con el visto bueno del responsable, se abrió **una PR a `develop` por repo** (Infra, BD, backend, frontend), a mezclar en ese orden: Ramas de lote mezcladas en ella: frontend `feat/mrm-lote1-frontend`, `-lote2-`, `-lote3a-`, `-lote3b-`; backend `feat/mrm-lote1-backend`, `-lote2-`, `-lote3-`; BD con commits directos (lotes 2, 1 y 3b).
+
+| Repositorio | Rama | Base | PR | Título | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| AsistenciasUCO/AsistenciasUCO-Infra | `feat/mejoras-revision-manual` | `develop` | https://github.com/AsistenciasUCO/AsistenciasUCO-Infra/pull/41 | docs(work-items): revision 2 del responsable y contratos DEC-065 | ABIERTA a develop; mezclar primero |
+| johnjduque/gestion-asistencia-db | `feat/mejoras-revision-manual` | `develop` | https://github.com/johnjduque/gestion-asistencia-db/pull/118 | feat(db): sesiones con aval, cancelacion y altas compuestas (DEC-065) | ABIERTA a develop; gate limpio 853 TEST_PASS; mezclar segunda |
+| alejovh12/AsistenciasUCO | `feat/mejoras-revision-manual` | `develop` | https://github.com/alejovh12/AsistenciasUCO/pull/130 | feat(backend): sesiones con aval, cancelacion y altas compuestas | ABIERTA a develop; 4304 pruebas + 121 ITs; requiere #118 |
+| shesho22/AsistenciasUCO-Frontend | `feat/mejoras-revision-manual` | `develop` | https://github.com/shesho22/AsistenciasUCO-Frontend/pull/91 | feat(frontend): sesiones con aval, decisiones y formularios compuestos | ABIERTA a develop; 2822 specs; mezclar última (requiere #130 y #118) |
