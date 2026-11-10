@@ -22,6 +22,7 @@
     .\infra.ps1 db-deploy
     .\infra.ps1 db-seed
     .\infra.ps1 db-test
+    .\infra.ps1 db-reset-qa -Mode Base -StopBackend -Yes
     .\infra.ps1 kc-token -Role Docente
     .\infra.ps1 kc-diagnose
     .\infra.ps1 verify
@@ -123,6 +124,7 @@ function Show-Help {
     Write-Host "  reload-db        Compila esquema DDL y restablece la semilla limpia en un solo paso." -ForegroundColor White
     Write-Host "  db-test          Ejecuta la suite transaccional de pruebas de BD (test_suite.sql)." -ForegroundColor White
     Write-Host "  db-cupos         Amplia la capacidad de cupos de todos los grupos (+40 cupos) para pruebas." -ForegroundColor White
+    Write-Host "  db-reset-qa      Estado base de pruebas ampliado: -Mode Base|Snapshot|Restore (-Backup, -StopBackend, -Yes)." -ForegroundColor White
     Write-Host ""
     Write-Host "3. IDENTIDAD Y KEYCLOAK (OIDC / OAuth2):" -ForegroundColor Yellow
     Write-Host "  kc-token         Obtiene un JWT Bearer valido para un rol especifico." -ForegroundColor White
@@ -355,6 +357,24 @@ switch ($Command.ToLowerInvariant()) {
 
     "db-test" {
         Invoke-TargetScript (Join-Path $infraRoot "components\sqlserver\scripts\test-summary.ps1")
+    }
+
+    "db-reset-qa" {
+        # -Mode y -Password son parametros de infra.ps1; el resto (-Backup, -Database, -StopBackend, -Yes...) llega en RemainingArgs.
+        $resetScript = Join-Path $infraRoot "scripts\database\reset-datos-prueba.ps1"
+        $resetArgs = @{}
+        if ($Mode) { $resetArgs['Mode'] = $Mode }
+        if ($Password) { $resetArgs['Password'] = $Password }
+        $pending = @($RemainingArgs)
+        for ($i = 0; $i -lt $pending.Count; $i++) {
+            if ($pending[$i] -match '^-(\w+)$') {
+                $name = $Matches[1]
+                if (($i + 1) -lt $pending.Count -and $pending[$i + 1] -notmatch '^-\w+$') { $resetArgs[$name] = $pending[$i + 1]; $i++ }
+                else { $resetArgs[$name] = $true }
+            }
+        }
+        & $resetScript @resetArgs
+        exit $LASTEXITCODE
     }
 
     "db-cupos" {
