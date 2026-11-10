@@ -2,7 +2,7 @@ openapi: 3.1.2
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: AsistenciasUCO — Golden Path API
-  version: 1.6.0
+  version: 1.7.0
   description: |
     Contrato canónico LB-001C.1 para el Golden Path del backend AsistenciasUCO.
     Sigue el estilo PRAGMATIC_RESOURCE_PLUS_BUSINESS_COMMAND. HTTP/DB es la fuente
@@ -19,6 +19,8 @@ info:
     1.6.0 (CULM-001-D D.9-c, F-TRX-016/F-TRX-019, DEC-044 (11)): GET /api/v1/realtime/stream declara 406 (Accept incompatible) y abre con el
     comentario SSE ": conectado"; se publica POST /api/v1/realtime/emit (solo ADMINISTRADOR, cuerpo validado). GET /api/v1/realtime/status
     tambien es solo ADMINISTRADOR (diagnostico del canal, fuera de este contrato). Sin cambios en schemas existentes.
+    1.7.0 (DEC-065 (2), HU030/HU047): Sesion y SesionV2 agregan estadoSolicitud (PENDIENTE|APROBADA|RECHAZADA; null si la sesion no nacio como
+    solicitud) y pendienteAprobacion (boolean). Cambio aditivo: una sesion creada por el docente queda pendiente del aval del coordinador.
 servers:
   - url: /
     description: Servidor que publica esta especificación
@@ -1189,7 +1191,7 @@ components:
     Sesion:
       type: object
       additionalProperties: false
-      required: [sesion, grupo, nombre, numero, codigo, numeroSemana, codigoGrupo, nombreGrupo, fechaHoraInicio, fechaHoraFin, estado, cancelacion]
+      required: [sesion, grupo, nombre, numero, codigo, numeroSemana, codigoGrupo, nombreGrupo, fechaHoraInicio, fechaHoraFin, estado, cancelacion, estadoSolicitud, pendienteAprobacion]
       properties:
         sesion:
           type: string
@@ -1223,6 +1225,13 @@ components:
           description: CULM-001 B. CANCELADA si y solo si cancelacion no es null.
         cancelacion:
           $ref: '#/components/schemas/CancelacionSesion'
+        estadoSolicitud:
+          type: [string, 'null']
+          enum: [PENDIENTE, APROBADA, RECHAZADA, null]
+          description: DEC-065 (2). Estado de la solicitud de sesion extraordinaria; null si la sesion no nacio como solicitud.
+        pendienteAprobacion:
+          type: boolean
+          description: DEC-065 (2). true mientras la solicitud espera el aval del coordinador; una sesion pendiente no admite tomas ni asistencia.
     EstudianteGrupo:
       type: object
       additionalProperties: false
@@ -1630,7 +1639,7 @@ components:
     SesionV2:
       type: object
       additionalProperties: false
-      required: [sesion, grupo, nombre, numero, codigo, numeroSemana, codigoGrupo, nombreGrupo, fechaHoraInicio, fechaHoraFin, estadoTemporal, procedenciaTemporal, estado, cancelacion]
+      required: [sesion, grupo, nombre, numero, codigo, numeroSemana, codigoGrupo, nombreGrupo, fechaHoraInicio, fechaHoraFin, estadoTemporal, procedenciaTemporal, estado, cancelacion, estadoSolicitud, pendienteAprobacion]
       properties:
         sesion:
           type: string
@@ -1671,6 +1680,13 @@ components:
           description: CULM-001 B. CANCELADA si y solo si cancelacion no es null.
         cancelacion:
           $ref: '#/components/schemas/CancelacionSesion'
+        estadoSolicitud:
+          type: [string, 'null']
+          enum: [PENDIENTE, APROBADA, RECHAZADA, null]
+          description: DEC-065 (2). Estado de la solicitud de sesion extraordinaria; null si la sesion no nacio como solicitud.
+        pendienteAprobacion:
+          type: boolean
+          description: DEC-065 (2). true mientras la solicitud espera el aval del coordinador; una sesion pendiente no admite tomas ni asistencia.
     CancelacionSesion:
       type: [object, 'null']
       additionalProperties: false
