@@ -9,8 +9,8 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## Resumen General
 
-- **Total de Endpoints Protegidos:** 200
-- **Total de Endpoints Exentos (PÃºblicos / Webhook):** 4
+- **Total de Endpoints Protegidos:** 201
+- **Total de Endpoints Exentos (PÃºblicos / Webhook):** 6
 - **Roles Definidos:** ADMINISTRADOR, DECANO, COORDINADOR, DOCENTE, ESTUDIANTE
 
 ## Perfiles Funcionales
@@ -307,7 +307,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `PATCH` | `/api/v2/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 | `GET` | `/api/v2/sesiones/grupo/{grupoId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 
-### Rol: ESTUDIANTE (25)
+### Rol: ESTUDIANTE (26)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -325,6 +325,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/estudiante/materias/{materiaId}/sesiones` | ROLES | Solo la matricula inscrita del estudiante autenticado: el SP usp_consultar_sesiones_materia_estudiante resuelve el ambito, pagina (pagina y tamano opcionales) y entrega la fecha limite de justificacion (CULM-001 D.1). |
 | `POST` | `/api/v1/estudiante/matricular-grupo` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `GET` | `/api/v1/estudiante/oferta-academica` | ROLES | Programas del estudiante autenticado (EstudiantePrograma); el ámbito lo fuerza el procedimiento almacenado. |
+| `GET` | `/api/v1/estudiante/plan-estudio` | ROLES | HU018: solo los planes activos de los programas del estudiante autenticado (EstudiantePrograma); el ámbito lo fuerza usp_consultar_plan_estudio_estudiante. |
 | `GET` | `/api/v1/estudiante/reclamos` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `DELETE` | `/api/v1/estudiante/reclamos/{id}` | ROLES | CULM-001 A.2-7: solo el reclamo propio y pendiente del estudiante autenticado (usp_retirar_solicitud_revision_asistencia: REV_006 404, REV_007 409). |
 | `GET` | `/api/v1/jornadas-programa` | AUTHENTICATED | â€” |
@@ -344,5 +345,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `POST` | `/api/v1/internal/azure-events` | Webhook de Azure Event Grid: autenticado por AzureEventGridAuthFilter (aeg-sas-token), fuera del PEP. |
 | `POST` | `/api/v1/public/matricula-qr/registro` | HU176B: alta publica y matricula por QR/PIN; la credencial es el token/PIN rotativo. Exige red del campus, interruptor, correo institucional y limite de intentos por IP. No devuelve token de sesion. |
 | `POST` | `/api/v1/public/matricula-qr/validar` | HU176B: validacion publica de la matricula por QR/PIN; la credencial es el token/PIN rotativo (SHA-256 en BD, vigencia por parametros). Exige red del campus, interruptor y limite de intentos por IP (MatriculaQrRateLimitFilter); responde solo los datos minimos del curso y un error generico MQR_001 para cualquier token invalido. |
+| `POST` | `/api/v1/public/recuperacion-clave/confirmacion` | HU177: define la contrasena nueva; la credencial es el token de un solo uso del enlace (SHA-256 en BD, vigencia por parametro). Cualquier enlace que no sirve responde igual. Limite de intentos por IP. |
+| `POST` | `/api/v1/public/recuperacion-clave/solicitud` | HU177: solicitud publica del enlace para definir una contrasena nueva; responde siempre igual, exista o no la cuenta, y solo encola un correo al usuario activo dueno del correo. Limite de intentos por IP (filtro de RecuperacionClaveWiringConfiguration) y espera minima entre enlaces en BD. |
 | `POST` | `/api/v1/public/verificar-correo` | IDENT-001: verificacion publica del correo; la credencial es el token de un solo uso del enlace (SHA-256 en BD, vigencia por parametro) y la ruta tiene limite de intentos por IP (VerificacionCorreoRateLimitFilter). Sin datos personales en la respuesta. |
 
