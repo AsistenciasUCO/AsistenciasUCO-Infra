@@ -1,8 +1,10 @@
 # ==============================================================================
-# Traefik Dynamic Configuration: Hardened Security Headers
+# Traefik Dynamic Configuration: Hardened Security Headers + Rate Limit (CF-03)
+# Aplicados a los routers de dynamic/routers.yml.
 # ==============================================================================
 http:
   middlewares:
+    # API: no sirve contenido activo, asi que la CSP es la mas estricta posible (sin unsafe-inline).
     sec-headers:
       headers:
         frameDeny: true
@@ -11,12 +13,30 @@ http:
         contentTypeNosniff: true
         forceSTSHeader: true
         stsIncludeSubdomains: true
-        stsPreload: true
         stsSeconds: 31536000
         customFrameOptionsValue: "DENY"
         referrerPolicy: "strict-origin-when-cross-origin"
         permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()"
-        contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' ws: wss:; object-src 'none'; frame-ancestors 'none';"
+        contentSecurityPolicy: "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+          Server: ""
+          X-Powered-By: ""
+
+    # SPA: la CSP la define el nginx del frontend (depende de las URL de API e IdP);
+    # aqui se omite para no intersectarla con una politica que bloquearia la app.
+    sec-headers-web:
+      headers:
+        frameDeny: true
+        sslRedirect: false
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "DENY"
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()"
         customResponseHeaders:
           X-Robots-Tag: "noindex, nofollow"
           Server: ""
@@ -26,4 +46,11 @@ http:
       rateLimit:
         average: 100
         burst: 50
+        period: 1m
+
+    # La SPA descarga decenas de archivos estaticos por carga: limite mas holgado.
+    rate-limit-web:
+      rateLimit:
+        average: 600
+        burst: 200
         period: 1m

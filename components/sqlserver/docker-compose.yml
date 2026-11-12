@@ -18,7 +18,7 @@ volumes:
 
 services:
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2022-CU20-GDR1-ubuntu-22.04
     container_name: ${SQL_CONTAINER_NAME:-sql_server_asistencias}
     restart: unless-stopped
     environment:

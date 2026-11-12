@@ -1,0 +1,16 @@
+# ==============================================================================
+# Alertmanager - Asistencias UCO (OBS-12)
+# Receptor LOCAL sin credenciales: las alertas se agrupan y quedan visibles en la
+# interfaz (http://127.0.0.1:9093) y en la API /api/v2/alerts. No se envia nada fuera.
+# Para notificar de verdad (correo, Teams, Slack) agregue un receptor con su
+# configuracion y los secretos desde variables o Key Vault; no los escriba en este archivo.
+# ==============================================================================
+route:
+  receiver: local-sin-envio
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: local-sin-envio
