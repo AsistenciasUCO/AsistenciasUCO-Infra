@@ -8,6 +8,19 @@ api:
 entryPoints:
   web:
     address: ":80"
+    # CF-03: todo el trafico HTTP se redirige a HTTPS
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+    http:
+      # Sin certificados declarados Traefik usa su certificado autofirmado por defecto (solo desarrollo).
+      # Para un certificado local confiable use mkcert y declare tls.certificates en dynamic/tls.yml
+      # (sin commitear la clave privada). En produccion, un certResolver o el balanceador con TLS.
+      tls: {}
 
 providers:
   docker:

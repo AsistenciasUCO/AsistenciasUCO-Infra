@@ -27,6 +27,8 @@ volumes:
     name: asistencias_keycloak_db_data
   asistencias_prometheus_data:
     name: asistencias_prometheus_data
+  asistencias_alertmanager_data:
+    name: asistencias_alertmanager_data
   asistencias_grafana_data:
     name: asistencias_grafana_data
   asistencias_azurite_data:
@@ -43,7 +45,7 @@ services:
   # ----------------------------------------------------------------------------
   sqlserver:
     profiles: ["core", "full"]
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2022-CU20-GDR1-ubuntu-22.04
     container_name: ${SQL_CONTAINER_NAME:-sql_server_asistencias}
     restart: unless-stopped
     environment:
@@ -90,7 +92,7 @@ services:
     environment:
       POSTGRES_DB: ${KC_DB_DATABASE:-keycloak}
       POSTGRES_USER: ${KC_DB_USERNAME:-keycloak}
-      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:-change-me-postgres-keycloak}
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:?defina KC_DB_PASSWORD en .env (ver .env.example)}
     volumes:
       - asistencias_keycloak_db_data:/var/lib/postgresql/data
     deploy:
@@ -124,11 +126,11 @@ services:
         condition: service_healthy
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-kcadmin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-change-me-kcadmin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?defina KC_BOOTSTRAP_ADMIN_PASSWORD en .env (ver .env.example)}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KC_DB_DATABASE:-keycloak}
       KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-change-me-postgres-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?defina KC_DB_PASSWORD en .env (ver .env.example)}
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KC_PASSWORD_MIN_LENGTH: ${KC_PASSWORD_MIN_LENGTH:-12}
@@ -160,6 +162,8 @@ services:
     image: otel/opentelemetry-collector-contrib:0.114.0
     container_name: otel_collector_asistencias
     restart: unless-stopped
+    depends_on:
+      - tempo
     ports:
       - "${HOST_BIND_IP:-127.0.0.1}:${OTEL_GRPC_PORT:-4317}:4317"
       - "${HOST_BIND_IP:-127.0.0.1}:${OTEL_HTTP_PORT:-4318}:4318"
@@ -178,9 +182,47 @@ services:
     restart: unless-stopped
     ports:
       - "${HOST_BIND_IP:-127.0.0.1}:${PROMETHEUS_HOST_PORT:-9090}:9090"
+    # host.docker.internal: el backend corre en el host (actuator en 8090); en Linux requiere host-gateway
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./components/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./components/observability/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - asistencias_prometheus_data:/prometheus
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 5b. OBSERVABILIDAD: Alertmanager (OBS-12) - receptor local sin credenciales
+  # ----------------------------------------------------------------------------
+  alertmanager:
+    profiles: ["observability", "full"]
+    image: prom/alertmanager:v0.35.0
+    container_name: alertmanager_asistencias
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${ALERTMANAGER_HOST_PORT:-9093}:9093"
+    volumes:
+      - ./components/observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - asistencias_alertmanager_data:/alertmanager
+    networks:
+      - asistencias_network
+
+  # ----------------------------------------------------------------------------
+  # 5c. OBSERVABILIDAD: Tempo (trazas, OBS-09) - almacenamiento efimero (tmpfs), solo desarrollo
+  # ----------------------------------------------------------------------------
+  tempo:
+    profiles: ["observability", "full"]
+    image: grafana/tempo:2.9.5
+    container_name: tempo_asistencias
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./components/observability/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - type: tmpfs
+        target: /var/tempo
+        tmpfs:
+          mode: 1777
     networks:
       - asistencias_network
 
@@ -195,7 +237,7 @@ services:
     ports:
       - "${HOST_BIND_IP:-127.0.0.1}:${GRAFANA_HOST_PORT:-3000}:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?defina GRAFANA_ADMIN_PASSWORD en .env (ver .env.example)}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - asistencias_grafana_data:/var/lib/grafana
@@ -230,6 +272,9 @@ services:
     restart: unless-stopped
     ports:
       - "${HOST_BIND_IP:-127.0.0.1}:80:80"
+      - "${HOST_BIND_IP:-127.0.0.1}:443:443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./components/proxy/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -246,8 +291,8 @@ services:
     container_name: ${MINIO_CONTAINER_NAME:-minio_asistencias}
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-AdminPassword123456!}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?defina MINIO_ROOT_USER en .env (ver .env.example)}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?defina MINIO_ROOT_PASSWORD en .env (ver .env.example)}
       MINIO_BROWSER: "off"
     command: ["server", "/data"]
     ports:

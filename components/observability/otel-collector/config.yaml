@@ -24,13 +24,18 @@ exporters:
     namespace: "asistencias_uco"
   debug:
     verbosity: basic
+  # Trazas hacia Tempo (OBS-09); red interna de compose, sin TLS (solo desarrollo)
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [debug]
+      exporters: [otlp/tempo, debug]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]
