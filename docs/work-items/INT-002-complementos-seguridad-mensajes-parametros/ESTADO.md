@@ -72,6 +72,35 @@ Variables del backend (`.env` local, fuera de Git): `APP_ADAPTERS_PARAMETER_CATA
 ## 5. Pendiente / para revisar en pantalla
 
 - Pantalla del Catálogo (`http://localhost:4201`) con `security-demo` o `lab-pdp-admin`: comprobar que el microfrontend administrativo cargue con el perfil asignado (validado por API, no en pantalla).
-- Montar el microfrontend de Parámetros (`parametros-administration.js`, guía §8) en la administración de AsistenciasUCO: **no se hizo** (trabajo de frontend aparte).
+- ~~Montar el microfrontend de Parámetros en la administración de AsistenciasUCO~~ **Hecho el 2026-11-12** en el frontend,
+  rama `feat/INT-002-microfrontend-parametros` (desde `origin/develop`, worktree
+  `C:\Proyectos\GestionAsistencia-INT002-PRM\GestioAsistenciaFrontend`, commit `317669f`, sin push). Decisión del responsable: la
+  administración de parámetros de la UI es **solo** `parametros-administration.js` del equipo de parámetros.
+  - `ParametrosAdministrationComponent` (`src/app/features/parametros/parametros-administration/`, standalone, OnPush,
+    signals) descarga el módulo con `import()` de URL de runtime, monta en `ngAfterViewInit`, espera `handle.ready` y
+    desmonta al destruirse; estados cargando / listo / error (reintento) / sesión vencida / sin permiso / sin configurar.
+  - Vive en la pestaña **Parámetros** de `AdminSystemComponent`: `/app/admin/sistema` (Sistema & Auditoría) y
+    `/app/admin/configuracion/parametros` (mismo componente en modo `parametros`), ambas con `roleGuard` ADMINISTRADOR.
+    Se retiraron la lista propia y `parametro-edicion-modal.component.ts`; endpoints y SP del backend siguen (TD-090).
+  - Configuración por `env.js` (no quemada en código): `CATALOGO_PARAMETROS_APPLICATION_ID` (`0d24a3a4-…`, el mismo del
+    `.env` del backend; sin valor por defecto, la pantalla avisa si falta), `CATALOGO_PARAMETROS_UI_URL`
+    (`/parametros-ui/parametros-administration.js`) y `CATALOGO_PARAMETROS_API_BASE_URL` (`/catalogo-parametros/api/v1`).
+    También en `env.template.js`, `docker-entrypoint.d/40-env-js.sh` y `.env.example`.
+  - `refreshIntervalMs: 0`: leído en el bundle 1.0.0, `0` desactiva el `setInterval` (el valor por defecto es 60000, es
+    decir, sondeo). Las actualizaciones llegan por SSE (`…/administracion/events`). Hallazgo para el equipo: TD-091.
+  - Proxy de `ng serve`: `/catalogo-parametros` → `localhost:8081` y `/parametros-ui` → `localhost:4201`. El PDP ya
+    admite `http://localhost:4200` (`PDP_CORS_ALLOWED_ORIGINS` y orígenes de retorno de `lab.env`), pero la API del
+    Catálogo solo admite `FRONTEND_ALLOWED_ORIGINS=http://localhost:4201` y responde 403 de CORS al Origin 4200: el proxy
+    quita `Origin`, igual que en `/messageucolab` (TD-091). El nginx de producción aún no publica estas rutas (TD-091).
+  - 401 → `onAuthenticationRequired` → estado "sesión vencida", desmontaje y botón de login de Seguridad que vuelve a
+    la ruta actual (mismo comportamiento que mensajes; sin redirección automática para no entrar en bucle).
+  - Pruebas: `parametros-administration.component.spec.ts` (montaje ok, fallo del import, `mount` que lanza,
+    `handle.ready` rechazado, 401 en carga y después, login, unmount, carreras de reintento y destrucción);
+    `npm run verify` en verde (2745 pruebas, cobertura realtime 95,26 % / 86,81 %, build de producción).
+  - **Validado en pantalla (2026-11-12)** con `uco-administrador` en `http://localhost:4200/app/admin/sistema` (`ng serve`
+    del worktree): el micro frontend muestra «Cambios en tiempo real conectados», el módulo `Asistencias` y los 21
+    parámetros de AsistenciasUCO; `GET …/administracion` 200 y SSE `…/administracion/events` abierto por el proxy. Solo
+    lectura: no se editó ningún parámetro. Antes de eso, con `catalogo-parametros-app` detenido, la pantalla mostró el
+    estado de error con «Reintentar» (500 del proxy), como se esperaba.
 - `provision_asistencias.py verify` falla en `develop` por una ruta constante en `RecuperacionClaveController` (HU177): TD-087.
 - Azure (App Configuration / Key Vault) sigue sin suscripción activa (hallazgo 9 de CULM-001); el laboratorio opera con `catalogoparametros` y `messageucolab` (contingencia Azure → código → texto del enum).

@@ -109,6 +109,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-087](#td-087) | `provision_asistencias.py verify` falla en `develop`: `extract_endpoints.py` no admite rutas constantes (`RecuperacionClaveController`, HU177) | ABIERTA / NON_BLOCKING | no |
 | [TD-088](#td-088) | Catálogo de Parámetros 0.1.7: plantilla de recursos vacía, `tipos-parametro` sin semilla y sin validación de referencia en `POST /parametros` | ABIERTA / NON_BLOCKING | no |
 | [TD-089](#td-089) | Gateway Kong de MessageUcoLab degradado tras ~4 h: deja de aceptar conexiones nuevas desde contenedores | ABIERTA / NON_BLOCKING | no |
+| [TD-090](#td-090) | `/api/v1/admin/parametros` y sus SP sin uso desde la UI: la administración de parámetros es el micro frontend del Catálogo | ABIERTA / NON_BLOCKING | no |
+| [TD-091](#td-091) | `parametros-administration.js` 1.0.0: sondeo por defecto cada 60 s, CORS de un solo origen; nginx propio sin rutas a los micro frontends | ABIERTA / NON_BLOCKING | no |
 
 ## TD-001
 
@@ -1108,4 +1110,22 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Descripción:** Con el contenedor limitado a 1,6 GiB de memoria, tras unas 4 h de ejecución Kong no acepta conexiones nuevas desde otros contenedores (el Catálogo, que consulta mensajes por Kong, se cuelga). `docker restart api-gateway-kong` lo recupera. La comprobación de Kong de `scripts/tests/test_catalogo_parametros.ps1` lo detecta (sin respuesta en 5 s).
 - **Impacto:** Medio para el laboratorio: degrada Catálogo y mensajes sin error claro.
 - **Resolución esperada:** Que el equipo de mensajes revise el consumo de memoria/conexiones de Kong (límites, keepalive, fugas) y añada un healthcheck que detecte la degradación.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-090
+
+- **Título:** Endpoints y SP de administración propia de parámetros (`/api/v1/admin/parametros`, HU168) sin uso desde la UI tras montar el micro frontend del Catálogo.
+- **Origen:** INT-002 (2026-11-12). Decisión del responsable: la administración de parámetros de AsistenciasUCO es únicamente `parametros-administration.js` del equipo de parámetros, montado en la administración del sistema (ADMINISTRADOR).
+- **Descripción:** El frontend (rama `feat/INT-002-microfrontend-parametros`) retiró la lista de parámetros y `parametro-edicion-modal.component.ts` de `admin-system`; la pestaña Parámetros (en `/app/admin/sistema` y en `/app/admin/configuracion/parametros`, que reutiliza el mismo componente) monta ahora el micro frontend. Siguen vivos, sin consumidor de UI: `AdminParametroController` (`GET /api/v1/admin/parametros` paginado, `PUT /api/v1/admin/parametros/{id}` y su historial de cambios), sus casos de uso y los SP de consulta/actualización de `dbo.CatalogoParametro`, además de `AdminManagementService.cargarParametros/actualizarParametro` en el frontend. No se borraron a propósito: los SP/ufn siguen leyendo `dbo.CatalogoParametro` y con el proveedor `catalogoparametros` nada sincroniza el Catálogo externo hacia la BD (brecha anotada en INT-002 §2.3; la edición local responde 409 PRM_010).
+- **Impacto:** Bajo (superficie de API sin uso; riesgo de que alguien edite la tabla local creyendo que es la fuente de verdad).
+- **Resolución esperada:** Cuando exista la sincronización Catálogo → BD (webhook delgado con HMAC → backend invalida caché y actualiza la fila vía SP), retirar el `PUT` y el historial, dejar el `GET` solo si un reporte lo necesita, y borrar los métodos del servicio del frontend y sus pruebas.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-091
+
+- **Título:** Micro frontend `parametros-administration.js` 1.0.0: refresco periódico por defecto (sondeo cada 60 s) y CORS de un solo origen en la API del Catálogo.
+- **Origen:** INT-002 (2026-11-12), montaje del micro frontend en AsistenciasUCO (lectura del bundle servido en `http://localhost:4201/parametros-ui/`).
+- **Descripción:** (1) `mount()` usa `refreshIntervalMs ?? 60000` y con un valor distinto de 0 programa un `setInterval` que llama `refresh()` mientras la pestaña está visible; acepta `0` (sin intervalo) o un valor entre 30000 y 86400000. El componente ya abre SSE (`{apiBaseUrl}/aplicaciones/{id}/administracion/events`, evento `catalogo-aplicacion`) y refresca al reconectar, así que el intervalo es sondeo redundante; AGENTS.md prohíbe el polling y AsistenciasUCO monta con `refreshIntervalMs: 0`. La guía §8 de liberación muestra `60000` como ejemplo. (2) La API del Catálogo (`FRONTEND_ALLOWED_ORIGINS`, por defecto solo `http://localhost:4201`) responde 403 de CORS a cualquier petición con `Origin: http://localhost:4200`, aunque llegue por proxy del mismo origen; el PDP sí admite 4200. El proxy de desarrollo de AsistenciasUCO quita la cabecera `Origin` en `/catalogo-parametros` (mismo arreglo que `/messageucolab`). (3) Del lado de AsistenciasUCO, el nginx de producción del frontend (`nginx/default.conf`) no publica `/parametros-ui`, `/catalogo-parametros` ni `/messageucolab`: hoy solo funciona con `ng serve`.
+- **Impacto:** Bajo en el laboratorio; en un despliegue real los tres puntos impiden o degradan la administración de parámetros.
+- **Resolución esperada:** Pedir al equipo de parámetros que el valor por defecto sea `0` (o que se retire el intervalo y se documenten los eventos SSE como mecanismo de actualización, idealmente con un webhook para consumidores backend) y que `FRONTEND_ALLOWED_ORIGINS` admita una lista de orígenes documentada. En AsistenciasUCO, agregar al nginx las ubicaciones con destino configurable (o publicar los micro frontends detrás del mismo gateway) antes del despliegue.
 - **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
