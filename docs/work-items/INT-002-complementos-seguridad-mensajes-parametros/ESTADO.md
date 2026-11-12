@@ -41,7 +41,12 @@ El `.env` entregado traía valores del equipo de parámetros (su PDP, su Message
 2. **Identidad de servicio Catálogo → MessageUcoLab:** `svc-…-catalogo-parametros-a-messageucolab-dev-v2` (la primera, `…-dev`, quedó creada sin secreto conocido por un fallo del script y el PDP no permite rotarla ni borrarla: ignorarla), recurso `GET /messageucolab/v1/public/messages/{codigo}` y rol técnico `MESSAGEUCOLAB_MESSAGES_READ` en la aplicación `MessageUcoLab`, solicitud aprobada. `client_credentials` responde 200 y el PEP deja pasar la consulta pública (422 por falta de `X-Environment-Id`, es decir, ya dentro de la aplicación).
 3. **MessageUcoLab:** aplicación `Catalogo` en la organización `UCO` (ambientes Develop/Testing/Produccion), 7 funcionalidades de la plantilla e importación de `plantilla-mensajes.xlsx` (144 mensajes, 0 errores) para Develop. La plantilla trae en su hoja oculta el `applicationId` del equipo de parámetros; se reemplazó por el nuestro antes de importar.
 4. **Catálogo:** organización `UCO`, aplicación `AsistenciasUCO`, ambiente `Develop`, módulo `Asistencias`, funcionalidad `Parametros de negocio`, 21 parámetros con nombre `GRUPO.CLAVE` (los de `ParametrosPorDefecto`) y sus metadatos para Develop (`RED.PROXIES_CONFIABLES` sin metadato: el Catálogo rechaza el valor vacío y aplica el valor por defecto del backend), y un **Token** de consulta.
-5. **Backend:** proveedor `catalogoparametros` (`CatalogoParametrosHttpParameterCatalogAdapter`, `CatalogoParametrosProviderProperties`, `CatalogoParametrosAdapterConfiguration`), una sola llamada `GET /tokens/{id}/parametros` con caché por TTL (5 min), selección por `parametro.nombre` = `GRUPO<separador>CLAVE`, valor en `metadatos[].metadato.valor`; 401/403/5xx y fallos de red → `ParameterCatalogException` (el decorador DEC-018 aplica el valor por defecto). Variables `CATALOGO_PARAMETROS_*` documentadas en `.env.example` y `.env.template`.
+5. **Backend:** proveedor `catalogoparametros` (`CatalogoParametrosHttpParameterCatalogAdapter`, `CatalogoParametrosProviderProperties`, `CatalogoParametrosAdapterConfiguration`), una sola llamada `GET /tokens/{id}/parametros` con caché por TTL (5 min; con la caché vencida se sirven los valores anteriores y se refresca en segundo plano con una sola petición en vuelo; si el refresco falla se conservan los valores, se escribe WARN y no se reintenta durante una gracia de hasta 30 s acotada por el TTL; timeout HTTP por defecto 10 s, antes 3 s), selección por `parametro.nombre` = `GRUPO<separador>CLAVE`, valor en `metadatos[].metadato.valor`; 401/403/5xx y fallos de red → `ParameterCatalogException` (el decorador DEC-018 aplica el valor por defecto). Variables `CATALOGO_PARAMETROS_*` documentadas en `.env.example` y `.env.template`.
+
+6. **Verificación 2026-11-12:**
+   - **PDP:** aplicación `Catalogo` con 104 recursos, rol `ADMINISTRADOR_PARAMETROS` con 100 recursos, perfil `Administracion de parametros` asignado a `lab-pdp-admin`, `security-demo` y `uco-administrador`.
+   - **PEP:** `security-demo` -> 200 en `/parametros`, `/organizaciones` y `/tipos-metadato`; `uco-docente` -> 403 `ACCESS_DENIED`; sin sesión -> 401 `TOKEN_INVALID`.
+   - **Script E2E:** `scripts/tests/test_catalogo_parametros.ps1` (salud del Catálogo y su frontend, lectura del token con secreto válido/inválido/ausente, API administrativa sin sesión, Kong, salud del backend y registro QR con correo no institucional -> 400 `VCE_001` con `@uco.edu.co` tomado del Catálogo). Resultado con el laboratorio levantado: todas las comprobaciones pasaron (lectura del token en ~1 s con el Catálogo caliente, 20 parámetros).
 
 ## 3. Cómo levantar el laboratorio ahora (orden y conjunto ligero)
 
@@ -54,11 +59,15 @@ La VM de Docker (7,65 GiB) **no soporta** los tres stacks completos: al arrancar
 
 Variables del backend (`.env` local, fuera de Git): `APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER=catalogoparametros`, `APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER=messageucolab`, `CATALOGO_PARAMETROS_BASE_URL=http://localhost:8081/catalogo-parametros/api/v1`, `CATALOGO_PARAMETROS_TOKEN_ID`, `CATALOGO_PARAMETROS_SECRETO`, `CATALOGO_PARAMETROS_APPLICATION_ID`, `CATALOGO_PARAMETROS_ENVIRONMENT_ID`.
 
-## 4. Hallazgos para los otros equipos (ver TECHNICAL_DEBT TD-086 a TD-088)
+## 4. Hallazgos para los otros equipos (ver TECHNICAL_DEBT TD-086 a TD-089)
 
 - **Seguridad:** la 0.1.11 anunciada no puede crear identidades de servicio sobre un realm persistido (falta el cliente aprovisionador); la 0.1.13 lo migra pero su entrypoint fija el puerto 8080. Nuestro compose lo resuelve con el relevo `keycloak-relay`.
 - **Parámetros:** `plantilla-resources.xlsx` vacía; la imagen 0.1.7 no siembra `tipos-parametro` (lista vacía y solo lectura) y `POST /parametros` acepta un `idTipoParametro` inexistente; el valor vacío de un metadato se rechaza; el `GET /parametros` pagina a 10 por defecto.
 - **Mensajes:** sin novedades; la plantilla de importación del Catálogo lleva el `applicationId` embebido (hay que generarla, o adaptarla, por aplicación).
+
+- **Kong degradado (TD-089):** tras ~4 h de uso (contenedor con 1,6 GiB) `api-gateway-kong` dejó de aceptar conexiones nuevas desde otros contenedores; `docker restart api-gateway-kong` lo recuperó.
+- **Dependencia del Catálogo con MessageUcoLab (TD-088):** el endpoint `GET /tokens/{id}/parametros` consulta mensajes en MessageUcoLab (vía Kong) antes de responder; si Kong no responde se cuelga más de 30 s en vez de devolver los parámetros sin mensajes.
+- **Lectura fría del token (TD-088):** la primera lectura tarda entre 1 y 13 s; por eso el timeout del backend pasó de 3 s a 10 s y la caché sirve valores vencidos mientras refresca.
 
 ## 5. Pendiente / para revisar en pantalla
 

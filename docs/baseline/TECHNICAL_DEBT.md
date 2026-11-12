@@ -108,6 +108,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-086](#td-086) | Security Baseline 0.1.13: el entrypoint de Keycloak fija el Admin API en 8080 (relevo `keycloak-relay` en el compose endurecido) | ABIERTA / NON_BLOCKING | no |
 | [TD-087](#td-087) | `provision_asistencias.py verify` falla en `develop`: `extract_endpoints.py` no admite rutas constantes (`RecuperacionClaveController`, HU177) | ABIERTA / NON_BLOCKING | no |
 | [TD-088](#td-088) | Catálogo de Parámetros 0.1.7: plantilla de recursos vacía, `tipos-parametro` sin semilla y sin validación de referencia en `POST /parametros` | ABIERTA / NON_BLOCKING | no |
+| [TD-089](#td-089) | Gateway Kong de MessageUcoLab degradado tras ~4 h: deja de aceptar conexiones nuevas desde contenedores | ABIERTA / NON_BLOCKING | no |
 
 ## TD-001
 
@@ -1095,7 +1096,16 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 
 - **Título:** Catálogo de Parámetros 0.1.7 (componente del equipo de parámetros): plantilla de recursos vacía, `tipos-parametro` sin semilla y sin validación de referencias.
 - **Origen:** INT-002 (2026-11-11), instalación y siembra del Catálogo en el laboratorio.
-- **Descripción:** (1) `plantilla-resources.xlsx` entregada solo con encabezados: los recursos que exige el microfrontend se registraron por API a partir del OpenAPI del componente (104 recursos). (2) `GET /tipos-parametro` devuelve `[]` y no hay `POST`; `POST /parametros` exige `idTipoParametro` pero acepta un UUID inexistente (se usó `00000000-0000-0000-0000-000000000001`). (3) `POST /metadatos` rechaza el valor vacío (`RED.PROXIES_CONFIABLES` queda sin metadato y usa el valor por defecto del backend). (4) `GET /parametros` y `GET /metadatos-ambiente` paginan a 10 por defecto (`page`, `pageSize`). (5) El app registra en bucle `UnknownHostException: otel-collector` cuando la observabilidad del compose está apagada.
+- **Descripción:** (1) `plantilla-resources.xlsx` entregada solo con encabezados: los recursos que exige el microfrontend se registraron por API a partir del OpenAPI del componente (104 recursos). (2) `GET /tipos-parametro` devuelve `[]` y no hay `POST`; `POST /parametros` exige `idTipoParametro` pero acepta un UUID inexistente (se usó `00000000-0000-0000-0000-000000000001`). (3) `POST /metadatos` rechaza el valor vacío (`RED.PROXIES_CONFIABLES` queda sin metadato y usa el valor por defecto del backend). (4) `GET /parametros` y `GET /metadatos-ambiente` paginan a 10 por defecto (`page`, `pageSize`). (5) El app registra en bucle `UnknownHostException: otel-collector` cuando la observabilidad del compose está apagada. (6) `GET /tokens/{id}/parametros` consulta mensajes en MessageUcoLab antes de responder: si Kong no responde se cuelga más de 30 s en vez de devolver los parámetros sin mensajes. (7) La lectura fría del token tarda entre 1 y 13 s (el backend subió su timeout a 10 s y sirve la caché vencida mientras refresca).
 - **Impacto:** Bajo para AsistenciasUCO (el adaptador y el decorador DEC-018 lo absorben); los hallazgos son del otro equipo.
-- **Resolución esperada:** Informar al equipo de parámetros: plantilla con los recursos reales, semilla de `tipos-parametro`, validación de referencias y valor vacío permitido o documentado.
+- **Resolución esperada:** Informar al equipo de parámetros: plantilla con los recursos reales, semilla de `tipos-parametro`, validación de referencias y valor vacío permitido o documentado, y que el endpoint de token no dependa de MessageUcoLab (o falle rápido y devuelva los parámetros) y reduzca la latencia en frío.
 - **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-089
+
+- **Título:** Gateway Kong de MessageUcoLab (`api-gateway-kong`, puerto 8000) se degrada tras ~4 h y deja de aceptar conexiones nuevas desde contenedores.
+- **Origen:** INT-002 (2026-11-12), diagnóstico de latencias >30 s en `GET /tokens/{id}/parametros` del Catálogo de Parámetros.
+- **Descripción:** Con el contenedor limitado a 1,6 GiB de memoria, tras unas 4 h de ejecución Kong no acepta conexiones nuevas desde otros contenedores (el Catálogo, que consulta mensajes por Kong, se cuelga). `docker restart api-gateway-kong` lo recupera. La comprobación de Kong de `scripts/tests/test_catalogo_parametros.ps1` lo detecta (sin respuesta en 5 s).
+- **Impacto:** Medio para el laboratorio: degrada Catálogo y mensajes sin error claro.
+- **Resolución esperada:** Que el equipo de mensajes revise el consumo de memoria/conexiones de Kong (límites, keepalive, fugas) y añada un healthcheck que detecte la degradación.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
