@@ -152,11 +152,14 @@ ambiente** con la importación masiva de MessageUcoLab (solo crea mensajes nuevo
      --template <su-plantilla-descargada>.xlsx --xlsx mensajes-asistencias.xlsx
    ```
 
-   (Si prefiere, copie las filas 2–145 de `Complementos\CatalogoMensajes\plantilla-mensajes.xlsx` a su plantilla.)
+   (Si prefiere, copie las filas de `Complementos\CatalogoMensajes\plantilla-mensajes.xlsx` a su plantilla.)
 3. En la pantalla de MessageUcoLab: **Importar** → seleccione los ambientes → validar → confirmar.
 4. Configure el Backend (`MESSAGEUCOLAB_APPLICATION_ID` / `MESSAGEUCOLAB_ENVIRONMENT_ID`) y `messages-switch messageucolab`.
 
 La coherencia seed ↔ alias ↔ límites la verifica `MessageUcoLabCatalogoTest`; la prueba viva `MessageUcoLabLiveIT`
 comprueba contra el componente real, sin contingencia, que cada mensaje cargado devuelve el texto exacto del seed.
 Si se añade un código largo al seed, regenere el fixture y los alias con el mismo script (`--psv`, `--yaml`).
+Al regenerar pase siempre `--previo <catalogo-mensajes-usuario.psv vigente>` (VAL-oleada3 MSG-03): conserva el código remoto ya
+importado de cada mensaje y numera los códigos largos nuevos después del último de su prefijo, sin renumerar los existentes
+(por ejemplo `ERR021` quedó libre al retirar un mensaje y no se reutiliza). El catálogo del 2026-11-13 tiene 398 mensajes de usuario.
 Para comprobar que el fixture del Backend sigue al seed: `build-message-catalog.py --seed GestioAsistenciaDB\schema\seed --check <catalogo-mensajes-usuario.psv>` (termina con error si hay desfase).
