@@ -1,0 +1,45 @@
+# ==============================================================================
+# VAL-oleada3 (REA-06 / F12-08): reparto round-robin entre 2 réplicas con health check por réplica.
+# Cada réplica se sondea en SU puerto de gestión (/actuator/health/readiness: BD + circuit breakers); una réplica
+# que no responde sale del reparto en <= interval + timeout y vuelve sola al recuperarse. El servicio ponderado
+# propaga la salud de sus hijos (healthCheck: {}).
+# Las cabeceras de seguridad (sec-headers) se omiten a propósito: este proxy solo existe para medir.
+# ==============================================================================
+http:
+  routers:
+    backend-replicas:
+      rule: "PathPrefix(`/`)"
+      entryPoints: [web]
+      service: backend-replicas
+
+  services:
+    backend-replicas:
+      weighted:
+        healthCheck: {}
+        services:
+          - name: backend-r0
+            weight: 1
+          - name: backend-r1
+            weight: 1
+
+    backend-r0:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /actuator/health/readiness
+          port: 8090
+          interval: 5s
+          timeout: 2s
+        servers:
+          - url: "http://host.docker.internal:8080"
+
+    backend-r1:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /actuator/health/readiness
+          port: 8092
+          interval: 5s
+          timeout: 2s
+        servers:
+          - url: "http://host.docker.internal:8082"

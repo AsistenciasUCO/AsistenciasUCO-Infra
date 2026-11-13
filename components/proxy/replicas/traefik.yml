@@ -1,0 +1,43 @@
+# ==============================================================================
+# VAL-oleada3 (REA-06 / F12-08): Traefik de PRUEBA para balancear 2 réplicas del backend
+# ------------------------------------------------------------------------------
+# Solo desarrollo local. Escucha HTTP plano en :8088 (publicado en 127.0.0.1) y reparte entre las réplicas del
+# backend que corren en el host (scripts/load/start-replicas.ps1 del backend: API 8080/8082, gestión 8090/8092).
+# No usa el socket de Docker (solo proveedor de archivos) y NO aplica el middleware rate-limit del proxy principal
+# (100 req/min por IP): el generador de carga sale de una sola IP y lo dispararía. El proxy principal
+# (components/proxy, perfil proxy) no cambia.
+# ==============================================================================
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: false
+  insecure: false
+
+entryPoints:
+  web:
+    address: ":8088"
+  # Entrada interna solo para la sonda de salud del contenedor (no se publica).
+  ping:
+    address: ":8082"
+
+ping:
+  entryPoint: ping
+
+providers:
+  file:
+    directory: "/etc/traefik/dynamic"
+    watch: true
+
+log:
+  level: INFO
+  format: json
+
+# El access log JSON trae ServiceURL: con él se demuestra el reparto de peticiones entre réplicas.
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep
+    headers:
+      defaultMode: drop
