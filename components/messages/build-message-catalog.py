@@ -5,6 +5,8 @@ carpeta o un archivo). El catalogo de MessageUcoLab debe cubrir todos los mensaj
 
 Salidas:
   * --psv   catalogo canonico|codigo remoto|tipo|categoria|titulo|contenido (fixture de pruebas del Backend)
+  * --previo fixture .psv vigente: conserva el codigo remoto ya importado de cada canonico (VAL-oleada3 MSG-03); los
+             codigos largos nuevos toman el siguiente numero libre de su prefijo, sin renumerar los existentes
   * --yaml  bloque `code-aliases` para application.yml (solo codigos que no caben en 10 caracteres)
   * --xlsx  copia de la plantilla oficial de importacion con las filas cargadas (sin tocar la plantilla de origen)
 
@@ -33,6 +35,11 @@ TYPE_MAP = {  # tipoMensaje del seed -> (Tipo, Categoria) de la plantilla
     "BUSINESS_ERROR": ("Funcional", "Error"),
     "SYSTEM_ERROR": ("Técnico", "Error"),
     "SUCCESS": ("Funcional", "Confirmación"),
+    # VAL-oleada3 MSG-03: tipos que los seeds ya usan (validaciones, seguridad, tecnicos e informativos).
+    "VALIDATION_ERROR": ("Funcional", "Error"),
+    "SECURITY_ERROR": ("Funcional", "Error"),
+    "TECHNICAL_ERROR": ("Técnico", "Error"),
+    "INFO": ("Funcional", "Información"),
 }
 PREFIX_FOR_LONG = {"ERR_": "ERR", "SUC_": "SUC"}
 
@@ -60,11 +67,30 @@ def read_seed(path):
     return list(messages.values())
 
 
-def remote_codes(rows):
+def read_previous(path):
+    """Codigo remoto ya asignado a cada canonico en un fixture .psv anterior (vacio si no se indica)."""
+    if not path:
+        return {}
+    previous = {}
+    for line in open(path, encoding="utf-8"):
+        if line.strip() and not line.startswith("#"):
+            canonical, remote = line.split(SEP, 2)[:2]
+            previous[canonical] = remote
+    return previous
+
+
+def remote_codes(rows, previous=None):
+    previous = previous or {}
     counters, out, used = {}, {}, set()
+    for remote in previous.values():
+        for prefix in PREFIX_FOR_LONG.values():
+            if re.fullmatch(prefix + r"\d{3}", remote):
+                counters[prefix] = max(counters.get(prefix, 0), int(remote[len(prefix):]))
     for code, *_ in rows:
         plain = re.sub(r"[^A-Za-z0-9]", "", code)
-        if len(plain) <= MAX_REMOTE:
+        if code in previous:
+            remote = previous[code]
+        elif len(plain) <= MAX_REMOTE:
             remote = plain
         else:
             prefix = next((v for k, v in PREFIX_FOR_LONG.items() if code.startswith(k)), None)
@@ -120,6 +146,7 @@ def main():
     p.add_argument("--seed", required=True)
     p.add_argument("--template")
     p.add_argument("--psv")
+    p.add_argument("--previo", help="fixture .psv vigente cuyos codigos remotos se conservan")
     p.add_argument("--check", help="fixture .psv a comparar contra los seeds; termina con error si no coinciden")
     p.add_argument("--yaml")
     p.add_argument("--xlsx")
@@ -130,7 +157,7 @@ def main():
     a = p.parse_args()
 
     rows = read_seed(a.seed)
-    remote = remote_codes(rows)
+    remote = remote_codes(rows, read_previous(a.previo))
     records, psv, aliases, over = [], [], [], []
     for code, tipo_seed, _severity, content in rows:
         tipo, categoria = TYPE_MAP[tipo_seed]
