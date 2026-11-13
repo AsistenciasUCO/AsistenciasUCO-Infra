@@ -92,6 +92,17 @@ Para evitar saturar la memoria RAM en el equipo de desarrollo, el orquestador ma
 | **`proxy`** | Traefik v3 con Hardened Headers | ~128 MB | Terminación de cabeceras de seguridad y proxy. |
 | **`full`** | Todos los 8 contenedores simultáneos | ~5.2 GB | Pruebas de integración total antes de release. |
 
+**Dos réplicas del backend (VAL-oleada3, REA-06 / F12-08).** `docker-compose.replicas.yml` es un proyecto Compose aparte
+(`asistencias-uco-replicas`, no toca los perfiles de arriba ni necesita `.env`): un Traefik de prueba en `127.0.0.1:8088`
+que reparte round-robin entre las réplicas del host (8080 y 8082) con health check por réplica en su puerto de gestión
+(`components/proxy/replicas/`). Las réplicas se arrancan desde el backend con `.\scripts\load\start-replicas.ps1 -Replicas 2`
+y la carga con `.\scripts\load\run-load-test.ps1`. Resultados y guía: [work item](docs/work-items/VAL-oleada3-carga/PLAN.md).
+
+```powershell
+docker compose -f docker-compose.replicas.yml up -d    # http://127.0.0.1:8088
+docker compose -f docker-compose.replicas.yml down     # sin -v: no tiene volúmenes
+```
+
 ---
 
 ## 4. Comandos Rápidos del Flujo de Desarrollo

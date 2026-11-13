@@ -1,0 +1,33 @@
+# ==============================================================================
+# VAL-oleada3 (REA-06 / F12-08): balanceador de PRUEBA para 2 réplicas del backend
+# ------------------------------------------------------------------------------
+# Proyecto Compose independiente (no toca docker-compose.yml ni sus perfiles, no necesita .env).
+#   docker compose -f docker-compose.replicas.yml up -d      # http://127.0.0.1:8088 -> réplicas 8080 y 8082
+#   docker compose -f docker-compose.replicas.yml down       # (sin -v: no tiene volúmenes)
+# Las réplicas se arrancan desde el backend: .\scripts\load\start-replicas.ps1 -Replicas 2
+# Guía completa y resultados: Repositorio_GestionAsistenciaBackend/docs/work-items/VAL-oleada3-carga/
+# ==============================================================================
+name: asistencias-uco-replicas
+
+services:
+  proxy-replicas:
+    # traefik:v3.2 fijado por digest (misma versión que el proxy principal).
+    image: traefik:v3.2@sha256:e561a37f8710d9cf41c78bdf421d822b2c0b48267ec0552e644565fb55466ea9
+    container_name: proxy_replicas_asistencias
+    restart: "no"
+    ports:
+      - "127.0.0.1:${REPLICAS_PROXY_PORT:-8088}:8088"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./components/proxy/replicas/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./components/proxy/replicas/dynamic:/etc/traefik/dynamic:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128m
