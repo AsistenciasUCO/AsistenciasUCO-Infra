@@ -10,7 +10,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 ## Resumen General
 
 - **Total de Endpoints Protegidos:** 201
-- **Total de Endpoints Exentos (PÃºblicos / Webhook):** 6
+- **Total de Endpoints Exentos (PÃºblicos / Webhook):** 4
 - **Roles Definidos:** ADMINISTRADOR, DECANO, COORDINADOR, DOCENTE, ESTUDIANTE
 
 ## Perfiles Funcionales
@@ -25,7 +25,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## CatÃ¡logo de Rutas por Rol
 
-### Rol: ADMINISTRADOR (77)
+### Rol: ADMINISTRADOR (76)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -104,10 +104,9 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: DECANO (49)
+### Rol: DECANO (48)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -158,10 +157,9 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: COORDINADOR (77)
+### Rol: COORDINADOR (76)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -240,7 +238,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
 ### Rol: DOCENTE (59)
@@ -286,6 +283,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `PUT` | `/api/v1/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
 | `GET` | `/api/v1/sesiones/{sesionId}/tomas` | ROLES | CULM-001 B.2: docente titular de la sesion (Application + SP: RBAC DOCENTE y titularidad). |
 | `POST` | `/api/v1/sesiones/{sesionId}/tomas` | ROLES | CULM-001 B.2: docente titular de la sesion (Application + SP: RBAC DOCENTE y titularidad). |
+| `GET` | `/api/v1/sesiones/{sesionId}/tomas/resumen` | ROLES | Puntos de control: docente titular de la sesion (Application + SP: RBAC DOCENTE y titularidad). |
 | `POST` | `/api/v1/sesiones/cierres` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
 | `POST` | `/api/v1/sesiones/consultas` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
 | `GET` | `/api/v1/sesiones/grupo/{grupoId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
@@ -300,14 +298,13 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `DELETE` | `/api/v1/tomas/{tomaId}/qr` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma (Application + SP). |
 | `POST` | `/api/v1/tomas/{tomaId}/qr` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma; el token solo viaja en la respuesta y en el SSE del titular. |
 | `POST` | `/api/v1/tomas/{tomaId}/qr/rotacion` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma; el token solo viaja en la respuesta y en el SSE del titular. |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 | `POST` | `/api/v2/sesiones` | ROLES | â€” |
 | `GET` | `/api/v2/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 | `PATCH` | `/api/v2/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 | `GET` | `/api/v2/sesiones/grupo/{grupoId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 
-### Rol: ESTUDIANTE (26)
+### Rol: ESTUDIANTE (25)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -335,7 +332,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
 ## Endpoints Exentos del PEP (PÃºblicos / IntegraciÃ³n)
@@ -345,7 +341,5 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `POST` | `/api/v1/internal/azure-events` | Webhook de Azure Event Grid: autenticado por AzureEventGridAuthFilter (aeg-sas-token), fuera del PEP. |
 | `POST` | `/api/v1/public/matricula-qr/registro` | HU176B: alta publica y matricula por QR/PIN; la credencial es el token/PIN rotativo. Exige red del campus, interruptor, correo institucional y limite de intentos por IP. No devuelve token de sesion. |
 | `POST` | `/api/v1/public/matricula-qr/validar` | HU176B: validacion publica de la matricula por QR/PIN; la credencial es el token/PIN rotativo (SHA-256 en BD, vigencia por parametros). Exige red del campus, interruptor y limite de intentos por IP (MatriculaQrRateLimitFilter); responde solo los datos minimos del curso y un error generico MQR_001 para cualquier token invalido. |
-| `POST` | `/api/v1/public/recuperacion-clave/confirmacion` | HU177: define la contrasena nueva; la credencial es el token de un solo uso del enlace (SHA-256 en BD, vigencia por parametro). Cualquier enlace que no sirve responde igual. Limite de intentos por IP. |
-| `POST` | `/api/v1/public/recuperacion-clave/solicitud` | HU177: solicitud publica del enlace para definir una contrasena nueva; responde siempre igual, exista o no la cuenta, y solo encola un correo al usuario activo dueno del correo. Limite de intentos por IP (filtro de RecuperacionClaveWiringConfiguration) y espera minima entre enlaces en BD. |
 | `POST` | `/api/v1/public/verificar-correo` | IDENT-001: verificacion publica del correo; la credencial es el token de un solo uso del enlace (SHA-256 en BD, vigencia por parametro) y la ruta tiene limite de intentos por IP (VerificacionCorreoRateLimitFilter). Sin datos personales en la respuesta. |
 
