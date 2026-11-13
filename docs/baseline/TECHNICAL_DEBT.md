@@ -105,6 +105,12 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-083](#td-083) | HU042 por SSE y campana de notificaciones diferidas (C.2) | ABIERTA / NON_BLOCKING | no |
 | [TD-084](#td-084) | Regla escrita de seguridad web (cookies HttpOnly y CSRF) contradice la implementación Bearer | ABIERTA / NON_BLOCKING | no |
 | [TD-085](#td-085) | Código aleatorio de sesión en `usp_generar_sesiones_grupo` colisiona con `UX_Sesion_Grupo_Codigo` (CI de BD intermitente) | ABIERTA / NON_BLOCKING | no |
+| [TD-086](#td-086) | Security Baseline 0.1.13: el entrypoint de Keycloak fija el Admin API en 8080 (relevo `keycloak-relay` en el compose endurecido) | ABIERTA / NON_BLOCKING | no |
+| [TD-087](#td-087) | `provision_asistencias.py verify` falla en `develop`: `extract_endpoints.py` no admite rutas constantes (`RecuperacionClaveController`, HU177) | ABIERTA / NON_BLOCKING | no |
+| [TD-088](#td-088) | Catálogo de Parámetros 0.1.7: plantilla de recursos vacía, `tipos-parametro` sin semilla y sin validación de referencia en `POST /parametros` | ABIERTA / NON_BLOCKING | no |
+| [TD-089](#td-089) | Gateway Kong de MessageUcoLab degradado tras ~4 h: deja de aceptar conexiones nuevas desde contenedores | ABIERTA / NON_BLOCKING | no |
+| [TD-090](#td-090) | `/api/v1/admin/parametros` y sus SP sin uso desde la UI: la administración de parámetros es el micro frontend del Catálogo | ABIERTA / NON_BLOCKING | no |
+| [TD-091](#td-091) | `parametros-administration.js` 1.0.0: sondeo por defecto cada 60 s, CORS de un solo origen; nginx propio sin rutas a los micro frontends | ABIERTA / NON_BLOCKING | no |
 
 ## TD-001
 
@@ -1069,3 +1075,57 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Medio para la CI (falsos negativos intermitentes, reintento manual); bajo en producción (un grupo real rara vez supera 100 sesiones: ≈ 0,03 %), pero una generación fallida deja la tupla `SYS_001` sin filas.
 - **Resolución esperada / propuesta:** Sustituir la v1 congelada mediante supersesión autorizada en un manifiesto post-freeze (`scripts/freeze-manifest.ps1`, mecanismo `SUPERSEDES`) con un código determinista por grupo (p. ej. derivado de `numero`) o un reintento acotado ante colisión; actualizar `test_golden_path_immutability.sql` y el contrato B1 (§2.7.6) que fijan su texto. No se corrige dentro de la revisión 2 porque exige cambio de contrato WORM.
 - **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001 (revisión 2).
+
+## TD-086
+
+- **Título:** Security Baseline 0.1.13: el entrypoint de la imagen de Keycloak fija el Admin API en `127.0.0.1:8080`; el laboratorio endurecido necesita un relevo de puerto.
+- **Origen:** INT-002 (2026-11-11), actualización 0.1.9 → 0.1.13 para habilitar las identidades de servicio (autenticación entre aplicaciones).
+- **Descripción:** La 0.1.11 anunciada por el equipo de seguridad no puede crear identidades de servicio sobre un realm persistido (`POST /applications/{id}/service-identities` → 500; el PDP recibe 401 de Keycloak porque falta el cliente `security-pdp-provisioner`). La 0.1.13 migra el realm al arrancar, pero su `security-baseline-entrypoint.sh` espera `</dev/tcp/127.0.0.1/8080` y usa `kcadm --server http://127.0.0.1:8080`; con `KC_HTTP_PORT=19090` (puerto oficial del laboratorio) aborta con `Keycloak no abrió el puerto de administración a tiempo`. El compose endurecido del backend deja Keycloak en el 8080 interno y agrega `keycloak-relay` (`alpine/socat`, `network_mode: service:keycloak`, 19090 → 8080) para que PDP/PEP y el host sigan usando `keycloak.localhost:19090`.
+- **Impacto:** Bajo (un contenedor auxiliar más; sin cambio de contrato). Riesgo: cada versión nueva del entrypoint puede cambiar la suposición del puerto.
+- **Resolución esperada:** Pedir al equipo de seguridad que el entrypoint lea `KC_HTTP_PORT` (o acepte un `SECURITY_BASELINE_ADMIN_PORT`) y retirar el relevo.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-087
+
+- **Título:** `provision_asistencias.py verify` falla en `develop` porque `extract_endpoints.py` exige rutas literales y HU177 usa constantes.
+- **Origen:** INT-002 (2026-11-11), verificación de solo lectura del PDP tras actualizar Security Baseline.
+- **Descripción:** `extract_endpoints.ExtractionError: RecuperacionClaveController.java: la ruta no es un literal de texto (SecurityPublicEndpoints.RECUPERACION_CLAVE_SOLICITUD)`. El inventario sin JVM no resuelve referencias a constantes, así que `verify`, `catalog` y `pdp` quedan inutilizables hasta corregirlo (la prueba Maven `AccessCatalogConsistencyTest` sí usa el mapeo real).
+- **Impacto:** Medio para la operación del laboratorio (no se puede verificar deriva PDP ↔ catálogo desde la CLI).
+- **Resolución esperada:** Que `extract_endpoints.py` resuelva constantes `static final String` del mismo árbol (`SecurityPublicEndpoints`) o que los controladores usen literales con el catálogo como única fuente.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-088
+
+- **Título:** Catálogo de Parámetros 0.1.7 (componente del equipo de parámetros): plantilla de recursos vacía, `tipos-parametro` sin semilla y sin validación de referencias.
+- **Origen:** INT-002 (2026-11-11), instalación y siembra del Catálogo en el laboratorio.
+- **Descripción:** (1) `plantilla-resources.xlsx` entregada solo con encabezados: los recursos que exige el microfrontend se registraron por API a partir del OpenAPI del componente (104 recursos). (2) `GET /tipos-parametro` devuelve `[]` y no hay `POST`; `POST /parametros` exige `idTipoParametro` pero acepta un UUID inexistente (se usó `00000000-0000-0000-0000-000000000001`). (3) `POST /metadatos` rechaza el valor vacío (`RED.PROXIES_CONFIABLES` queda sin metadato y usa el valor por defecto del backend). (4) `GET /parametros` y `GET /metadatos-ambiente` paginan a 10 por defecto (`page`, `pageSize`). (5) El app registra en bucle `UnknownHostException: otel-collector` cuando la observabilidad del compose está apagada. (6) `GET /tokens/{id}/parametros` consulta mensajes en MessageUcoLab antes de responder: si Kong no responde se cuelga más de 30 s en vez de devolver los parámetros sin mensajes. (7) La lectura fría del token tarda entre 1 y 13 s (el backend subió su timeout a 10 s y sirve la caché vencida mientras refresca).
+- **Impacto:** Bajo para AsistenciasUCO (el adaptador y el decorador DEC-018 lo absorben); los hallazgos son del otro equipo.
+- **Resolución esperada:** Informar al equipo de parámetros: plantilla con los recursos reales, semilla de `tipos-parametro`, validación de referencias y valor vacío permitido o documentado, y que el endpoint de token no dependa de MessageUcoLab (o falle rápido y devuelva los parámetros) y reduzca la latencia en frío.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-089
+
+- **Título:** Gateway Kong de MessageUcoLab (`api-gateway-kong`, puerto 8000) se degrada tras ~4 h y deja de aceptar conexiones nuevas desde contenedores.
+- **Origen:** INT-002 (2026-11-12), diagnóstico de latencias >30 s en `GET /tokens/{id}/parametros` del Catálogo de Parámetros.
+- **Descripción:** Con el contenedor limitado a 1,6 GiB de memoria, tras unas 4 h de ejecución Kong no acepta conexiones nuevas desde otros contenedores (el Catálogo, que consulta mensajes por Kong, se cuelga). `docker restart api-gateway-kong` lo recupera. La comprobación de Kong de `scripts/tests/test_catalogo_parametros.ps1` lo detecta (sin respuesta en 5 s).
+- **Impacto:** Medio para el laboratorio: degrada Catálogo y mensajes sin error claro.
+- **Resolución esperada:** Que el equipo de mensajes revise el consumo de memoria/conexiones de Kong (límites, keepalive, fugas) y añada un healthcheck que detecte la degradación.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-090
+
+- **Título:** Endpoints y SP de administración propia de parámetros (`/api/v1/admin/parametros`, HU168) sin uso desde la UI tras montar el micro frontend del Catálogo.
+- **Origen:** INT-002 (2026-11-12). Decisión del responsable: la administración de parámetros de AsistenciasUCO es únicamente `parametros-administration.js` del equipo de parámetros, montado en la administración del sistema (ADMINISTRADOR).
+- **Descripción:** El frontend (rama `feat/INT-002-microfrontend-parametros`) retiró la lista de parámetros y `parametro-edicion-modal.component.ts` de `admin-system`; la pestaña Parámetros (en `/app/admin/sistema` y en `/app/admin/configuracion/parametros`, que reutiliza el mismo componente) monta ahora el micro frontend. Siguen vivos, sin consumidor de UI: `AdminParametroController` (`GET /api/v1/admin/parametros` paginado, `PUT /api/v1/admin/parametros/{id}` y su historial de cambios), sus casos de uso y los SP de consulta/actualización de `dbo.CatalogoParametro`, además de `AdminManagementService.cargarParametros/actualizarParametro` en el frontend. No se borraron a propósito: los SP/ufn siguen leyendo `dbo.CatalogoParametro` y con el proveedor `catalogoparametros` nada sincroniza el Catálogo externo hacia la BD (brecha anotada en INT-002 §2.3; la edición local responde 409 PRM_010).
+- **Impacto:** Bajo (superficie de API sin uso; riesgo de que alguien edite la tabla local creyendo que es la fuente de verdad).
+- **Resolución esperada:** Cuando exista la sincronización Catálogo → BD (webhook delgado con HMAC → backend invalida caché y actualiza la fila vía SP), retirar el `PUT` y el historial, dejar el `GET` solo si un reporte lo necesita, y borrar los métodos del servicio del frontend y sus pruebas.
+- **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-091
+
+- **Título:** Micro frontend `parametros-administration.js` 1.0.0: refresco periódico por defecto (sondeo cada 60 s) y CORS de un solo origen en la API del Catálogo.
+- **Origen:** INT-002 (2026-11-12), montaje del micro frontend en AsistenciasUCO (lectura del bundle servido en `http://localhost:4201/parametros-ui/`).
+- **Descripción:** (1) `mount()` usa `refreshIntervalMs ?? 60000` y con un valor distinto de 0 programa un `setInterval` que llama `refresh()` mientras la pestaña está visible; acepta `0` (sin intervalo) o un valor entre 30000 y 86400000. El componente ya abre SSE (`{apiBaseUrl}/aplicaciones/{id}/administracion/events`, evento `catalogo-aplicacion`) y refresca al reconectar, así que el intervalo es sondeo redundante; AGENTS.md prohíbe el polling y AsistenciasUCO monta con `refreshIntervalMs: 0`. La guía §8 de liberación muestra `60000` como ejemplo. (2) La API del Catálogo (`FRONTEND_ALLOWED_ORIGINS`, por defecto solo `http://localhost:4201`) responde 403 de CORS a cualquier petición con `Origin: http://localhost:4200`, aunque llegue por proxy del mismo origen; el PDP sí admite 4200. El proxy de desarrollo de AsistenciasUCO quita la cabecera `Origin` en `/catalogo-parametros` (mismo arreglo que `/messageucolab`). (3) ~~Del lado de AsistenciasUCO, el nginx de producción del frontend no publicaba `/parametros-ui`, `/catalogo-parametros` ni `/messageucolab`~~ **Resuelto el 2026-11-12** (rama `feat/INT-002-microfrontend-parametros`): `nginx/templates/default.conf.template` reenvía las tres rutas a `MESSAGEUCOLAB_UPSTREAM`, `CATALOGO_PARAMETROS_UPSTREAM` y `CATALOGO_PARAMETROS_UI_UPSTREAM` (por defecto `host.docker.internal:8000/8081/4201`), quita `Origin` en las APIs y no acumula los eventos SSE; probado con `nginx:alpine` sobre el build de producción (configuración válida, módulo 200, API 401 sin sesión y sin 403 de CORS).
+- **Impacto:** Bajo en el laboratorio; en un despliegue real los tres puntos impiden o degradan la administración de parámetros.
+- **Resolución esperada:** Pedir al equipo de parámetros que el valor por defecto sea `0` (o que se retire el intervalo y se documenten los eventos SSE como mecanismo de actualización, idealmente con un webhook para consumidores backend) y que `FRONTEND_ALLOWED_ORIGINS` admita una lista de orígenes documentada. En AsistenciasUCO, agregar al nginx las ubicaciones con destino configurable (o publicar los micro frontends detrás del mismo gateway) antes del despliegue.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.

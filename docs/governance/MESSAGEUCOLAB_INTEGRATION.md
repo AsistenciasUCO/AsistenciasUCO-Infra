@@ -57,7 +57,7 @@ componente de seguridad, por lo que **MessageUcoLab depende del Security Baselin
 
 Orden recomendado. Los pasos 1–4 usan la UI de seguridad/Doppler y **no los puede hacer un agente por ti** (credenciales).
 
-1. **Seguridad arriba, siempre primero:** `.\AsistenciasUCO-Infra\infra.ps1 security-up` (Security Baseline 0.1.9 del Backend: PDP 18080, PEP 18081, Keycloak 19090) y `security-ui`. Levantarla antes evita el choque de redes `172.31.x` (H-24).
+1. **Seguridad arriba, siempre primero:** `.\AsistenciasUCO-Infra\infra.ps1 security-up` (Security Baseline 0.1.13 del Backend: PDP 18080, PEP 18081, Keycloak 19090) y `security-ui`. Levantarla antes evita el choque de redes `172.31.x` (H-24).
 2. **Permitir la pantalla de mensajes en seguridad** (guía paso 1): ya resuelto. El compose del Backend parametriza los orígenes y `lab.env` incluye `http://localhost:5174`; la guía original (editar el `.env` de `Complementos`) no funciona con el compose 0.1.7 (hallazgo H-23). Ver [`SECURITY_BASELINE_UPGRADE_GUIDE.md`](../hardening/SECURITY_BASELINE_UPGRADE_GUIDE.md).
 3. **Registrar MessageUcoLab en seguridad** (guía paso 2): app `MessageUcoLab` (URL base `http://localhost:8000`), carga masiva de las 28 rutas con
    `Complementos/CatalogoMensajes/plantilla-recursos.xlsx` (la guía lo llama `recursos-messageucolab.xlsx`, H-16), rol "Gestor de mensajes" con los 28 recursos y

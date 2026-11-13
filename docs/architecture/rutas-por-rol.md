@@ -9,7 +9,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## Resumen General
 
-- **Total de Endpoints Protegidos:** 200
+- **Total de Endpoints Protegidos:** 201
 - **Total de Endpoints Exentos (PÃºblicos / Webhook):** 4
 - **Roles Definidos:** ADMINISTRADOR, DECANO, COORDINADOR, DOCENTE, ESTUDIANTE
 
@@ -25,7 +25,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## CatÃ¡logo de Rutas por Rol
 
-### Rol: ADMINISTRADOR (77)
+### Rol: ADMINISTRADOR (76)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -104,10 +104,9 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: DECANO (49)
+### Rol: DECANO (48)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -158,10 +157,9 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: COORDINADOR (77)
+### Rol: COORDINADOR (76)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -240,7 +238,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
 ### Rol: DOCENTE (59)
@@ -286,6 +283,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `PUT` | `/api/v1/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
 | `GET` | `/api/v1/sesiones/{sesionId}/tomas` | ROLES | CULM-001 B.2: docente titular de la sesion (Application + SP: RBAC DOCENTE y titularidad). |
 | `POST` | `/api/v1/sesiones/{sesionId}/tomas` | ROLES | CULM-001 B.2: docente titular de la sesion (Application + SP: RBAC DOCENTE y titularidad). |
+| `GET` | `/api/v1/sesiones/{sesionId}/tomas/resumen` | ROLES | Puntos de control: docente titular de la sesion (Application + SP: RBAC DOCENTE y titularidad). |
 | `POST` | `/api/v1/sesiones/cierres` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
 | `POST` | `/api/v1/sesiones/consultas` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
 | `GET` | `/api/v1/sesiones/grupo/{grupoId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
@@ -300,7 +298,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `DELETE` | `/api/v1/tomas/{tomaId}/qr` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma (Application + SP). |
 | `POST` | `/api/v1/tomas/{tomaId}/qr` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma; el token solo viaja en la respuesta y en el SSE del titular. |
 | `POST` | `/api/v1/tomas/{tomaId}/qr/rotacion` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma; el token solo viaja en la respuesta y en el SSE del titular. |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 | `POST` | `/api/v2/sesiones` | ROLES | â€” |
 | `GET` | `/api/v2/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
@@ -325,6 +322,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/estudiante/materias/{materiaId}/sesiones` | ROLES | Solo la matricula inscrita del estudiante autenticado: el SP usp_consultar_sesiones_materia_estudiante resuelve el ambito, pagina (pagina y tamano opcionales) y entrega la fecha limite de justificacion (CULM-001 D.1). |
 | `POST` | `/api/v1/estudiante/matricular-grupo` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `GET` | `/api/v1/estudiante/oferta-academica` | ROLES | Programas del estudiante autenticado (EstudiantePrograma); el ámbito lo fuerza el procedimiento almacenado. |
+| `GET` | `/api/v1/estudiante/plan-estudio` | ROLES | HU018: solo los planes activos de los programas del estudiante autenticado (EstudiantePrograma); el ámbito lo fuerza usp_consultar_plan_estudio_estudiante. |
 | `GET` | `/api/v1/estudiante/reclamos` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `DELETE` | `/api/v1/estudiante/reclamos/{id}` | ROLES | CULM-001 A.2-7: solo el reclamo propio y pendiente del estudiante autenticado (usp_retirar_solicitud_revision_asistencia: REV_006 404, REV_007 409). |
 | `GET` | `/api/v1/jornadas-programa` | AUTHENTICATED | â€” |
@@ -334,7 +332,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
-| `POST` | `/api/v1/usuarios` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
 ## Endpoints Exentos del PEP (PÃºblicos / IntegraciÃ³n)
