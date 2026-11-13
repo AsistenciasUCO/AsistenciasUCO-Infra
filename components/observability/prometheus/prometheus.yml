@@ -6,6 +6,15 @@ global:
   evaluation_interval: 15s
   scrape_timeout: 10s
 
+# Reglas de alerta (OBS-12) y destino de las alertas
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
 scrape_configs:
   # 1. Prometheus Auto-Métricas
   - job_name: 'prometheus'
@@ -17,11 +26,20 @@ scrape_configs:
     static_configs:
       - targets: ['otel-collector:8889']
 
-  # 3. Backend Spring Boot (Micrometer Actuator Prometheus)
+  # 3. Backend Spring Boot (Micrometer Actuator Prometheus) - OBS-08
+  # El actuator vive en el puerto de gestion 8090 (management.server.port), NO en la API (8080).
+  # El backend corre en el host: por defecto escucha solo en 127.0.0.1 y Docker no lo alcanza;
+  # en desarrollo local arranquelo con MANAGEMENT_SERVER_ADDRESS=0.0.0.0 (y no exponga 8090 fuera
+  # del equipo). Si el backend corre como contenedor de esta red, cambie el target a 'backend:8090'.
   - job_name: 'asistencias-backend'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['host.docker.internal:8080']
+      - targets: ['host.docker.internal:8090']
+
+  # 3b. Alertmanager
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
 
   # 4. Keycloak Identity Provider (Métricas Quarkus)
   - job_name: 'keycloak'

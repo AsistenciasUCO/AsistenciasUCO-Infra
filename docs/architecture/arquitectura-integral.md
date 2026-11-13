@@ -328,7 +328,7 @@ El ecosistema adopta los principios rectores de aplicaciones nativas en la nube:
 2. **Configuración y Secretos Externa (Factor III):**
    - Separación estricta entre código y configuración. Variables inyectadas por entorno, Azure App Configuration y Azure Key Vault.
 3. **Logs como Streams de Eventos (Factor XI):**
-   - Los servicios escriben sus trazas estructuradas a `stdout` en formato `Logstash JSONL`, recolectadas sin bloqueo por OpenTelemetry OTLP hacia la capa de observabilidad.
+   - Los servicios escriben sus logs estructurados en JSON (formato `Logstash JSONL`) por `stdout` por defecto. De forma opcional también los escriben en un archivo definido por `ASISTENCIAS_UCO_LOG_FILE`; los perfiles `local` y `dev` lo activan para que Alloy recolecte ese archivo. La exportación de logs por OTLP está desactivada (OTLP queda para métricas y trazas).
 4. **Paridad Desarrollo/Producción (Factor X):**
    - Uso idéntico de contenedores Docker para SQL Server 2022 y Keycloak 26 en ambientes locales y productivos.
 

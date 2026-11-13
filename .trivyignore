@@ -1,0 +1,6 @@
+# TRI-05 / TRI-06 (VAL oleada 2, 2026-11-12): excepciones de la compuerta Trivy de Infra.
+# Formato: un ID por linea, precedido de un comentario con el motivo; usar "exp:AAAA-MM-DD" para que la
+# excepcion venza y vuelva a bloquear. Solo se aceptan falsos positivos o hallazgos que no aplican.
+#
+# Triage 2026-11-12 (aquasec/trivy:0.74.0, fs, vuln+secret+misconfig, HIGH/CRITICAL, ignore-unfixed)
+# sobre el arbol rastreado: 0 hallazgos. Sin excepciones.
