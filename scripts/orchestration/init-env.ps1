@@ -284,6 +284,16 @@ APP_ADAPTERS_STORAGE_PROVIDER=minio
 APP_ADAPTERS_REALTIME_PROVIDER=local-sse
 APP_ADAPTERS_AUDIT_PROVIDER=logging
 
+# SEC-12 (VAL-oleada3-baul-secretos): el backend ya no trae los recursos Azure por defecto. Estas lineas mantienen el
+# uso de Key Vault y App Configuration de desarrollo; sin ellas, el perfil dev usa local_env y catalogos en SQL Server.
+APP_ADAPTERS_VAULT_PROVIDER=azure_keyvault
+APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER=azure_appconfig
+APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER=azure
+AZURE_KEYVAULT_ENDPOINT=https://kv-asist-dev-21245.vault.azure.net/
+AZURE_APPCONFIG_ENDPOINT=https://appcs-asist-dev-29183.azconfig.io
+# En local los secretos de ejecucion siguen en este .env (no en el baul de desarrollo): true los leeria del baul al arrancar.
+APP_SECRETS_RUNTIME_FROM_VAULT_ENABLED=false
+
 MINIO_ENDPOINT=http://${minioHost}:${minioPort}
 MINIO_ACCESS_KEY=$minioAppKey
 MINIO_SECRET_KEY=$minioAppSecret
