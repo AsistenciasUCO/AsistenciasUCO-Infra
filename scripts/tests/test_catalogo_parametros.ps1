@@ -3,6 +3,9 @@
   Prueba E2E del Catalogo de Parametros y su integracion con el backend (INT-002).
 .DESCRIPTION
   Lee CATALOGO_PARAMETROS_TOKEN_ID y CATALOGO_PARAMETROS_SECRETO del .env del backend sin mostrarlos.
+  Las secciones 8 y 9 comprueban de donde sale el valor que usa el backend: no del valor por defecto en codigo (log
+  por correlationId) ni de dbo.CatalogoParametro (dominio temporal solo en la BD, restaurado en un finally; usa
+  MSSQL_SA_PASSWORD del .env de Infra). Requiere el backend con APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER=catalogoparametros.
   Salida [OK]/[FALLO]; termina con exit 1 si alguna comprobacion falla.
 #>
 param(
@@ -10,7 +13,12 @@ param(
     [string]$CatalogoBaseUrl = 'http://localhost:8081/catalogo-parametros/api/v1',
     [string]$BackendUrl = 'http://localhost:8080/api/v1',
     [string]$BackendHealthUrl = 'http://localhost:8090/actuator/health',
-    [string]$KongUrl = 'http://localhost:8000'
+    [string]$KongUrl = 'http://localhost:8000',
+    [string]$BackendLogPath = 'C:\Proyectos\GestionAsistencia-CULM001\GestioAsistenciaBackend\infra\observability\logs\backend-baseline.jsonl',
+    [string]$InfraEnvPath = (Join-Path $PSScriptRoot '..\..\.env'),
+    [string]$SqlContainer = 'sql_server_asistencias',
+    # Omite la seccion 9, que escribe (y restaura) un valor temporal en dbo.CatalogoParametro.
+    [switch]$OmitirPruebaOrigenBd
 )
 
 $ErrorActionPreference = 'Stop'
@@ -113,22 +121,94 @@ $r = Invocar 'GET' $BackendHealthUrl @{} $null 15
 $up = ($r.Codigo -eq 200) -and ($r.Cuerpo -match '"status"\s*:\s*"UP"')
 Resultado $up "Backend: $BackendHealthUrl responde 200 y UP (HTTP $($r.Codigo))"
 
-# 7. Registro QR con correo no institucional (publico; el correo se valida antes de consultar el token)
-$tokenFalso = 'A' * 43
-$cuerpo = @{
-    token = $tokenFalso; pin = $null
-    idTipoIdentificacion = [guid]::NewGuid().ToString()
-    numeroIdentificacion = 1234567890
-    primerNombre = 'Prueba'; segundoNombre = $null; primerApellido = 'Catalogo'; segundoApellido = $null
-    correo = 'prueba.catalogo@gmail.com'; password = ('Pr' + [guid]::NewGuid().ToString('N') + '!')
-} | ConvertTo-Json -Compress
-$r = Invocar 'POST' "$BackendUrl/public/matricula-qr/registro" @{} $cuerpo 30
+# 7. Registro QR con correo no institucional (publico; el correo se valida antes de consultar el token). El dominio
+#    esperado es el que publica el Catalogo (seccion 3), no un literal: asi la comprobacion sigue al Catalogo.
+function RegistroQrNoInstitucional {
+    $cuerpo = @{
+        token = ('A' * 43); pin = $null
+        idTipoIdentificacion = [guid]::NewGuid().ToString()
+        numeroIdentificacion = 1234567890
+        primerNombre = 'Prueba'; segundoNombre = $null; primerApellido = 'Catalogo'; segundoApellido = $null
+        correo = 'prueba.catalogo@gmail.com'; password = ('Pr' + [guid]::NewGuid().ToString('N') + '!')
+    } | ConvertTo-Json -Compress
+    return Invocar 'POST' "$BackendUrl/public/matricula-qr/registro" @{} $cuerpo 30
+}
+
+function MostrarRespuesta([string]$texto) {
+    if ($texto.Length -gt 0) {
+        $corto = $texto; if ($corto.Length -gt 300) { $corto = $corto.Substring(0, 300) }
+        Write-Host "      Respuesta: $corto"
+    }
+}
+
+function CorrelationId([string]$texto) {
+    try { return ($texto | ConvertFrom-Json).correlationId } catch { return $null }
+}
+
+$dominioCatalogo = $valor
+if ([string]::IsNullOrWhiteSpace($dominioCatalogo)) { $dominioCatalogo = '@uco.edu.co' }
+$r = RegistroQrNoInstitucional
 $textoResp = $r.Cuerpo
-$esperado = ($r.Codigo -eq 400) -and ($textoResp -match 'VCE_001') -and ($textoResp -match '@uco\.edu\.co')
-Resultado $esperado "Backend: registro QR con correo no institucional -> 400 VCE_001 con dominio @uco.edu.co tomado del Catalogo (HTTP $($r.Codigo))"
-if (-not $esperado -and $textoResp.Length -gt 0) {
-    $corto = $textoResp; if ($corto.Length -gt 300) { $corto = $corto.Substring(0, 300) }
-    Write-Host "      Respuesta: $corto"
+$esperado = ($r.Codigo -eq 400) -and ($textoResp -match 'VCE_001') -and ($textoResp.Contains($dominioCatalogo))
+Resultado $esperado "Backend: registro QR con correo no institucional -> 400 VCE_001 con el dominio del Catalogo $dominioCatalogo (HTTP $($r.Codigo))"
+if (-not $esperado) { MostrarRespuesta $textoResp }
+
+# 8. Origen del valor (I): el dominio no salio del valor por defecto en codigo. El decorador DEC-018 registra un WARN
+#    'Parametro resuelto con el valor por defecto' con el correlationId de la peticion cuando el Catalogo falla.
+$correlacion = CorrelationId $textoResp
+if ([string]::IsNullOrWhiteSpace($correlacion) -or -not (Test-Path $BackendLogPath)) {
+    Resultado $false "Log del backend con el correlationId de la peticion ($BackendLogPath)"
+} else {
+    Start-Sleep -Milliseconds 500
+    $porDefecto = @(Select-String -Path $BackendLogPath -SimpleMatch $correlacion |
+        Where-Object { $_.Line -match 'valor por defecto' -and $_.Line -match 'DOMINIO_CORREO_ESTUDIANTE' })
+    Resultado ($porDefecto.Count -eq 0) "Backend: REGISTRO.DOMINIO_CORREO_ESTUDIANTE no se resolvio con el valor por defecto en codigo (correlationId $correlacion)"
+}
+
+# 9. Origen del valor (II): el dominio no sale de dbo.CatalogoParametro. Se pone otro dominio solo en la BD local, se
+#    repite el registro (debe seguir citando el del Catalogo) y se restauran valor y fechaModificacion en un finally.
+#    Con APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER=sqlserver esta comprobacion falla a proposito.
+if ($OmitirPruebaOrigenBd) {
+    Write-Host '[OMITIDO] Origen del valor frente a dbo.CatalogoParametro (-OmitirPruebaOrigenBd)'
+} else {
+    $saPassword = LeerEnv $InfraEnvPath 'MSSQL_SA_PASSWORD'
+    if ([string]::IsNullOrWhiteSpace($saPassword)) {
+        Resultado $false "MSSQL_SA_PASSWORD definido en $InfraEnvPath"
+    } else {
+        function Sql([string]$consulta) {
+            $salida = docker exec -e "SQLCMDPASSWORD=$saPassword" $SqlContainer /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C `
+                -d gestionasistenciadb -h -1 -W -s '|' -b -Q "SET NOCOUNT ON; $consulta" 2>&1
+            if ($LASTEXITCODE -ne 0) { throw "sqlcmd fallo: $salida" }
+            return @($salida | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        }
+        $filtro = "grupo = 'REGISTRO' AND clave = 'DOMINIO_CORREO_ESTUDIANTE'"
+        $original = $null
+        try {
+            $fila = @(Sql "SELECT CONVERT(NVARCHAR(400), valor) + '|' + CONVERT(VARCHAR(30), fechaModificacion, 121) FROM dbo.CatalogoParametro WHERE $filtro")
+            if ($fila.Count -ne 1) { throw 'No existe REGISTRO.DOMINIO_CORREO_ESTUDIANTE en dbo.CatalogoParametro.' }
+            $partes = $fila[0].Trim() -split '\|', 2
+            $original = @{ Valor = $partes[0]; Fecha = $partes[1] }
+            $dominioBd = '@origen-bd.invalid'
+            [void](Sql "UPDATE dbo.CatalogoParametro SET valor = N'$dominioBd' WHERE $filtro")
+            $r = RegistroQrNoInstitucional
+            $ok = ($r.Codigo -eq 400) -and $r.Cuerpo.Contains($dominioCatalogo) -and -not $r.Cuerpo.Contains($dominioBd)
+            Resultado $ok "Backend: con otro dominio solo en la BD ($dominioBd) sigue citando el del Catalogo $dominioCatalogo (HTTP $($r.Codigo))"
+            if (-not $ok) { MostrarRespuesta $r.Cuerpo }
+        } catch {
+            Resultado $false "Prueba de origen frente a la BD: $($_.Exception.Message)"
+        } finally {
+            if ($null -ne $original) {
+                $valorSql = $original.Valor.Replace("'", "''")
+                try {
+                    [void](Sql "UPDATE dbo.CatalogoParametro SET valor = N'$valorSql', fechaModificacion = CONVERT(DATETIME, '$($original.Fecha)', 121) WHERE $filtro")
+                    $restaurado = @(Sql "SELECT CONVERT(NVARCHAR(400), valor) FROM dbo.CatalogoParametro WHERE $filtro")
+                    Resultado ($restaurado[0].Trim() -eq $original.Valor) "BD restaurada: REGISTRO.DOMINIO_CORREO_ESTUDIANTE = $($original.Valor)"
+                } catch {
+                    Resultado $false "No se pudo restaurar REGISTRO.DOMINIO_CORREO_ESTUDIANTE (valor original: $($original.Valor), fecha: $($original.Fecha)): $($_.Exception.Message)"
+                }
+            }
+        }
+    }
 }
 
 Write-Host ''
