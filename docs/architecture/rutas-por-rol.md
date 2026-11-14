@@ -32,9 +32,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/admin/areas` | ROLES | â€” |
 | `GET` | `/api/v1/admin/asignaturas` | ROLES | HU143: asignaturas de la institucion del administrador; el ambito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/admin/auditoria` | ROLES | HU172: rastro de auditoria de la institucion; solo lectura, rango maximo de 90 dias; el procedimiento almacenado exige el perfil ADMINISTRADOR. |
-| `POST` | `/api/v1/admin/cargas` | ROLES | HU171: Carga masiva de decanos por el administrador institucional; auditado. |
-| `GET` | `/api/v1/admin/cargas/plantilla` | ROLES | HU171: Descarga de plantilla CSV de decanos para carga masiva. |
-| `POST` | `/api/v1/admin/cargas/validacion` | ROLES | HU171: Validacion previa sin escrituras de carga masiva de decanos. |
 | `POST` | `/api/v1/admin/cierre-masivo` | ROLES | â€” |
 | `GET` | `/api/v1/admin/cierre-masivo/historial` | ROLES | â€” |
 | `GET` | `/api/v1/admin/comparativa-facultades` | ROLES | â€” |
@@ -121,9 +118,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/coordinador/planes-estudio/{planId}/asignaturas` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `GET` | `/api/v1/decano/aforo-grupos` | ROLES | Alcance de la facultad del decano autenticado; el ámbito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/decano/asignaturas` | ROLES | HU143: el decano busca en su facultad y el administrador en su institucion; el ambito lo fuerza el procedimiento almacenado. |
-| `POST` | `/api/v1/decano/cargas` | ROLES | HU171: Carga masiva de coordinadores por el decano; auditado. |
-| `GET` | `/api/v1/decano/cargas/plantilla` | ROLES | HU171: Descarga de plantilla CSV de coordinadores para carga masiva. |
-| `POST` | `/api/v1/decano/cargas/validacion` | ROLES | HU171: Validacion previa sin escrituras de carga masiva de coordinadores. |
 | `GET` | `/api/v1/decano/comparativa-programas` | ROLES | Alcance de la facultad del decano autenticado; el ámbito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/decano/consolidado-asistencia` | ROLES | HU061: grupos de la facultad del decano (administrador: su institucion); el ambito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/decano/coordinadores` | ROLES | Alcance de la facultad del decano autenticado. |
@@ -174,9 +168,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/coordinador/asignaturas` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `PATCH` | `/api/v1/coordinador/asignaturas/{id}/estado` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `GET` | `/api/v1/coordinador/caracteres-asignatura` | ROLES | Catalogo de solo consulta sin ambito. |
-| `POST` | `/api/v1/coordinador/cargas` | ROLES | HU171: Carga masiva de docentes por el coordinador de programa; auditado. |
-| `GET` | `/api/v1/coordinador/cargas/plantilla` | ROLES | HU171: Descarga de plantilla CSV de docentes para carga masiva. |
-| `POST` | `/api/v1/coordinador/cargas/validacion` | ROLES | HU171: Validacion previa sin escrituras de carga masiva de docentes. |
 | `GET` | `/api/v1/coordinador/componentes-formacion` | ROLES | HU147: catalogo de componentes de formacion (BAS, INS, ESP); solo lectura. |
 | `GET` | `/api/v1/coordinador/consolidado-asistencia` | ROLES | HU061: grupos del programa del coordinador (administrador: su institucion); el ambito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/coordinador/docentes` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
