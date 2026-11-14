@@ -87,7 +87,8 @@ Si el resultado es `[PASS]`, tu rama está certificada para commit.
 # Foto del estado actual (no detiene nada; deja /var/opt/mssql/backup/gestionasistenciadb_QA_<fecha>.bak)
 .\AsistenciasUCO-Infra\infra.ps1 db-reset-qa -Mode Snapshot
 
-# Estado base: respaldo canonico CULM001 + migraciones 13-28 + deploy_schema + fixture datos_prueba_ampliados.sql + su prueba
+# Estado base: respaldo canonico CULM001 + migrar.ps1 (Baseline -SoloDetectadas -ReaplicarParciales y Aplicar, hasta la ultima
+# migracion de develop) + deploy_schema + fixture datos_prueba_ampliados.sql + su prueba. Requiere el repo de BD con migrar.ps1 -SoloDetectadas.
 .\AsistenciasUCO-Infra\infra.ps1 db-reset-qa -Mode Base -StopBackend -Yes
 
 # Volver a una foto

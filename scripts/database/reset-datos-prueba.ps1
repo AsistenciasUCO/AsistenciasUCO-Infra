@@ -4,9 +4,11 @@
 
 .DESCRIPTION
     Compatible con Windows PowerShell 5.1. Modos:
-      Base      Restaura el respaldo canonico del contenedor, aplica las migraciones 13 a 28 (carpeta migrations/ del repositorio
-                de BD), ejecuta deploy_schema.ps1, aplica el fixture test/fixtures/datos_prueba_ampliados.sql y corre
-                test/test_datos_prueba_ampliados.sql. Es DESTRUCTIVO: reemplaza la base indicada.
+      Base      Restaura el respaldo canonico del contenedor, lo alinea con develop con la tarea de migracion del repositorio de BD
+                (scripts/migrar.ps1: -Modo Baseline -SoloDetectadas -ReaplicarParciales registra las migraciones cuyo efecto ya
+                trae el respaldo y -Modo Aplicar ejecuta en orden las que faltan, hasta la ultima), ejecuta deploy_schema.ps1, aplica el fixture
+                test/fixtures/datos_prueba_ampliados.sql y corre test/test_datos_prueba_ampliados.sql. Es DESTRUCTIVO: reemplaza la
+                base indicada. VAL-migrar-detectar (2026-11-13): antes aplicaba un rango fijo (13 a 28) y dejaba la base atrasada.
       Snapshot  BACKUP DATABASE del estado actual a /var/opt/mssql/backup/<base>_QA_<fecha>.bak (o a -Backup).
       Restore   Restaura -Backup sobre la base indicada (destructivo).
     Antes de Base o Restore sobre la base por defecto hay que DETENER EL BACKEND (puerto 8080): sus conexiones y trabajos
@@ -51,8 +53,6 @@ param(
     [string]$ContainerName,
     [string]$DbRepo,
     [string]$Password,
-    [int]$MigrationFrom = 13,
-    [int]$MigrationTo = 28,
     [switch]$StopBackend,
     [switch]$Yes,
     [switch]$SkipFixture,
@@ -241,13 +241,29 @@ function Invoke-BaseMode {
         Assert-Ok (Invoke-Docker -DockerArgs @('cp', "$work\.", "${ContainerName}:$remote")) 'docker cp'
         $null = Invoke-Docker -DockerArgs @('exec', '-u', '0', $ContainerName, 'chmod', '-R', 'a+rX', $remote)
 
-        $migs = @(Get-ChildItem -LiteralPath (Join-Path $work 'migrations') -Filter '*_up.sql' | ForEach-Object {
-                if ($_.Name -match '^(\d+)_') { [pscustomobject]@{ N = [int]$Matches[1]; Name = $_.Name } }
-            } | Where-Object { $_.N -ge $MigrationFrom -and $_.N -le $MigrationTo } | Sort-Object N)
-        if ($migs.Count -eq 0) { throw "No hay migraciones $MigrationFrom a $MigrationTo en $DbRepo\migrations." }
-        foreach ($m in $migs) {
-            Write-Step "Migracion $($m.Name)"
-            Assert-Ok (Invoke-SqlInContainer -Db $Database -File "$remote/migrations/$($m.Name)" -Variables @("MIGDIR=$remote/migrations")) "migracion $($m.Name)"
+        # VAL-migrar-detectar: la tarea de migracion del repositorio de BD decide que falta (marcadores de cada migracion) y lo
+        # aplica en orden hasta la ultima; deja el registro dbo.MigracionAplicada al dia (Estado: pendientes=0 deriva=0). Ella misma
+        # cambia el nombre de la base en sus copias cuando -Database no es la base por defecto.
+        $migrar = Join-Path $DbRepo 'scripts\migrar.ps1'
+        if (-not (Test-Path $migrar) -or -not (Select-String -LiteralPath $migrar -Pattern 'SoloDetectadas' -Quiet)) {
+            throw "El repositorio de BD ($DbRepo) no tiene scripts/migrar.ps1 con -SoloDetectadas: actualicelo (git pull en develop)."
+        }
+        foreach ($paso in @(@('Baseline', '-SoloDetectadas'), @('Aplicar'), @('Estado'))) {
+            Write-Step "migrar.ps1 -Modo $($paso -join ' ')"
+            $migrarArgs = @{ Modo = $paso[0]; ContainerName = $ContainerName; Password = $SqlPassword; Database = $Database }
+            # -ReaplicarParciales: el respaldo canonico se mantuvo con deploy_schema.ps1, que crea tablas nuevas pero no borra lo que
+            # retira una migracion; esas salen PARCIAL y se re-ejecutan en orden (son idempotentes; antes este modo re-ejecutaba 13 a 28).
+            if ($paso.Count -gt 1) { $migrarArgs['SoloDetectadas'] = $true; $migrarArgs['ReaplicarParciales'] = $true }
+            $previous = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                $migLog = @(& $migrar @migrarArgs *>&1 | ForEach-Object { "$_" })
+                $migCode = $LASTEXITCODE
+            }
+            finally { $ErrorActionPreference = $previous }
+            $migLog | Where-Object { $_ -match '^MIGRAR_(RESUMEN|DETECTAR_RESUMEN|DETECTAR_PARCIAL|DETECTADA_FUERA|PARCIALES_PENDIENTES|APLICADA_AHORA|FALLO)|^\s+falta:' } | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
+            if ($migCode -ne 0) { throw ("migrar.ps1 -Modo $($paso -join ' ') fallo (codigo $migCode).`n" + (($migLog | Select-Object -Last 15) -join "`n")) }
+            if ($paso[0] -eq 'Estado' -and -not ($migLog -match 'MIGRAR_RESUMEN .* pendientes=0 deriva=0')) { throw 'Tras migrar.ps1 quedan migraciones pendientes o con deriva.' }
         }
 
         Write-Step 'Desplegando el esquema (deploy_schema.ps1).'
