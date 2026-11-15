@@ -1,0 +1,61 @@
+# Seccion asis-datos (siempre arriba): SQL Server y MinIO.
+# Se aplica sobre GestioAsistenciaBackend/infra/files/compose.yaml (MinIO) y agrega el servicio sqlserver.
+# Volumenes y redes EXTERNOS: los crea `infra.ps1 stack` y un `docker compose down -v` nunca los borra.
+services:
+  sqlserver:
+    # SQL Server 2022 CU25 (16.0.4262.2): la BD del laboratorio ya esta en esta version y no se puede bajar de CU.
+    image: mcr.microsoft.com/mssql/server@sha256:fc010e5c955453eabc4a24d2f304103e26176fe89796b564f039c45e77a8ebc1
+    # Nombre historico: ~250 scripts, guias y contratos de los cuatro repositorios lo usan (deploy_schema, migrar, gates).
+    container_name: sql_server_asistencias
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Defina MSSQL_SA_PASSWORD en stack/.env}
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - mssql:/var/opt/mssql
+    networks:
+      asis-red:
+        aliases: [sqlserver]
+    restart: unless-stopped
+    stop_grace_period: 90s
+    healthcheck:
+      # La clave va por SQLCMDPASSWORD (no como argumento -P: check-secrets.ps1 lo marca como CLI_PASSWORD_ARGUMENT).
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    labels:
+      asistencias.seccion: asis-datos
+
+  minio:
+    container_name: asis-datos-minio
+    networks:
+      asis-red:
+        aliases: [minio]
+    labels:
+      asistencias.seccion: asis-datos
+
+  minio-init:
+    container_name: asis-datos-minio-init
+    labels:
+      asistencias.seccion: asis-datos
+
+volumes:
+  mssql:
+    name: asis-datos-mssql
+    external: true
+  minio_data:
+    name: asistencias-minio-data
+    external: true
+
+networks:
+  files-backend:
+    name: asistencias-files-backend
+    external: true
+  asis-red:
+    name: asis-red
+    external: true

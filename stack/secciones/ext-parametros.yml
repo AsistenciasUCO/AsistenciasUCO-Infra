@@ -1,0 +1,54 @@
+# Seccion ext-parametros: Catalogo de Parametros 0.1.7 / frontend 0.1.6 (kit del equipo, Complementos/CatalogoParametros/Catalogo-Parametros).
+# Se aplica sobre su docker-compose.yml (sin tocarlo); solo app, frontend, redis y surrealdb (sin su observabilidad).
+# Usa el puerto 8081 del PC: no puede convivir con asis-contingencia (Keycloak propio, tambien 8081).
+services:
+  app:
+    container_name: ext-parametros-app
+    networks:
+      asis-red:
+        aliases: [ext-parametros-app]
+    labels:
+      asistencias.seccion: ext-parametros
+  frontend:
+    container_name: ext-parametros-frontend
+    labels:
+      asistencias.seccion: ext-parametros
+  redis:
+    container_name: ext-parametros-redis
+    labels:
+      asistencias.seccion: ext-parametros
+  surrealdb:
+    container_name: ext-parametros-surrealdb
+    labels:
+      asistencias.seccion: ext-parametros
+  prometheus:
+    container_name: ext-parametros-prometheus
+  grafana:
+    container_name: ext-parametros-grafana
+  otel-collector:
+    container_name: ext-parametros-otel
+  jaeger:
+    container_name: ext-parametros-jaeger
+  loki:
+    container_name: ext-parametros-loki
+  promtail:
+    container_name: ext-parametros-promtail
+
+volumes:
+  redis-data:
+    name: catalogo-parametros_redis-data
+    external: true
+  surrealdb-data:
+    name: catalogo-parametros_surrealdb-data
+    external: true
+  grafana-data:
+    name: catalogo-parametros_grafana-data
+    external: true
+  prometheus-data:
+    name: catalogo-parametros_prometheus-data
+    external: true
+
+networks:
+  asis-red:
+    name: asis-red
+    external: true

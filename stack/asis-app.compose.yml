@@ -1,0 +1,74 @@
+# Seccion asis-app: Backend y Frontend de Asistencias UCO como imagenes construidas desde develop
+# (`infra.ps1 stack build`). La configuracion la genera `infra.ps1 stack up` en stack/generado/ segun las secciones
+# activas (proveedores de seguridad, mensajes y parametros). Ese directorio esta fuera de Git: lleva secretos del .env del
+# Backend y de lab.env.
+name: asis-app
+
+services:
+  # Dueno de la red del Backend. El Backend exige que el PEP, el PDP y el emisor de tokens de administracion lleguen por
+  # HTTP solo a loopback (SecurityBaselinePepProperties / SecurityBaselinePdpAdminProperties: HTTPS en ambientes
+  # compartidos). Estos enlaces reproducen la topologia del laboratorio dentro del contenedor: en 127.0.0.1 del Backend
+  # escuchan PEP (18081), PDP (18080), Keycloak de Seguridad (19090) y el Keycloak de contingencia (8081), reenviados por
+  # asis-red. Un destino que no este arriba solo falla al conectarse.
+  enlaces:
+    image: alpine/socat:1.8.0.3
+    container_name: asis-app-enlaces
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        socat TCP-LISTEN:18081,fork,reuseaddr,bind=127.0.0.1 TCP:ext-seguridad-pep:8081 &
+        socat TCP-LISTEN:18080,fork,reuseaddr,bind=127.0.0.1 TCP:ext-seguridad-pdp:8080 &
+        socat TCP-LISTEN:19090,fork,reuseaddr,bind=127.0.0.1 TCP:ext-seguridad-keycloak:19090 &
+        socat TCP-LISTEN:8081,fork,reuseaddr,bind=127.0.0.1 TCP:asis-contingencia-keycloak:8080 &
+        wait
+    ports:
+      - "127.0.0.1:8080:8080"
+      # Puerto de gestion (Actuator/Prometheus) solo en loopback del PC; el Backend solo lo abre a la red del contenedor
+      # con asis-obs arriba (MANAGEMENT_SERVER_ADDRESS=0.0.0.0, ver docs/observability/README.md del Backend).
+      - "127.0.0.1:8090:8090"
+    networks:
+      asis-red:
+        aliases: [asis-app-backend]
+    restart: "no"
+    labels:
+      asistencias.seccion: asis-app
+
+  backend:
+    image: asistencias-backend:develop
+    container_name: asis-app-backend
+    env_file:
+      - ./generado/backend.env
+    # Comparte la red de `enlaces`: sus puertos (8080, 8090) y sus reenvios en 127.0.0.1.
+    network_mode: "service:enlaces"
+    volumes:
+      # Logs JSONL en la carpeta que lee Alloy (asis-obs -> Loki), igual que el Backend local.
+      - ../../GestioAsistenciaBackend/infra/observability/logs:/app/infra/observability/logs
+    depends_on:
+      enlaces:
+        condition: service_started
+    restart: "no"
+    stop_grace_period: 40s
+    labels:
+      asistencias.seccion: asis-app
+
+  frontend:
+    image: asistencias-frontend:develop
+    container_name: asis-app-frontend
+    env_file:
+      - ./generado/frontend.env
+    ports:
+      # nginx-unprivileged escucha en 8080 dentro del contenedor.
+      - "127.0.0.1:4200:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: "no"
+    depends_on:
+      backend:
+        condition: service_started
+    labels:
+      asistencias.seccion: asis-app
+
+networks:
+  asis-red:
+    name: asis-red
+    external: true

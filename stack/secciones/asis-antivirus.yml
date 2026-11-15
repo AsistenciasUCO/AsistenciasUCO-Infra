@@ -1,0 +1,24 @@
+# Seccion asis-antivirus (bajo demanda, ~1,3 GB): ClamAV para las pruebas de soportes.
+# Se aplica sobre GestioAsistenciaBackend/infra/files/compose.yaml (servicio clamav).
+services:
+  clamav:
+    container_name: asis-antivirus-clamav
+    networks:
+      asis-red:
+        aliases: [clamav]
+    labels:
+      asistencias.seccion: asis-antivirus
+
+volumes:
+  # Firmas ya descargadas (334 MB) del contenedor anterior.
+  clamav_data:
+    name: asistencias_clamav_data
+    external: true
+
+networks:
+  files-backend:
+    name: asistencias-files-backend
+    external: true
+  asis-red:
+    name: asis-red
+    external: true

@@ -1,0 +1,27 @@
+# Seccion asis-contingencia (SOLO EMERGENCIAS): Keycloak propio (realm asistencias-uco) para operar si el componente de
+# Seguridad del equipo no esta disponible. Nunca arranca solo. Se aplica sobre GestioAsistenciaBackend/infra/keycloak/compose.yaml.
+# Usa el puerto 8081 del PC: no puede convivir con ext-parametros.
+services:
+  keycloak-db:
+    container_name: asis-contingencia-keycloak-db
+    restart: "no"
+    labels:
+      asistencias.seccion: asis-contingencia
+  keycloak:
+    container_name: asis-contingencia-keycloak
+    restart: "no"
+    networks:
+      asis-red:
+        aliases: [asis-contingencia-keycloak]
+    labels:
+      asistencias.seccion: asis-contingencia
+
+volumes:
+  keycloak_db_data:
+    name: asistencias-uco-security_keycloak_db_data
+    external: true
+
+networks:
+  asis-red:
+    name: asis-red
+    external: true

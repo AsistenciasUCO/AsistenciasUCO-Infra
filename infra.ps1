@@ -143,6 +143,11 @@ function Show-Help {
     Write-Host "                   Opciones: -Mode own | baseline" -ForegroundColor Gray
     Write-Host "  security-status  Consulta el estado activo del switch de seguridad en Backend y Frontend." -ForegroundColor White
     Write-Host ""
+    Write-Host "5a. CONTENEDORES POR SECCIONES Y ESCENARIOS (stack/secciones.json):" -ForegroundColor Yellow
+    Write-Host "  stack list                     Secciones (asis-*, ext-*) y escenarios de prueba." -ForegroundColor White
+    Write-Host "  stack up <escenario|seccion>   Levanta solo lo necesario (basico, mensajes, parametros, completo, ...)." -ForegroundColor White
+    Write-Host "  stack plan <...> | status | down [secciones] | build [backend|frontend]" -ForegroundColor White
+    Write-Host ""
     Write-Host "5b. CATALOGO DE MENSAJES (MESSAGEUCOLAB - EQUIPO DE MENSAJERIA):" -ForegroundColor Yellow
     Write-Host "  messages-up      Levanta MessageUcoLab (Docker + secretos por Doppler)." -ForegroundColor White
     Write-Host "  messages-up-light Modo ligero: sin Ollama/traduccion ni observabilidad (poca RAM)." -ForegroundColor White
@@ -501,6 +506,13 @@ switch ($Command.ToLowerInvariant()) {
 
     "messages-status" {
         & (Join-Path $infraRoot "components\messages\start-messages.ps1") -Status
+        exit $LASTEXITCODE
+    }
+
+    "stack" {
+        # Secciones y escenarios de contenedores (stack/secciones.json). Ej.: .\infra.ps1 stack up basico
+        $stackScript = Join-Path $infraRoot "scripts\orchestration\stack.ps1"
+        if ($RemainingArgs -and $RemainingArgs.Length -gt 0) { & $stackScript @RemainingArgs } else { & $stackScript }
         exit $LASTEXITCODE
     }
 
