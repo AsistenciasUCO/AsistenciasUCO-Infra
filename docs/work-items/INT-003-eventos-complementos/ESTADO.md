@@ -109,11 +109,39 @@ detenida en septiembre; las versiones oficiales salen de `develop` como releases
 | E2E aviso → BD | `PUT` del texto de `MSG_GEN004` en MessageUcoLab → fila `GEN_004` actualizada en 1,4 s; `MESSAGE_UPDATED` publicado; texto restaurado |
 | Ruta pública de textos | `UI012` 200 con el texto; `UI999`, `GEN004`, `ui012` 404 `GEN_001`; desde la SPA (4200 → 8080, con preflight) 200 |
 
+### 6.1 Validación funcional en el laboratorio (2026-11-15, tarde)
+
+| Caso | Resultado |
+| :--- | :--- |
+| Cambio en MessageUcoLab con el Backend **apagado** | La BD no cambia; al arrancar, la reconciliación lo copia (`actualizados=1`) y la suscripción durable entrega el aviso pendiente, que queda `sinCambios` (idempotente) |
+| Alta de un mensaje nuevo (`INT003PRB`) | MessageUcoLab 0.3.0 avisa `MessageUpdated` (no `MessageCreated`); `noExisten=1`, sin filas nuevas |
+| Borrado (`MessageDeleted`) | Solo vence la caché; la BD conserva sus 482 filas |
+| Importación masiva (1 y 2 mensajes) | Llega un `MessageUpdated` por mensaje; **nunca llegó `MessagesChanged`** (esa rama solo la cubren las pruebas unitarias) |
+| Edición desde la pantalla de mensajes de Asistencias (minifront `main`) | Lista y edita en Develop con 0.3.0; el cambio llegó a `GEN_004` en el mismo segundo; texto restaurado |
+| SPA con sesión real (`uco-administrador`) | Al negar una ruta, la SPA pidió `UI094` al Backend: 200 |
+| Rol `ADMIN` de MessageUcoLab en el PDP | Sin rutas ni perfiles: no concede nada (inocuo) |
+| Mensajes de prueba creados | Borrados (`INT003PRB`, `INT003IMP`, `INT003IMPB`, `INT003IMPC`) |
+
+**Hallazgos**
+
+* **358 códigos de la BD no están en MessageUcoLab** (los agregados después de la carga del 2026-11-04: `ACC_APP_*`,
+  `VAL_APP_*`, `NOF_APP_*`, `ALR_*`, `AQR_*`, `MQR_*`, …). Con `provider=messageucolab` y `MESSAGEUCOLAB_FALLBACK=none`,
+  `MessageCatalogPort.getUserMessage` devuelve el **código crudo**: el estudiante ve sus alertas como `ALR_010` y `ALR_011`
+  (`GET /estudiante/alertas`, comprobado). Los errores que pasan por `GlobalExceptionHandler` no se ven afectados (usan el
+  texto de respaldo del enum). Viene de INT-002, no de INT-003.
+* **16 mensajes de MessageUcoLab no existen en la BD:** `SIG_001`…`SIG_015` y `ERR021` (solicitudes de ingreso a grupo,
+  retiradas en CULM-001 A.1). Son obsoletos.
+* `MESSAGE_UPDATED` se descarta con `FAIL_ZERO_SUBSCRIBER` aun con la SPA abierta: la SPA no mantiene un SSE global.
+
 ## 7. Pendiente
 
 * La SPA pide cada texto `UI###` al usarlo; los que cambian en MessageUcoLab se ven tras recargar (el `MESSAGE_UPDATED` solo
   se publica para códigos de la BD). Si se quiere al instante, la SPA puede escuchar ese evento en el SSE autenticado.
 * `infra.ps1 messages-switch` sigue escribiendo solo el `.env` del Backend; `MENSAJES_UI_DESDE_CATALOGO` del frontend se pone a mano.
+* **Decisión pendiente:** cargar en MessageUcoLab los 358 códigos que faltan (importación oficial, §7 de la guía, con
+  `build-message-catalog.py --previo`) y/o agregar `sqlserver` como contingencia de `MessageUcoLabMessageCatalogAdapter`
+  (la BD ya queda sincronizada por los avisos). Hasta entonces, en el laboratorio las alertas del estudiante muestran el código.
+* Retirar de MessageUcoLab los 16 mensajes obsoletos (`SIG_*`, `ERR021`).
 
 ## 8. Solicitudes a otros equipos
 
