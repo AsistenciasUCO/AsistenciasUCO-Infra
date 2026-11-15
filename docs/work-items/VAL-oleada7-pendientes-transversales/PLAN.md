@@ -88,6 +88,13 @@ backend, BD e Infra, más la revisión de registros duplicados del 2026-11-15. S
   Alejandro. Se ejecuta solo con autorización explícita en la conversación y cuando el otro agente haya terminado de
   aprovisionar el conjunto de datos.
 
+### H. Inventario de rutas para el PDP (backend, hallado durante la oleada)
+
+- `MensajesInterfazPublicaController` usa `@RequestMapping(RUTA_BASE)` y `extract_endpoints.py` solo acepta literales
+  (TD-087): la suite offline del extractor y `provision_asistencias.py catalog|verify|pdp` fallan en `develop`.
+- Cambio: literal en la anotación, `RUTA_BASE` se conserva para el filtro y una prueba comprueba que son iguales. No se
+  cambia el extractor: rechazar constantes es intencional ("no adivina").
+
 ## 3. Entregables y gates
 
 | Repo | Rama | Commits | Gates |
