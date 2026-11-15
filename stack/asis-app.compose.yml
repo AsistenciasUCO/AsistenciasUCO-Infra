@@ -23,6 +23,9 @@ services:
         wait
     ports:
       - "127.0.0.1:8080:8080"
+      # Puerto de gestion (Actuator/Prometheus) solo en loopback del PC; el Backend solo lo abre a la red del contenedor
+      # con asis-obs arriba (MANAGEMENT_SERVER_ADDRESS=0.0.0.0, ver docs/observability/README.md del Backend).
+      - "127.0.0.1:8090:8090"
     networks:
       asis-red:
         aliases: [asis-app-backend]
@@ -35,8 +38,11 @@ services:
     container_name: asis-app-backend
     env_file:
       - ./generado/backend.env
-    # Comparte la red de `enlaces`: sus puertos (8080) y sus reenvios en 127.0.0.1.
+    # Comparte la red de `enlaces`: sus puertos (8080, 8090) y sus reenvios en 127.0.0.1.
     network_mode: "service:enlaces"
+    volumes:
+      # Logs JSONL en la carpeta que lee Alloy (asis-obs -> Loki), igual que el Backend local.
+      - ../../GestioAsistenciaBackend/infra/observability/logs:/app/infra/observability/logs
     depends_on:
       enlaces:
         condition: service_started

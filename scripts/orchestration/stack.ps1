@@ -173,7 +173,16 @@ function New-ConfiguracionApp([string[]]$secciones) {
     $b['SPRING_DATASOURCE_URL'] = ($b['SPRING_DATASOURCE_URL'] -replace '//(localhost|127\.0\.0\.1)(:1433)?', '//sql_server_asistencias:1433')
     $b['MINIO_ENDPOINT'] = 'http://minio:9000'
     $b['CLAMAV_HOST'] = 'clamav'
-    if ($secciones -contains 'asis-obs') { $b['MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT'] = 'http://asis-obs-alloy:4318/v1/traces' }
+    # Logs JSONL en la carpeta montada que lee Alloy (un archivo propio para distinguirlo del Backend local).
+    $b['ASISTENCIAS_UCO_LOG_FILE'] = 'infra/observability/logs/backend-contenedor.jsonl'
+    $b['ASISTENCIAS_UCO_LOG_FILE_PATTERN'] = 'infra/observability/logs/backend-contenedor.%d{yyyy-MM-dd}.%i.jsonl'
+    if ($secciones -contains 'asis-obs') {
+        $b['MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT'] = 'http://asis-obs-alloy:4318/v1/traces'
+        # Prometheus recolecta por host.docker.internal:8090 (publicado solo en 127.0.0.1 del PC).
+        $b['MANAGEMENT_SERVER_ADDRESS'] = '0.0.0.0'
+    } else {
+        $b['MANAGEMENT_SERVER_ADDRESS'] = '127.0.0.1'
+    }
     if ($b.Contains('APP_ADAPTERS_IDENTITY_PROVIDER')) { $b.Remove('APP_ADAPTERS_IDENTITY_PROVIDER') }
 
     # Emisor publico de los tokens (el que ve el navegador; en asis-red keycloak.localhost es alias del Keycloak de Seguridad).
@@ -277,6 +286,11 @@ function Wait-Salud([string]$nombre, [int]$segundos = 300) {
                 $estado = docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}sin-healthcheck{{end}}' $valor 2>$null
                 if ($estado -eq 'running|healthy' -or $estado -eq 'running|sin-healthcheck') { $ok = $true; break }
                 if ($estado -like 'exited*') { break }
+            } elseif ($tipo -eq 'exec') {
+                # exec:<contenedor>|<comando sh>: sano cuando el comando termina con 0 (p. ej. la salud real de Pulsar).
+                $contenedor, $comando = $valor -split '\|', 2
+                docker exec $contenedor sh -c $comando 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { $ok = $true; break }
             } else {
                 try { if ((Invoke-WebRequest -UseBasicParsing $valor -TimeoutSec 5).StatusCode -eq 200) { $ok = $true; break } } catch { }
             }

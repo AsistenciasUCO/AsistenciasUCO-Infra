@@ -61,6 +61,27 @@ del `.env` del Backend, de `lab.env` y de los `env.js` locales del Frontend, seg
 
 El Frontend activa los textos del catálogo (`MENSAJES_UI_DESDE_CATALOGO`) solo con `ext-mensajes`.
 
+## Validación de los escenarios (2026-11-15)
+
+| Escenario | Resultado |
+| :--- | :--- |
+| `basico` | API 200 para los 5 roles y 401 sin token; login real en la SPA del contenedor |
+| `mensajes` | Suscripción a Pulsar, reconciliación de 482 mensajes (0 fallidos), cambio en MessageUcoLab → BD en 2,8 s, textos `UI###` y alertas con texto |
+| `parametros` | El Backend lee el Catálogo (un valor distinto solo en `dbo.CatalogoParametro` no se usa); microfrontend y API por el proxy de la SPA |
+| `soportes` | Subida → ClamAV (`CLEAN`) → MinIO → descarga idéntica; ClamAV detecta EICAR |
+| `observabilidad` | Trazas en Tempo, logs en Loki por `correlationId`, métricas en Prometheus (`up`) |
+| `contingencia` | Token del Keycloak propio (`iss` `localhost:8081`) aceptado por el Backend en contenedor; SPA en modo `legacy` |
+
+Ajustes que salieron de estas pruebas:
+
+* `ext-mensajes` usa su propio volumen de Pulsar (`ext-mensajes-pulsar-data`): el anterior quedó con ledgers que el bookie ya no
+  podía escribir (`Not enough non-faulty bookies available`, caso descrito en el README del kit). El volumen viejo se conserva.
+* La salud de `ext-mensajes` incluye `brokers/health` de Pulsar y la de `ext-parametros` el `actuator/health` del Catálogo: la app
+  no arranca hasta que estén listos (antes el Backend se suscribía o consultaba demasiado pronto).
+* `asis-app` monta `GestioAsistenciaBackend/infra/observability/logs` (Alloy → Loki, archivo `backend-contenedor.jsonl`) y publica
+  el puerto de gestión `8090` solo en `127.0.0.1`; el Backend lo abre (`MANAGEMENT_SERVER_ADDRESS=0.0.0.0`) solo con `asis-obs`.
+* El Backend reintenta la suscripción a Pulsar si falla (PR del Backend `fix/int003-reintento-suscripcion-pulsar`).
+
 ## Cómo está armado
 
 * Cada sección aplica un archivo propio de [`secciones/`](secciones/) **sobre el compose original** (el del Backend o el kit

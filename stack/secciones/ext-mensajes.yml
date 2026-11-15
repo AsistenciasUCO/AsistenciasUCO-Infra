@@ -56,8 +56,11 @@ volumes:
     name: messageucolab_surrealdb-data
     external: true
     driver: !reset null
+  # Volumen propio de la seccion: el anterior (messageucolab_pulsar-data) quedo con ledgers que el bookie ya no puede
+  # escribir ("Not enough non-faulty bookies available", README del kit). Pulsar solo guarda avisos de paso; el
+  # volumen viejo se conserva sin uso.
   pulsar-data:
-    name: messageucolab_pulsar-data
+    name: ext-mensajes-pulsar-data
     external: true
     driver: !reset null
   pulsar-conf:
