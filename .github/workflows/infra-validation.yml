@@ -41,7 +41,7 @@ jobs:
           set -euo pipefail
           test -f docker-compose.yml
           test -f .env.example
-          grep -q '^GRAFANA_ADMIN_PASSWORD=' .env.example || {
+          grep -q '^GRAFANA_ADMIN_PASSWORD[=]' .env.example || {
             echo '::error::.env.example must declare GRAFANA_ADMIN_PASSWORD (required by docker-compose.yml).'
             exit 1
           }
