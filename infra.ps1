@@ -63,10 +63,7 @@ param(
     [string]$Mode,
 
     [Parameter(Mandatory = $false)]
-    [string]$ApplicationId,
-
-    [Parameter(Mandatory = $false)]
-    [string]$EnvironmentId,
+    [string]$ClientId,
 
     [Parameter(Mandatory = $false)]
     [switch]$Fix,
@@ -153,7 +150,7 @@ function Show-Help {
     Write-Host "  messages-status  Contenedores y salud de MessageUcoLab (http://localhost:8000)." -ForegroundColor White
     Write-Host "  messages-ui      Levanta MessageUcoLab y lanza su pantalla (puerto 5174)." -ForegroundColor White
     Write-Host "  messages-switch  Alterna el catalogo de mensajes del Backend entre Azure y MessageUcoLab." -ForegroundColor White
-    Write-Host "                   Opciones: -Mode azure | messageucolab | status [-ApplicationId <uuid> -EnvironmentId <uuid>]" -ForegroundColor Gray
+    Write-Host "                   Opciones: -Mode azure | messageucolab | status [-ClientId <svc-...>]" -ForegroundColor Gray
     Write-Host ""
     Write-Host "6. CALIDAD, GOBERNANZA Y SEGURIDAD (DEVSECOPS):" -ForegroundColor Yellow
     Write-Host "  verify           Pre-Flight Check integral: Auditoria de Secretos + Contratos WORM." -ForegroundColor White
@@ -516,8 +513,7 @@ switch ($Command.ToLowerInvariant()) {
         $switchScript = Join-Path $infraRoot "scripts\orchestration\switch-message-catalog.ps1"
         $targetMode = if ($PSBoundParameters.ContainsKey('Mode')) { $Mode } else { 'status' }
         $msgSplat = @{ Mode = $targetMode }
-        if ($PSBoundParameters.ContainsKey('ApplicationId')) { $msgSplat['ApplicationId'] = $ApplicationId }
-        if ($PSBoundParameters.ContainsKey('EnvironmentId')) { $msgSplat['EnvironmentId'] = $EnvironmentId }
+        if ($PSBoundParameters.ContainsKey('ClientId')) { $msgSplat['ClientId'] = $ClientId }
         if ($RemainingArgs -and $RemainingArgs.Length -gt 0) {
             & $switchScript @msgSplat @RemainingArgs
         } else {
