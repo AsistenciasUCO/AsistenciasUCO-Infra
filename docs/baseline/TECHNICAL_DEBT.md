@@ -112,6 +112,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-090](#td-090) | `/api/v1/admin/parametros` y sus SP sin uso desde la UI: la administración de parámetros es el micro frontend del Catálogo | ABIERTA / NON_BLOCKING | no |
 | [TD-091](#td-091) | `parametros-administration.js` 1.0.0: sondeo por defecto cada 60 s, CORS de un solo origen; nginx propio sin rutas a los micro frontends | ABIERTA / NON_BLOCKING | no |
 | [TD-092](#td-092) | MessageUcoLab: el micro frontend elige la aplicación por nombre y el backend por id (dos "Asistencias UCO" en el laboratorio); contingencia `azure` por defecto sin Azure en local | ABIERTA / NON_BLOCKING | no |
+| [TD-093](#td-093) | Unicidad de personas y roles: altas de decano y coordinador reutilizan a otra persona por número sin tipo; sin índices únicos ni bloqueos; segundo rol sin acceso en el PDP | ABIERTA | no; sí antes de abrir altas masivas o producción |
 
 ## TD-001
 
@@ -1139,3 +1140,23 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Medio: en un despliegue real, el administrador puede editar un catálogo que la aplicación no lee.
 - **Resolución esperada:** (a) Dejar una sola aplicación "Asistencias UCO" en MessageUcoLab por ambiente, con el catálogo completo importado y el rol del administrador con acceso a ella. (b) Que el frontend monte el widget con los mismos ids del backend (el widget acepta ids en lugar de nombres) o, al menos, que el backend registre al arrancar el id y el nombre de la aplicación que lee. (c) En los perfiles `local` y `dev`, usar `none` como contingencia por defecto, como ya hace SEC-12 con el baúl y los catálogos.
 - **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+
+## TD-093
+
+- **Título:** Unicidad de personas y roles en las altas: decano y coordinador reutilizan a otra persona, sin índices únicos ni bloqueos, y el segundo rol de una persona queda sin acceso en el PDP.
+- **Origen:** Revisión de registros duplicados y usuarios con varios roles (2026-11-15), sobre `develop` de BD (migración 44) y del backend. Cada escenario se corrió en una transacción con `ROLLBACK` (`@@TRANCOUNT = 0` al final); los datos del laboratorio estaban limpios (0 correos o documentos repetidos, 71 usuarios con un rol cada uno).
+- **Descripción:**
+  1. **Decano y coordinador buscan a la persona solo por número o correo** (`usp_crear_decano_interno`, `usp_crear_coordinador_interno`: `SELECT TOP 1 ... WHERE correo = ... OR numeroIdentificacion = ...`). No comparan el tipo de documento, no detectan que documento y correo sean de personas distintas y no bloquean la lectura. El backend (`CrearDecanoUseCaseImpl`, `CrearCoordinadorUseCaseImpl`) frena por la API los casos con documento y correo de personas distintas (`ERR_UNICIDAD_DOCUMENTO`, `ERR_UNICIDAD_CORREO`, `ERR_IDENTIDAD_USUARIO_CONFLICTO`), pero no el siguiente.
+  2. **Mismo número, distinto tipo (llega por la API):** alta de un decano nuevo con CE y el número de un estudiante existente con CC. El backend no encuentra a nadie con CE, el SP reutiliza al estudiante, lo hace decano y confirma; el control posterior del backend no encuentra a la persona por tipo y número y responde 500. Sin `@Transactional` ni compensación, el estudiante queda como decano y la persona nueva no existe.
+  3. **Rol inactivo:** volver a crear un decano o coordinador desactivado responde "registrado exitosamente" y el rol sigue con `estado = 0`.
+  4. **Coordinador repetido:** crear como coordinador a quien ya lo es responde "registrado exitosamente" (no crea fila doble); decano sí avisa con `DEC_020`.
+  5. **Sin índices únicos:** solo hay claves primarias y los únicos de `IdentidadExterna`. No hay único en `Usuario.correo`, en `Usuario(idTipoIdentificacion, numeroIdentificacion)` ni en la columna `usuario` de `Docente`, `Decano`, `Coordinador`, `Estudiante` y `Administrador`. La unicidad depende de los SP, y solo `usp_admitir_estudiante` lee con `UPDLOCK, HOLDLOCK`: un doble envío o dos altas simultáneas pueden duplicar.
+  6. **Segundo rol sin acceso:** tener varios roles es intencional (HU121-HU122 R5, ámbito como unión). La SPA une los roles y entra por el de mayor prioridad. `KeycloakIdentityProviderAdapter.crearCuenta` agrega el rol de cliente a la cuenta existente, pero con `SECURITY_BASELINE_PDP_PROFILE_SYNC_ENABLED=false` (valor por defecto) el perfil del PDP no cambia: la persona recibe 403 en el nuevo rol hasta reconciliar (`/identidad/cuentas/acceso/reconciliaciones`).
+  7. **Docente (fuera de esta corrección por decisión del responsable):** `usp_vincular_docente_programa` rechaza documento o correo repetidos (`DOC_003`), pero también a una persona distinta con el mismo número y otro tipo, y no bloquea la lectura.
+  8. Relacionado: el documento es `INT` (TD-006); 15 correos están guardados con mayúsculas (sin efecto en la unicidad por la collation `CI`).
+- **Impacto:** Medio. El caso 2 deja datos incorrectos con una entrada válida desde la pantalla; el 5 es un riesgo de carrera; el 6 confunde las pruebas manuales con usuarios de varios roles.
+- **Resolución esperada:**
+  - BD: decano y coordinador al estilo de `usp_admitir_estudiante` (tipo y número, rechazo equivalente a `ADS_004` para personas distintas, `UPDLOCK, HOLDLOCK`), reactivar o avisar del rol inactivo, mensaje de "ya es coordinador", migración con índices únicos (correo, tipo y número, `usuario` en cada tabla de rol; los datos actuales ya cumplen) y pruebas en `test_suite.sql`.
+  - Backend: que un fallo posterior al SP no deje cambios a medias (resolverlo en la BD es lo preferido).
+  - Seguridad: activar la sincronización de perfiles en el laboratorio o incluir la reconciliación en el guion de pruebas manuales de usuarios con varios roles.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no; sí antes de abrir altas masivas o producción. **Estado:** ABIERTA.
