@@ -46,6 +46,9 @@ pueden convivir (ambos usan el puerto 8081 del PC).
 | `observabilidad` | `basico` + obs | Trazas y logs por `correlationId` |
 | `contingencia` | datos, contingencia, app | Arranque sin la Seguridad del equipo |
 
+Para dejar la base con los datos de prueba variados (73 usuarios, todos los roles y casos preparados) después de
+levantar un escenario: `.\infra.ps1 datos-prueba cargar -Yes`. Guía completa: [docs/runbooks/PRUEBAS_LOCALES.md](../docs/runbooks/PRUEBAS_LOCALES.md).
+
 ## Configuración automática de `asis-app`
 
 Con `asis-app`, `stack up` genera `stack/generado/backend.env` y `frontend.env` (fuera de Git: llevan secretos) a partir

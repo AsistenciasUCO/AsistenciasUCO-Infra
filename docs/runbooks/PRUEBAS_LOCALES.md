@@ -1,0 +1,68 @@
+# Pruebas locales de la versión final
+
+Guía para que cualquier integrante deje su laboratorio listo para probar todos los roles con los mismos datos.
+Todo se ejecuta desde la raíz del workspace con `.\AsistenciasUCO-Infra\infra.ps1`.
+
+## 1. Levantar lo necesario
+
+```powershell
+.\AsistenciasUCO-Infra\infra.ps1 stack up basico      # BD + Seguridad + Backend y Frontend en contenedores
+.\AsistenciasUCO-Infra\infra.ps1 stack status
+```
+
+Use `mensajes`, `parametros`, `soportes` u `observabilidad` según lo que vaya a probar (ver [stack/README.md](../../stack/README.md)).
+La Seguridad del equipo debe estar aprovisionada una vez (`provision_asistencias.py keycloak` y `pdp`, ver
+`GestioAsistenciaBackend/infra/security-baseline`).
+
+## 2. Cargar los datos de prueba variados
+
+```powershell
+.\AsistenciasUCO-Infra\infra.ps1 datos-prueba cargar -Yes
+```
+
+Respalda la base actual en `/var/opt/mssql/backup`, la recrea desde el esquema de `develop`, carga el conjunto de
+`GestioAsistenciaDB/scripts/datos-prueba`, da de alta los 73 usuarios en Keycloak y el PDP y verifica cada rol (unos 10
+minutos). Requiere Python 3 de Windows (`-Python <ruta>` si no está el lanzador `py`).
+
+| Paso suelto | Comando |
+| :--- | :--- |
+| Solo cuentas y perfiles de Seguridad | `infra.ps1 datos-prueba seguridad` |
+| Solo la verificación por rol (lectura) | `infra.ps1 datos-prueba verificar` |
+| Guardar el estado actual antes de probar | `infra.ps1 db-reset-qa -Mode Snapshot` |
+| Volver a ese estado | `infra.ps1 db-reset-qa -Mode Restore -Backup <archivo.bak> -Yes` (detener antes el backend) |
+
+Los usuarios, con su rol, programa y grupos, están en
+[USUARIOS.md](../../../GestioAsistenciaDB/scripts/datos-prueba/USUARIOS.md). Todos usan la contraseña común de
+laboratorio (`AGENTS.md`, sección 7) y entran por correo en `http://localhost:4200`.
+
+## 3. Casos preparados
+
+| Funcionalidad | Con quién | Qué hay listo |
+| :--- | :--- | :--- |
+| Cambio de decano | Administrador, Facultades | Andrés Ospina es decano sin facultad; Paula Zuluaga dirige una facultad sin programas (se puede desactivar) |
+| Cambio de coordinador | Decano de Ingeniería o de Económicas, Programas | Mauricio Quintero y Claudia Montoya están libres en su facultad; Esteban Rendón está inactivo (debe rechazarse) |
+| Cambio de docente de un grupo | Coordinador, Grupos | Julián Hoyos está vinculado a Sistemas y Tec. Software sin grupos; Liliana Mejía tiene el vínculo inactivo (debe rechazarse) |
+| Reasignación de una propuesta | Cambiar la coordinadora de Sistemas | La propuesta de cancelación de Santiago (Bases de Datos) pasa al nuevo coordinador |
+| Decisión del docente | Alejandro Cárdenas | Revisión de Brayan (Ética, 26,7 %) pendiente |
+| Reclamos | María Rostagno, Hugo Serna, Sebastián Toro | 3 pendientes; también hay uno aceptado, uno rechazado y uno retirado |
+| Solicitudes de sesión | Coordinadora de Sistemas y de Tec. Software | 2 sesiones extraordinarias pendientes |
+| Alertas | Estudiantes Santiago, Kevin, Brayan (pérdida) y Mateo, Laura, Camila, Valeria (riesgo) | Alertas activas |
+| Cierre masivo | Administrador, período 2026-1 | Terminó sin cerrar; Alejandro Pineda supera el 20 % y quedaría cancelado por inasistencia |
+| Visibilidad por rol | Cualquiera | Grupos compartidos entre programas y facultades (Cátedra, Ética, Cálculo, Costos) |
+| Doble rol | Diana Londoño | Coordinadora de Tec. Software y docente de Pruebas de Software |
+
+Los correos que genere la aplicación van al buzón de prueba (`SMTP_NOTIFICATION_TEST_MODE_ENABLED=true`).
+
+## 4. Suites automáticas
+
+```powershell
+.\AsistenciasUCO-Infra\infra.ps1 datos-prueba verificar      # visibilidad por rol sobre estos datos
+.\AsistenciasUCO-Infra\scripts\tests\test_all_hus.ps1         # HU de los 5 roles
+.\AsistenciasUCO-Infra\infra.ps1 verify                       # secretos y contratos antes de un commit
+```
+
+## Límites conocidos
+
+- El historial de asistencia se registra hasta el momento de la carga; las cifras exactas cambian según el día.
+- Los scripts siembran el período 2026-2 (1 de agosto a 15 de diciembre de 2026): después de esa fecha el generador
+  de sesiones rechaza el período y hay que mover las fechas en `generar_datos_prueba.py`.
