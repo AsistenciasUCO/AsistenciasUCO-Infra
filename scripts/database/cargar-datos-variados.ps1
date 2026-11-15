@@ -197,7 +197,8 @@ function Invoke-Cargar {
             throw ("deploy_schema.ps1 fallo (codigo $($deploy.ExitCode)).`n" + (($deploy.Lines | Select-Object -Last 15) -join "`n"))
         }
 
-        Assert-Ok (Invoke-Native -Exe 'docker' -Arguments @('exec', $ContainerName, 'rm', '-rf', '/tmp/datos-prueba')) 'limpiar /tmp/datos-prueba'
+        # docker cp deja los archivos como root: la copia anterior solo se puede borrar como root.
+        Assert-Ok (Invoke-Native -Exe 'docker' -Arguments @('exec', '-u', 'root', $ContainerName, 'rm', '-rf', '/tmp/datos-prueba')) 'limpiar /tmp/datos-prueba'
         Assert-Ok (Invoke-Native -Exe 'docker' -Arguments @('cp', $datosDir, "${ContainerName}:/tmp/datos-prueba")) 'copiar los scripts al contenedor'
         foreach ($f in @('01_estructura.sql', '02_sesiones.sql', '03_asistencia.sql', '04_flujos.sql')) {
             Write-Step "Ejecutando $f"

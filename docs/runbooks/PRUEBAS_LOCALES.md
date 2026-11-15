@@ -63,6 +63,13 @@ Los correos que genere la aplicación van al buzón de prueba (`SMTP_NOTIFICATIO
 
 ## Límites conocidos
 
+- Red del campus: con el backend en contenedor, las peticiones llegan desde la red de Docker (p. ej. `192.168.80.1`).
+  Los datos de prueba dejan `RED/CIDRS_CAMPUS` con loopback y los rangos privados `172.16.0.0/12` y `192.168.0.0/16`
+  para que el registro por QR/PIN funcione en el laboratorio (también desde un celular en la misma red). Con la sección
+  `ext-parametros` el valor sale del Catálogo de Parámetros.
+- 2026-1 terminó sin cierre masivo: mientras no se cierre, el horario del estudiante y la lista de grupos del
+  coordinador muestran también esos grupos (hallazgo abierto: no filtran por período vigente).
+
 - El historial de asistencia se registra hasta el momento de la carga; las cifras exactas cambian según el día.
 - Los scripts siembran el período 2026-2 (1 de agosto a 15 de diciembre de 2026): después de esa fecha el generador
   de sesiones rechaza el período y hay que mover las fechas en `generar_datos_prueba.py`.

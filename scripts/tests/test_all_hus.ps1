@@ -193,10 +193,16 @@ function Find-SesionId($grupoId, $nombre) {
     return [string]$m[0].sesion
 }
 
-function New-SesionV2($grupoId, $nombre, [datetime]$inicio, [datetime]$fin) {
+function New-SesionV2($grupoId, $nombre, [datetime]$inicio, [datetime]$fin, [switch]$SinAprobar) {
     $cuerpo = @{ grupo = "$grupoId"; nombre = $nombre; fechaHoraInicio = (Format-Utc $inicio); fechaHoraFin = (Format-Utc $fin) }
     Invoke-Api POST "$BASEV2/sesiones" $hDoc $cuerpo | Out-Null
-    return (Find-SesionId $grupoId $nombre)
+    $id = Find-SesionId $grupoId $nombre
+    # DEC-065 (2): la sesion que crea el docente nace con una solicitud PENDIENTE y no admite tomas ni asistencia (SES_023)
+    # hasta que el coordinador del programa la aprueba. Las sesiones de prueba se aprueban como en el flujo real.
+    if (-not $SinAprobar) {
+        Invoke-Api POST "/coordinador/sesiones/$id/aprobacion" $hCoord @{ observacion = "CULM1-E2E aprobacion de sesion de prueba" } | Out-Null
+    }
+    return $id
 }
 
 # Busca una ventana de 1 hora sin cruce con las sesiones del docente (dias relativos a hoy, negativos = pasado).
@@ -429,6 +435,25 @@ Run-Test "PREP-E2E" "Preparar sesiones de prueba CULM1-E2E (en curso, pasada y f
     return "EnCurso=$idEn Pasada=$($script:sesPasada.id) PasadaEnPlazo=$($script:sesPasadaEnPlazo.id) Futura=$($script:sesFutura.id)"
 }
 
+Run-Test "DEC-065-Solicitud" "La sesion creada por el docente queda pendiente hasta que el coordinador la aprueba (una sola vez)" {
+    $ultimo = ""
+    for ($i = 0; $i -lt 10; $i++) {
+        $ini = ([datetime]::UtcNow.Date).AddDays((Get-Random -Minimum 31 -Maximum 300)).AddHours((Get-Random -Minimum 5 -Maximum 21))
+        $nombre = "CULM1-E2E-Solicitud-{0}" -f (Get-Random -Minimum 100000 -Maximum 999999)
+        try { $id = New-SesionV2 $script:grupoBaseId $nombre $ini $ini.AddHours(1) -SinAprobar; break }
+        catch { $ultimo = $_.Exception.Message; $id = $null; if ((Get-ApiStatus $ultimo) -ne 400) { throw } }
+    }
+    if (-not $id) { throw "No se pudo crear la sesion de prueba: $ultimo" }
+    $pend = Invoke-Api GET "/coordinador/sesiones/solicitudes?pagina=1&tamano=100" $hCoord
+    $filas = @($pend.datos) + @($pend.elementos) + @($pend.datos.elementos) | Where-Object { $_ -and (($_.idSesion -ieq $id) -or ($_.sesionId -ieq $id)) }
+    if (@($filas).Count -lt 1) { throw "La solicitud de la sesion $id no aparece en las pendientes del coordinador" }
+    Expect-ApiStatus 403 { Invoke-Api POST "/coordinador/sesiones/$id/aprobacion" $hDoc @{ observacion = "el docente no aprueba" } }
+    $ok = Invoke-Api POST "/coordinador/sesiones/$id/aprobacion" $hCoord @{ observacion = "CULM1-E2E aprobada" }
+    if (-not $ok.exitoso) { throw "La aprobacion no fue exitosa" }
+    Expect-ApiStatus 409 { Invoke-Api POST "/coordinador/sesiones/$id/aprobacion" $hCoord @{ observacion = "segunda vez" } }
+    return "Sesion $id pendiente, aprobada por el coordinador; el docente recibe 403 y la segunda aprobacion 409"
+}
+
 Run-Test "HU028,HU030,HU045" "Crear/abrir y programar sesiones de clase (v2, instantes UTC) para registro de asistencia" {
     if (-not $script:sesFutura) { throw "No hay sesion de prueba (falla PREP-E2E)" }
     $r = Invoke-Api GET "$BASEV2/sesiones/$($script:sesFutura.id)" $hDoc
@@ -659,11 +684,16 @@ Run-Test "CLEANUP-E2E" "Cerrar la sesion CULM1-E2E-EnCurso moviendola al pasado 
 
 Write-Host "`n -- Grupos y matricula manual (HU043-HU051) --" -ForegroundColor DarkCyan
 
-Run-Test "HU043" "Crear nuevo grupo academico validando cupos y aforo (usp_crear_grupo)" {
-    $oferta = Invoke-Api GET "/docente/oferta-creacion-grupos" $hDoc
-    if (-not $oferta.exitoso) { throw "No se pudo consultar la oferta de creacion de grupos" }
-    $script:docenteId = [string]$oferta.datos.idDocente
-    $script:asignaturaOfertaId = [string]$oferta.datos.asignaturas[0].idAsignatura
+Run-Test "HU043" "Crear nuevo grupo academico validando cupos y aforo (usp_crear_grupo; DEC-065 (4): solo el coordinador)" {
+    # DEC-065 (4): el coordinador crea el grupo de una asignatura de su programa y asigna al docente titular; se retiro la
+    # oferta de creacion del docente. El titular es el docente de prueba (vinculado al programa) para que HU050/HU051 operen.
+    $yo = Invoke-Api GET "/auth/me" $hDoc
+    $docentes = Invoke-Api GET "/coordinador/docentes" $hCoord
+    $script:docenteId = [string]@($docentes.datos | Where-Object { $_.idUsuario -ieq [string]$yo.datos.idUsuario })[0].idDocente
+    if (-not $script:docenteId) { throw "El docente de prueba no esta vinculado a un programa del coordinador" }
+    # Ojo: no llamar a una variable $base aqui; PowerShell no distingue mayusculas y taparia la URL $BASE de Invoke-Api.
+    $grupoDelDocente = @((Invoke-Api GET "/docente/asignaturas" $hDoc).datos | Where-Object { $_.idGrupo -ieq $script:grupoBaseId })[0]
+    $script:asignaturaOfertaId = [string]$grupoDelDocente.idAsignatura
     $periodos = Invoke-Api GET "/coordinador/periodos-academicos" $hCoord
     $hoy = [datetime]::UtcNow.Date
     $vig = @($periodos.datos | Where-Object { [datetime]::Parse($_.fechaInicio) -le $hoy -and [datetime]::Parse($_.fechaFin) -ge $hoy })
@@ -682,8 +712,9 @@ Run-Test "HU043" "Crear nuevo grupo academico validando cupos y aforo (usp_crear
             franjas = @(@{ dia = $dias[(Get-Random -Minimum 0 -Maximum 6)]; horaInicio = ("{0:D2}:00" -f $hora); horaFin = ("{0:D2}:00" -f ($hora + 2)) })
             generarSesionesAutomaticas = $false
         }
+        if ($i -eq 0) { Expect-ApiStatus 403 { Invoke-Api POST "/grupos" $hDoc $body } }
         try {
-            $res = Invoke-Api POST "/grupos" $hDoc $body
+            $res = Invoke-Api POST "/grupos" $hCoord $body
             if (-not $res.exitoso) { throw "Respuesta no exitosa al crear grupo" }
             $script:grupoNuevoId = [string]$res.datos.id
             return "Grupo creado id=$($script:grupoNuevoId) (CULM1-E2E-Grupo $codigo)"
@@ -856,7 +887,12 @@ Run-Test "HU072,HU075,HU076,HU079,HU080" "Consultar, asociar y gestionar planes 
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
     if ($null -eq $res.elementos -or $null -eq $res.totalElementos -or $null -eq $res.numeroPagina) { throw "La respuesta no es un ApiPageResponse (elementos/totalElementos/numeroPagina)" }
     if (@($res.elementos).Count -lt 1) { throw "El programa no tiene planes de estudio" }
-    $script:globalPlanId = [string]@($res.elementos)[0].id
+    # Plan de trabajo de los casos de malla (HU077, HU084...): activo y con cupo para un semestre mas (el catalogo llega a S10).
+    # Un programa puede tener planes anteriores inactivos; el primero de la lista no siempre es editable.
+    $trabajo = @($res.elementos | Where-Object { $_.estaActivoPlanEstudio -and $_.totalSemestres -lt 10 })
+    if ($trabajo.Count -lt 1) { $trabajo = @($res.elementos | Where-Object { $_.estaActivoPlanEstudio }) }
+    if ($trabajo.Count -lt 1) { $trabajo = @($res.elementos) }
+    $script:globalPlanId = [string]$trabajo[0].id
     return "Planes de estudio vigentes: $($res.totalElementos). Plan 1: INP $(@($res.elementos)[0].inp) (Semestres: $(@($res.elementos)[0].totalSemestres))"
 }
 
