@@ -133,15 +133,28 @@ detenida en septiembre; las versiones oficiales salen de `develop` como releases
   retiradas en CULM-001 A.1). Son obsoletos.
 * `MESSAGE_UPDATED` se descarta con `FAIL_ZERO_SUBSCRIBER` aun con la SPA abierta: la SPA no mantiene un SSE global.
 
+### 6.2 Carga de los 358 mensajes que faltaban (2026-11-15)
+
+* Excel generado con `build-message-catalog.py --previo <fixture del Backend> --solo <faltantes> --limite 2000` sobre la
+  plantilla vigente de "Asistencias UCO" (el fixture y los 122 alias ya cubrían los 482 códigos: no hubo cambios en el
+  Backend). Validación: 358 filas, 0 *issues*; confirmada en Develop (`count=358`).
+* La carga disparó 358 avisos `MessageUpdated`. **Defecto encontrado y corregido:** el límite de Kong (120/min por IP)
+  respondió 429 a 167 lecturas y `MessageUcoLabMessageSourceAdapter` las tomaba como "mensaje inexistente": el aviso se
+  confirmaba sin copiar el texto (con un cambio real, la BD habría quedado desactualizada hasta el siguiente arranque).
+  Ahora solo un 404 es "no existe"; 429, 5xx y fallos de red lanzan `FuenteNoDisponibleException` y el aviso vuelve a
+  Pulsar; `listar()` tampoco devuelve una lista vacía ante un fallo (la reconciliación falla en vez de "terminar" sin datos).
+* Tras reiniciar: reconciliación de **497** mensajes, 482 sin cambios (la BD ya tenía esos textos), 15 sin código en la BD,
+  **0 fallidos**. Las alertas del estudiante (`GET /estudiante/alertas`) muestran el texto en lugar de `ALR_010`/`ALR_011`.
+
 ## 7. Pendiente
 
 * La SPA pide cada texto `UI###` al usarlo; los que cambian en MessageUcoLab se ven tras recargar (el `MESSAGE_UPDATED` solo
   se publica para códigos de la BD). Si se quiere al instante, la SPA puede escuchar ese evento en el SSE autenticado.
 * `infra.ps1 messages-switch` sigue escribiendo solo el `.env` del Backend; `MENSAJES_UI_DESDE_CATALOGO` del frontend se pone a mano.
-* **Decisión pendiente:** cargar en MessageUcoLab los 358 códigos que faltan (importación oficial, §7 de la guía, con
-  `build-message-catalog.py --previo`) y/o agregar `sqlserver` como contingencia de `MessageUcoLabMessageCatalogAdapter`
-  (la BD ya queda sincronizada por los avisos). Hasta entonces, en el laboratorio las alertas del estudiante muestran el código.
-* Retirar de MessageUcoLab los 16 mensajes obsoletos (`SIG_*`, `ERR021`).
+* Opcional: agregar `sqlserver` como contingencia de `MessageUcoLabMessageCatalogAdapter` (la BD queda sincronizada por los
+  avisos) para que un código nuevo que aún no se cargó en MessageUcoLab no salga crudo.
+* Retirar de MessageUcoLab los 16 mensajes obsoletos (`SIG_*`, `ERR021`) (borrado: con confirmación del responsable).
+* Cada laboratorio del equipo debe repetir la carga (§6.2) en su propio MessageUcoLab.
 
 ## 8. Solicitudes a otros equipos
 

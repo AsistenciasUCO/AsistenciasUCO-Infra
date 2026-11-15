@@ -171,7 +171,7 @@ SPA (mensajeUi) ──GET /api/v1/public/mensajes-interfaz/UI012 (sin sesión)�
 
 ## 7. Cargar el catálogo de mensajes de usuario en MessageUcoLab
 
-El catálogo (144 mensajes de usuario) sale de **todos** los seeds de `GestioAsistenciaDB/schema/seed` (cada `MERGE` hacia
+El catálogo (482 mensajes de usuario al 2026-11-15) sale de **todos** los seeds de `GestioAsistenciaDB/schema/seed` (cada `MERGE` hacia
 `CatalogoMensajeUsuario`) y se carga **una vez por
 ambiente** con la importación masiva de MessageUcoLab (solo crea mensajes nuevos; los existentes se rechazan).
 
@@ -181,8 +181,12 @@ ambiente** con la importación masiva de MessageUcoLab (solo crea mensajes nuevo
   `ERR001…ERR024` y `SUC001…SUC003`, en el orden del seed, declarados en `code-aliases` de `application.yml`.
 * El **título** lleva el nombre canónico para buscarlo en la pantalla: `VAL_001 - El número de identificación es…`
   (si el canónico mide más de 30, el título es solo el canónico).
-* El **contenido** es el del seed. Hoy el componente admite 100 caracteres; `COO_001` (122) y `SES_005` (108) lo superan y
-  la validación los marcará hasta que el equipo de mensajes suba el límite a 150–200.
+* El **contenido** es el del seed. MessageUcoLab 0.3.0 admite contenido de 5 a 2000 caracteres y título de 5 a 1000
+  (pase `--limite 2000`); el más largo del seed tiene 136.
+* **Solo lo que falta:** la importación rechaza códigos existentes. Para completar un catálogo ya cargado, pase
+  `--solo <códigos remotos que faltan>` (la lista se obtiene cruzando el fixture
+  `GestioAsistenciaBackend/src/test/resources/messageucolab/catalogo-mensajes-usuario.psv` con
+  `GET /messageucolab/v1/messages/consumer`); así se hizo la carga de 358 del 2026-11-15 (INT-003, `ESTADO.md` §6.2).
 
 **Pasos:**
 
