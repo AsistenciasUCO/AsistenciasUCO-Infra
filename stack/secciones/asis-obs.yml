@@ -1,0 +1,45 @@
+# Seccion asis-obs (bajo demanda): observabilidad propia (Grafana, Prometheus, Loki, Tempo, Alloy).
+# Se aplica sobre GestioAsistenciaBackend/infra/observability/compose.yaml. Alloy recibe OTLP del Backend en contenedor.
+services:
+  grafana:
+    container_name: asis-obs-grafana
+    labels:
+      asistencias.seccion: asis-obs
+  prometheus:
+    container_name: asis-obs-prometheus
+    labels:
+      asistencias.seccion: asis-obs
+  loki:
+    container_name: asis-obs-loki
+    labels:
+      asistencias.seccion: asis-obs
+  tempo:
+    container_name: asis-obs-tempo
+    labels:
+      asistencias.seccion: asis-obs
+  alloy:
+    container_name: asis-obs-alloy
+    networks:
+      asis-red:
+        aliases: [asis-obs-alloy]
+    labels:
+      asistencias.seccion: asis-obs
+
+volumes:
+  grafana_data:
+    name: asistencias-uco-observability_grafana_data
+    external: true
+  prometheus_data:
+    name: asistencias-uco-observability_prometheus_data
+    external: true
+  loki_data:
+    name: asistencias-uco-observability_loki_data
+    external: true
+  tempo_data:
+    name: asistencias-uco-observability_tempo_data
+    external: true
+
+networks:
+  asis-red:
+    name: asis-red
+    external: true

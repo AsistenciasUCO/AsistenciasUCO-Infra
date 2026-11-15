@@ -1,0 +1,334 @@
+{
+  "descripcion": "Secciones de contenedores de Asistencias UCO y escenarios de prueba. Lo usa infra.ps1 stack (scripts/orchestration/stack.ps1). Rutas relativas a la raiz del workspace (la carpeta que contiene AsistenciasUCO-Infra).",
+  "red": "asis-red",
+  "redesExternas": [
+    "asis-red",
+    "asistencias-files-backend"
+  ],
+  "volumenesExternos": [
+    "asis-datos-mssql",
+    "asistencias-minio-data"
+  ],
+  "limiteMemoriaMb": 9500,
+  "secciones": {
+    "asis-datos": {
+      "descripcion": "SQL Server (BD del laboratorio) y MinIO (soportes). Siempre arriba.",
+      "siempre": true,
+      "memoriaMb": 2500,
+      "directorio": "GestioAsistenciaBackend/infra/files",
+      "compose": [
+        "compose.yaml",
+        "@stack/secciones/asis-datos.yml"
+      ],
+      "envFiles": [
+        "@stack/.env",
+        ".env"
+      ],
+      "servicios": [
+        "sqlserver",
+        "minio",
+        "minio-init"
+      ],
+      "salud": [
+        "contenedor:sql_server_asistencias",
+        "contenedor:asis-datos-minio"
+      ],
+      "urls": [
+        "SQL Server: localhost,1433 (sa)",
+        "MinIO API: http://localhost:9000"
+      ],
+      "proyectosAnteriores": [
+        "asistencias-files"
+      ]
+    },
+    "ext-seguridad": {
+      "descripcion": "Componente de Seguridad del equipo (Security Baseline 0.1.13: Keycloak, PDP, PEP, OPA).",
+      "memoriaMb": 1600,
+      "directorio": "GestioAsistenciaBackend/infra/security-baseline",
+      "compose": [
+        "compose.yaml",
+        "@stack/secciones/ext-seguridad.yml"
+      ],
+      "envFiles": [
+        "~/.asistencias-security-lab/lab.env"
+      ],
+      "servicios": [
+        "keycloak",
+        "keycloak-relay",
+        "surrealdb",
+        "redis",
+        "opa",
+        "pdp",
+        "pep"
+      ],
+      "salud": [
+        "contenedor:ext-seguridad-keycloak",
+        "contenedor:ext-seguridad-pdp",
+        "http:http://localhost:18081/actuator/health"
+      ],
+      "urls": [
+        "Keycloak: http://keycloak.localhost:19090",
+        "PDP: http://localhost:18080",
+        "PEP: http://localhost:18081",
+        "Consola de seguridad: Complementos/Seguridad/security-ui (npm run preview, 5175)"
+      ],
+      "proyectosAnteriores": [
+        "asistencias-security-lab",
+        "security-baseline"
+      ]
+    },
+    "ext-mensajes": {
+      "descripcion": "MessageUcoLab 0.3.0 (kit del equipo de mensajeria, secretos en Doppler).",
+      "memoriaMb": 3300,
+      "directorio": "Complementos/CatalogoMensajes/messageucolab-local",
+      "compose": [
+        "compose.yaml",
+        "@stack/secciones/ext-mensajes.yml"
+      ],
+      "envFiles": [],
+      "doppler": {
+        "proyecto": "messageucolab-local",
+        "config": "dev"
+      },
+      "servicios": [
+        "redis",
+        "redis-init",
+        "surrealdb",
+        "surrealdb-init",
+        "kong",
+        "pulsar",
+        "messageucolab"
+      ],
+      "salud": [
+        "contenedor:ext-mensajes-app",
+        "http:http://localhost:8000/actuator/health"
+      ],
+      "urls": [
+        "API (Kong): http://localhost:8000",
+        "Pulsar: pulsar://localhost:6800"
+      ],
+      "proyectosAnteriores": [
+        "messageucolab"
+      ],
+      "requiere": [
+        "ext-seguridad"
+      ]
+    },
+    "ext-parametros": {
+      "descripcion": "Catalogo de Parametros 0.1.7 y su microfrontend 0.1.6 (kit del equipo).",
+      "memoriaMb": 600,
+      "directorio": "Complementos/CatalogoParametros/Catalogo-Parametros",
+      "compose": [
+        "docker-compose.yml",
+        "@stack/secciones/ext-parametros.yml"
+      ],
+      "envFiles": [
+        ".env"
+      ],
+      "servicios": [
+        "redis",
+        "surrealdb",
+        "app",
+        "frontend"
+      ],
+      "conflictos": [
+        "asis-contingencia"
+      ],
+      "salud": [
+        "contenedor:ext-parametros-app"
+      ],
+      "urls": [
+        "API: http://localhost:8081/catalogo-parametros/api/v1",
+        "Microfrontend: http://localhost:4201"
+      ],
+      "proyectosAnteriores": [
+        "catalogo-parametros"
+      ],
+      "requiere": [
+        "ext-seguridad"
+      ]
+    },
+    "asis-antivirus": {
+      "descripcion": "ClamAV para las pruebas de soportes (adjuntos de reclamos y justificaciones).",
+      "memoriaMb": 1300,
+      "directorio": "GestioAsistenciaBackend/infra/files",
+      "compose": [
+        "compose.yaml",
+        "@stack/secciones/asis-antivirus.yml"
+      ],
+      "envFiles": [
+        ".env"
+      ],
+      "servicios": [
+        "clamav"
+      ],
+      "salud": [
+        "contenedor:asis-antivirus-clamav"
+      ],
+      "urls": [
+        "clamd: localhost:3310"
+      ],
+      "proyectosAnteriores": [
+        "asistencias-uco-infra"
+      ]
+    },
+    "asis-obs": {
+      "descripcion": "Observabilidad propia (Grafana, Prometheus, Loki, Tempo y Alloy para OTLP).",
+      "memoriaMb": 900,
+      "directorio": "GestioAsistenciaBackend/infra/observability",
+      "compose": [
+        "compose.yaml",
+        "@stack/secciones/asis-obs.yml"
+      ],
+      "envFiles": [
+        ".env"
+      ],
+      "servicios": [
+        "grafana",
+        "prometheus",
+        "loki",
+        "tempo",
+        "alloy"
+      ],
+      "salud": [
+        "contenedor:asis-obs-grafana"
+      ],
+      "urls": [
+        "Grafana: ver GRAFANA_PORT en GestioAsistenciaBackend/infra/observability/.env"
+      ],
+      "proyectosAnteriores": [
+        "asistencias-uco-observability"
+      ]
+    },
+    "asis-contingencia": {
+      "descripcion": "SOLO EMERGENCIAS: Keycloak propio (realm asistencias-uco) si el componente de Seguridad del equipo no esta disponible.",
+      "memoriaMb": 900,
+      "directorio": "GestioAsistenciaBackend/infra/keycloak",
+      "compose": [
+        "compose.yaml",
+        "@stack/secciones/asis-contingencia.yml"
+      ],
+      "envFiles": [
+        ".env"
+      ],
+      "servicios": [
+        "keycloak-db",
+        "keycloak"
+      ],
+      "conflictos": [
+        "ext-parametros"
+      ],
+      "salud": [
+        "contenedor:asis-contingencia-keycloak"
+      ],
+      "urls": [
+        "Keycloak (legacy): http://localhost:8081"
+      ],
+      "proyectosAnteriores": [
+        "asistencias-uco-security",
+        "gestioasistencia"
+      ]
+    },
+    "asis-app": {
+      "descripcion": "Backend y Frontend de Asistencias UCO (imagenes de develop).",
+      "memoriaMb": 1200,
+      "directorio": "AsistenciasUCO-Infra/stack",
+      "compose": [
+        "asis-app.compose.yml"
+      ],
+      "envFiles": [],
+      "servicios": [
+        "enlaces",
+        "backend",
+        "frontend"
+      ],
+      "requiereImagenes": [
+        "asistencias-backend:develop",
+        "asistencias-frontend:develop"
+      ],
+      "salud": [
+        "contenedor:asis-app-enlaces",
+        "contenedor:asis-app-backend",
+        "contenedor:asis-app-frontend"
+      ],
+      "urls": [
+        "SPA: http://localhost:4200",
+        "API: http://localhost:8080/api/v1"
+      ],
+      "proyectosAnteriores": [
+        "gestioasistenciabackend",
+        "gestioasistenciafrontend"
+      ]
+    }
+  },
+  "escenarios": {
+    "minimo": {
+      "secciones": [
+        "asis-datos"
+      ],
+      "pruebas": "Gate de BD y scripts SQL sobre la BD del laboratorio."
+    },
+    "basico": {
+      "secciones": [
+        "asis-datos",
+        "ext-seguridad",
+        "asis-app"
+      ],
+      "pruebas": "HU de los 5 roles (e2e_baseline.py, test_all_hus.ps1). Mensajes y parametros desde la BD."
+    },
+    "mensajes": {
+      "secciones": [
+        "asis-datos",
+        "ext-seguridad",
+        "ext-mensajes",
+        "asis-app"
+      ],
+      "pruebas": "Catalogo de mensajes, avisos por Pulsar -> BD, textos UI### de la SPA (int003_e2e)."
+    },
+    "parametros": {
+      "secciones": [
+        "asis-datos",
+        "ext-seguridad",
+        "ext-parametros",
+        "asis-app"
+      ],
+      "pruebas": "Catalogo de Parametros (test_catalogo_parametros.ps1) y microfrontend de administracion."
+    },
+    "completo": {
+      "secciones": [
+        "asis-datos",
+        "ext-seguridad",
+        "ext-mensajes",
+        "ext-parametros",
+        "asis-app"
+      ],
+      "pruebas": "Flujos completos con los tres componentes externos (sin antivirus ni observabilidad)."
+    },
+    "soportes": {
+      "secciones": [
+        "asis-datos",
+        "ext-seguridad",
+        "asis-antivirus",
+        "asis-app"
+      ],
+      "pruebas": "Adjuntos de reclamos y justificaciones (MinIO + ClamAV)."
+    },
+    "observabilidad": {
+      "secciones": [
+        "asis-datos",
+        "ext-seguridad",
+        "asis-obs",
+        "asis-app"
+      ],
+      "pruebas": "Trazas, metricas y logs por correlationId en Grafana."
+    },
+    "contingencia": {
+      "secciones": [
+        "asis-datos",
+        "asis-contingencia",
+        "asis-app"
+      ],
+      "pruebas": "Arranque con el Keycloak propio (provider legacy) cuando falla el componente de Seguridad."
+    }
+  }
+}

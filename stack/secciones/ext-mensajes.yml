@@ -1,0 +1,81 @@
+# Seccion ext-mensajes: MessageUcoLab 0.3.0 (kit del equipo de mensajeria, Complementos/CatalogoMensajes/messageucolab-local).
+# Se aplica sobre su compose.yaml (sin tocarlo) con `doppler run --project messageucolab-local --config dev`.
+# Solo se levantan los servicios ligeros (sin Grafana, Loki, Prometheus, OTel ni Ollama). Kong (8000) y Pulsar (6650) se
+# exponen en asis-red para el Backend en contenedor; redis/surrealdb NO (el Catalogo usa los mismos nombres de servicio).
+services:
+  redis:
+    container_name: ext-mensajes-redis
+    labels:
+      asistencias.seccion: ext-mensajes
+  redis-init:
+    container_name: ext-mensajes-redis-init
+    labels:
+      asistencias.seccion: ext-mensajes
+  surrealdb:
+    container_name: ext-mensajes-surrealdb
+    labels:
+      asistencias.seccion: ext-mensajes
+  surrealdb-init:
+    container_name: ext-mensajes-surrealdb-init
+    labels:
+      asistencias.seccion: ext-mensajes
+  kong:
+    container_name: ext-mensajes-kong
+    networks:
+      asis-red:
+        aliases: [ext-mensajes-kong]
+    labels:
+      asistencias.seccion: ext-mensajes
+  messageucolab:
+    container_name: ext-mensajes-app
+    labels:
+      asistencias.seccion: ext-mensajes
+  pulsar:
+    container_name: ext-mensajes-pulsar
+    networks:
+      asis-red:
+        # El listener interno de Pulsar se anuncia como pulsar://pulsar:6650.
+        aliases: [pulsar, ext-mensajes-pulsar]
+    labels:
+      asistencias.seccion: ext-mensajes
+  grafana:
+    container_name: ext-mensajes-grafana
+  loki:
+    container_name: ext-mensajes-loki
+  otel-collector:
+    container_name: ext-mensajes-otel-collector
+  prometheus:
+    container_name: ext-mensajes-prometheus
+
+volumes:
+  redis_data:
+    name: messageucolab_redis_data
+    external: true
+    driver: !reset null
+  surrealdb-data:
+    name: messageucolab_surrealdb-data
+    external: true
+    driver: !reset null
+  pulsar-data:
+    name: messageucolab_pulsar-data
+    external: true
+    driver: !reset null
+  pulsar-conf:
+    name: messageucolab_pulsar-conf
+    external: true
+    driver: !reset null
+  grafana-data:
+    name: messageucolab_grafana-data
+    external: true
+  loki-data:
+    name: messageucolab_loki-data
+    external: true
+  ollama-data:
+    name: messageucolab_ollama-data
+    external: true
+    driver: !reset null
+
+networks:
+  asis-red:
+    name: asis-red
+    external: true

@@ -1,0 +1,61 @@
+# Seccion ext-seguridad: componente de Seguridad del equipo (Security Baseline 0.1.13).
+# Se aplica sobre GestioAsistenciaBackend/infra/security-baseline/compose.yaml con --env-file %USERPROFILE%\.asistencias-security-lab\lab.env.
+# Solo renombra contenedores, conserva los volumenes existentes y expone en asis-red lo que usa el Backend en contenedor:
+#   keycloak.localhost:19090 (mismo emisor de los tokens que ve el navegador), PDP (8080) y PEP (8081).
+services:
+  keycloak:
+    container_name: ext-seguridad-keycloak
+    networks:
+      asis-red:
+        aliases: [keycloak.localhost, ext-seguridad-keycloak]
+    labels:
+      asistencias.seccion: ext-seguridad
+  keycloak-relay:
+    container_name: ext-seguridad-keycloak-relay
+    labels:
+      asistencias.seccion: ext-seguridad
+  surrealdb:
+    container_name: ext-seguridad-surrealdb
+    labels:
+      asistencias.seccion: ext-seguridad
+  redis:
+    container_name: ext-seguridad-redis
+    labels:
+      asistencias.seccion: ext-seguridad
+  opa:
+    container_name: ext-seguridad-opa
+    labels:
+      asistencias.seccion: ext-seguridad
+  pdp:
+    container_name: ext-seguridad-pdp
+    networks:
+      asis-red:
+        aliases: [ext-seguridad-pdp]
+    labels:
+      asistencias.seccion: ext-seguridad
+  pep:
+    container_name: ext-seguridad-pep
+    networks:
+      asis-red:
+        aliases: [ext-seguridad-pep]
+    labels:
+      asistencias.seccion: ext-seguridad
+
+volumes:
+  asistencias-security-lab-keycloak-data:
+    name: asistencias-security-lab_asistencias-security-lab-keycloak-data
+    external: true
+  asistencias-security-lab-surrealdb-data:
+    name: asistencias-security-lab_asistencias-security-lab-surrealdb-data
+    external: true
+  asistencias-security-lab-redis-data:
+    name: asistencias-security-lab_asistencias-security-lab-redis-data
+    external: true
+
+networks:
+  lab:
+    name: asistencias-security-lab-net
+    external: true
+  asis-red:
+    name: asis-red
+    external: true
