@@ -45,6 +45,18 @@ Set-StrictMode -Version Latest
 # Stop. Los fallos reales se detectan con $LASTEXITCODE y throw explicitos.
 $ErrorActionPreference = 'Continue'
 
+# Desde infra.ps1 los argumentos llegan reenviados como texto: '-Conservar' cae en $Objetivo en vez de enlazar el switch.
+$restantes = @()
+foreach ($o in $Objetivo) {
+    switch -Regex ($o) {
+        '^-(?i:Conservar)$' { $Conservar = [switch]::Present; continue }
+        '^-(?i:SinEsperar)$' { $SinEsperar = [switch]::Present; continue }
+        '^-(?i:IncluirDatos)$' { $IncluirDatos = [switch]::Present; continue }
+        default { $restantes += $o }
+    }
+}
+$Objetivo = $restantes
+
 $infraRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $workspace = (Resolve-Path (Join-Path $infraRoot '..')).Path
 $stackDir = Join-Path $infraRoot 'stack'
