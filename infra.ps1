@@ -122,6 +122,8 @@ function Show-Help {
     Write-Host "  db-test          Ejecuta la suite transaccional de pruebas de BD (test_suite.sql)." -ForegroundColor White
     Write-Host "  db-cupos         Amplia la capacidad de cupos de todos los grupos (+40 cupos) para pruebas." -ForegroundColor White
     Write-Host "  db-reset-qa      Estado base de pruebas ampliado: -Mode Base|Snapshot|Restore (-Backup, -StopBackend, -Yes)." -ForegroundColor White
+    Write-Host "  datos-prueba cargar -Yes       Base desde cero con datos variados (73 usuarios), Seguridad y verificacion por rol." -ForegroundColor White
+    Write-Host "  datos-prueba seguridad|verificar  Solo cuentas y perfiles de Seguridad | solo la verificacion por rol." -ForegroundColor White
     Write-Host ""
     Write-Host "3. IDENTIDAD Y KEYCLOAK (OIDC / OAuth2):" -ForegroundColor Yellow
     Write-Host "  kc-token         Obtiene un JWT Bearer valido para un rol especifico." -ForegroundColor White
@@ -376,6 +378,24 @@ switch ($Command.ToLowerInvariant()) {
             }
         }
         & $resetScript @resetArgs
+        exit $LASTEXITCODE
+    }
+
+    "datos-prueba" {
+        # Datos de prueba variados (GestioAsistenciaDB/scripts/datos-prueba). Ej.: .\infra.ps1 datos-prueba cargar -Yes
+        $datosScript = Join-Path $infraRoot "scripts\database\cargar-datos-variados.ps1"
+        $datosArgs = @{}
+        if ($Password) { $datosArgs['Password'] = $Password }
+        $pending = @($RemainingArgs)
+        for ($i = 0; $i -lt $pending.Count; $i++) {
+            if ($pending[$i] -match '^-(\w+)$') {
+                $name = $Matches[1]
+                if (($i + 1) -lt $pending.Count -and $pending[$i + 1] -notmatch '^-\w+$') { $datosArgs[$name] = $pending[$i + 1]; $i++ }
+                else { $datosArgs[$name] = $true }
+            }
+            elseif (-not $datosArgs.ContainsKey('Accion')) { $datosArgs['Accion'] = $pending[$i] }
+        }
+        & $datosScript @datosArgs
         exit $LASTEXITCODE
     }
 
