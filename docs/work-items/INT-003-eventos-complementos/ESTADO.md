@@ -153,7 +153,10 @@ detenida en septiembre; las versiones oficiales salen de `develop` como releases
 * `infra.ps1 messages-switch` sigue escribiendo solo el `.env` del Backend; `MENSAJES_UI_DESDE_CATALOGO` del frontend se pone a mano.
 * Opcional: agregar `sqlserver` como contingencia de `MessageUcoLabMessageCatalogAdapter` (la BD queda sincronizada por los
   avisos) para que un código nuevo que aún no se cargó en MessageUcoLab no salga crudo.
-* Retirar de MessageUcoLab los 16 mensajes obsoletos (`SIG_*`, `ERR021`) (borrado: con confirmación del responsable).
+* ~~Retirar de MessageUcoLab los 16 mensajes obsoletos~~ **Hecho (2026-11-15, autorizado por el responsable):** borrados
+  `SIG001`…`SIG015` y `ERR021` (verificando antes su título); 16 avisos `MessageDeleted` procesados sin reintentos y la BD
+  intacta (482). Paridad final: 482 mensajes de negocio en MessageUcoLab = 482 en la BD, sin faltantes ni sobrantes
+  (más 135 textos `UI###` de la SPA).
 * Cada laboratorio del equipo debe repetir la carga (§6.2) en su propio MessageUcoLab.
 
 ## 8. Solicitudes a otros equipos
