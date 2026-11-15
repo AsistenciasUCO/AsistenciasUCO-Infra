@@ -5,20 +5,19 @@
 .DESCRIPTION
     Actualiza GestioAsistenciaBackend\.env:
     - Modo 'azure'         : APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER=azure (predeterminado del backend).
-    - Modo 'messageucolab' : APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER=messageucolab + MESSAGEUCOLAB_URL / _APPLICATION_ID /
-                             _ENVIRONMENT_ID (no son secretos; se copian con el boton "Copiar identificadores" de la
-                             pantalla de MessageUcoLab, guia paso 7). Azure queda como contingencia (MESSAGEUCOLAB_FALLBACK).
+    - Modo 'messageucolab' : APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER=messageucolab + MESSAGEUCOLAB_URL y MESSAGEUCOLAB_CLIENT_ID
+                             (INT-003, MessageUcoLab 0.3.0: identidad de servicio con rol MESSAGE_CONSUMER creada en la
+                             consola de Seguridad y asociada al ambiente en MessageUcoLab). El secreto MESSAGEUCOLAB_CLIENT_SECRET
+                             lo escribe la persona en el .env (se ve una sola vez); este script solo comprueba que exista.
+                             La contingencia es MESSAGEUCOLAB_FALLBACK.
     - Modo 'status'        : Informa el modo activo sin modificar nada.
     El switch es estructural (arranque): reinicia el Backend despues de cambiarlo.
 
 .PARAMETER Mode
     azure | messageucolab | status
 
-.PARAMETER ApplicationId
-    UUID de la aplicacion en MessageUcoLab (solo modo messageucolab; obligatorio la primera vez).
-
-.PARAMETER EnvironmentId
-    UUID del ambiente (Develop/Testing/Produccion) de esa aplicacion.
+.PARAMETER ClientId
+    Client ID de la identidad de servicio (empieza por svc-; solo modo messageucolab; obligatorio la primera vez).
 
 .PARAMETER Url
     URL base de MessageUcoLab (gateway Kong). Predeterminado http://localhost:8000.
@@ -28,7 +27,7 @@
 
 .EXAMPLE
     .\switch-message-catalog.ps1 -Mode status
-    .\switch-message-catalog.ps1 -Mode messageucolab -ApplicationId <uuid> -EnvironmentId <uuid>
+    .\switch-message-catalog.ps1 -Mode messageucolab -ClientId svc-...-asistencias-dev
     .\switch-message-catalog.ps1 -Mode azure
 #>
 
@@ -38,8 +37,7 @@ param(
     [ValidateSet('azure', 'messageucolab', 'status')]
     [string]$Mode = 'status',
 
-    [string]$ApplicationId,
-    [string]$EnvironmentId,
+    [string]$ClientId,
     [string]$Url = 'http://localhost:8000',
 
     [ValidateSet('azure', 'none')]
@@ -61,6 +59,11 @@ function Get-EnvValue([string]$content, [string]$name) {
     return $null
 }
 
+function Write-EnvFile([string]$path, [string]$content) {
+    # UTF-8 sin BOM: Set-Content -Encoding utf8 de PowerShell 5.1 antepone un BOM que rompe la primera variable del .env.
+    [System.IO.File]::WriteAllText($path, $content.TrimEnd() + "`r`n", (New-Object System.Text.UTF8Encoding($false)))
+}
+
 function Set-EnvValue([string]$content, [string]$name, [string]$value) {
     $pattern = "(?m)^\s*$name\s*=.*$"
     if ([regex]::IsMatch($content, $pattern)) {
@@ -80,8 +83,10 @@ if ($Mode -eq 'status') {
     Write-Host "  * Provider activo : $current" -ForegroundColor Yellow
     if ($current -like 'messageucolab*') {
         Write-Host "  * URL             : $(Get-EnvValue $content 'MESSAGEUCOLAB_URL')" -ForegroundColor Yellow
-        Write-Host "  * applicationId   : $(Get-EnvValue $content 'MESSAGEUCOLAB_APPLICATION_ID')" -ForegroundColor Yellow
-        Write-Host "  * environmentId   : $(Get-EnvValue $content 'MESSAGEUCOLAB_ENVIRONMENT_ID')" -ForegroundColor Yellow
+        Write-Host "  * Client ID       : $(Get-EnvValue $content 'MESSAGEUCOLAB_CLIENT_ID')" -ForegroundColor Yellow
+        $secreto = Get-EnvValue $content 'MESSAGEUCOLAB_CLIENT_SECRET'
+        Write-Host "  * Secreto         : $(if ([string]::IsNullOrWhiteSpace($secreto)) { 'FALTA' } else { 'presente' })" -ForegroundColor Yellow
+        Write-Host "  * Avisos (Pulsar) : $(Get-EnvValue $content 'MESSAGEUCOLAB_PULSAR_URL')" -ForegroundColor Yellow
         Write-Host "  * Contingencia    : $(Get-EnvValue $content 'MESSAGEUCOLAB_FALLBACK')" -ForegroundColor Yellow
     }
     Write-Host "==============================================================================`n" -ForegroundColor Cyan
@@ -94,22 +99,21 @@ Write-Host "====================================================================
 
 if ($Mode -eq 'azure') {
     $content = Set-EnvValue $content 'APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER' 'azure'
-    Set-Content -Path $backendEnv -Value $content.TrimEnd() -Encoding utf8
+    Write-EnvFile $backendEnv $content
     Write-Host "  -> Backend .env: provider=azure. Las variables MESSAGEUCOLAB_* se conservan sin efecto." -ForegroundColor Green
 } else {
-    $guid = '^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'
-    $appId = if ($ApplicationId) { $ApplicationId } else { Get-EnvValue $content 'MESSAGEUCOLAB_APPLICATION_ID' }
-    $envId = if ($EnvironmentId) { $EnvironmentId } else { Get-EnvValue $content 'MESSAGEUCOLAB_ENVIRONMENT_ID' }
-    if ($appId -notmatch $guid -or $envId -notmatch $guid) {
-        throw "Faltan MESSAGEUCOLAB_APPLICATION_ID / MESSAGEUCOLAB_ENVIRONMENT_ID (UUID). Copialos en la pantalla de MessageUcoLab (http://localhost:5174, 'Copiar identificadores') y pasalos con -ApplicationId / -EnvironmentId."
+    $cliente = if ($ClientId) { $ClientId.Trim() } else { Get-EnvValue $content 'MESSAGEUCOLAB_CLIENT_ID' }
+    if ($cliente -notmatch '^svc-[A-Za-z0-9_-]+$') {
+        throw "Falta MESSAGEUCOLAB_CLIENT_ID (empieza por svc-). Crea la identidad en la consola de Seguridad (http://localhost:5173, Identidades de servicio), pide y aprueba MESSAGE_CONSUMER, asociala al ambiente en MessageUcoLab (http://localhost:5174) y pasala con -ClientId."
     }
-    # Los dos identificadores deben ser del MISMO boton: si no, MessageUcoLab responde 409 (guia, paso 7).
+    if ([string]::IsNullOrWhiteSpace((Get-EnvValue $content 'MESSAGEUCOLAB_CLIENT_SECRET'))) {
+        Write-Host "  [!] Falta MESSAGEUCOLAB_CLIENT_SECRET en el .env: escribelo a mano (el Backend no arranca sin el)." -ForegroundColor Yellow
+    }
     $content = Set-EnvValue $content 'APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER' 'messageucolab'
     $content = Set-EnvValue $content 'MESSAGEUCOLAB_URL' $Url
-    $content = Set-EnvValue $content 'MESSAGEUCOLAB_APPLICATION_ID' $appId
-    $content = Set-EnvValue $content 'MESSAGEUCOLAB_ENVIRONMENT_ID' $envId
+    $content = Set-EnvValue $content 'MESSAGEUCOLAB_CLIENT_ID' $cliente
     $content = Set-EnvValue $content 'MESSAGEUCOLAB_FALLBACK' $Fallback
-    Set-Content -Path $backendEnv -Value $content.TrimEnd() -Encoding utf8
+    Write-EnvFile $backendEnv $content
     Write-Host "  -> Backend .env: provider=messageucolab, url=$Url, contingencia=$Fallback." -ForegroundColor Green
     Write-Host "  -> Recuerda levantar el componente: .\infra.ps1 messages-up" -ForegroundColor Gray
 }

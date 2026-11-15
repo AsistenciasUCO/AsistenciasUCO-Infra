@@ -9,8 +9,8 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## Resumen General
 
-- **Total de Endpoints Protegidos:** 201
-- **Total de Endpoints Exentos (PÃºblicos / Webhook):** 4
+- **Total de Endpoints Protegidos:** 192
+- **Total de Endpoints Exentos (PÃºblicos / Webhook):** 5
 - **Roles Definidos:** ADMINISTRADOR, DECANO, COORDINADOR, DOCENTE, ESTUDIANTE
 
 ## Perfiles Funcionales
@@ -25,7 +25,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## CatÃ¡logo de Rutas por Rol
 
-### Rol: ADMINISTRADOR (76)
+### Rol: ADMINISTRADOR (74)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -77,6 +77,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/auth/me` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/categorias-justificacion` | AUTHENTICATED | HU005/HU016: catalogo base de solo consulta (motivos para justificar una inasistencia); sin datos personales. |
 | `GET` | `/api/v1/configuracion/identidad` | AUTHENTICATED | HU159: indica si la correccion del documento esta habilitada (parametro IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO); sin datos personales. |
+| `GET` | `/api/v1/configuracion/registro-estudiante` | ROLES | Configuracion publica del registro manual (dominio institucional vigente); sin datos personales. DEC-073: ADMINISTRADOR y DECANO la leen para validar el correo del personal que dan de alta. |
 | `GET` | `/api/v1/coordinador/periodos-academicos` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `GET` | `/api/v1/docentes` | ROLES | Alcance del programa del coordinador. |
 | `GET` | `/api/v1/docentes/{docenteId}` | ROLES | Alcance del programa del coordinador. |
@@ -103,7 +104,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: DECANO (48)
+### Rol: DECANO (46)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -112,6 +113,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/auth/me` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/categorias-justificacion` | AUTHENTICATED | HU005/HU016: catalogo base de solo consulta (motivos para justificar una inasistencia); sin datos personales. |
 | `GET` | `/api/v1/configuracion/identidad` | AUTHENTICATED | HU159: indica si la correccion del documento esta habilitada (parametro IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO); sin datos personales. |
+| `GET` | `/api/v1/configuracion/registro-estudiante` | ROLES | Configuracion publica del registro manual (dominio institucional vigente); sin datos personales. DEC-073: ADMINISTRADOR y DECANO la leen para validar el correo del personal que dan de alta. |
 | `GET` | `/api/v1/coordinador/asignaturas` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `GET` | `/api/v1/coordinador/periodos-academicos` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `GET` | `/api/v1/coordinador/planes-estudio` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
@@ -153,7 +155,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: COORDINADOR (76)
+### Rol: COORDINADOR (73)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -163,7 +165,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/auth/me` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/categorias-justificacion` | AUTHENTICATED | HU005/HU016: catalogo base de solo consulta (motivos para justificar una inasistencia); sin datos personales. |
 | `GET` | `/api/v1/configuracion/identidad` | AUTHENTICATED | HU159: indica si la correccion del documento esta habilitada (parametro IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO); sin datos personales. |
-| `GET` | `/api/v1/configuracion/registro-estudiante` | ROLES | Configuracion publica del registro manual (dominio institucional vigente); sin datos personales. |
+| `GET` | `/api/v1/configuracion/registro-estudiante` | ROLES | Configuracion publica del registro manual (dominio institucional vigente); sin datos personales. DEC-073: ADMINISTRADOR y DECANO la leen para validar el correo del personal que dan de alta. |
 | `GET` | `/api/v1/coordinador/alertas-tempranas` | ROLES | Alcance del programa del coordinador autenticado; el ámbito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/coordinador/asignaturas` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `PATCH` | `/api/v1/coordinador/asignaturas/{id}/estado` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
@@ -242,7 +244,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/categorias-justificacion` | AUTHENTICATED | HU005/HU016: catalogo base de solo consulta (motivos para justificar una inasistencia); sin datos personales. |
 | `GET` | `/api/v1/configuracion/identidad` | AUTHENTICATED | HU159: indica si la correccion del documento esta habilitada (parametro IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO); sin datos personales. |
 | `GET` | `/api/v1/configuracion/reclamos` | ROLES | CULM-001 D.2 (HU015): configuración institucional del formulario de reclamos (tope de soportes, tamaño y tipos de archivo, límite de subidas, días del plazo); sin datos personales, el procedimiento almacenado valida el rol. |
-| `GET` | `/api/v1/configuracion/registro-estudiante` | ROLES | Configuracion publica del registro manual (dominio institucional vigente); sin datos personales. |
+| `GET` | `/api/v1/configuracion/registro-estudiante` | ROLES | Configuracion publica del registro manual (dominio institucional vigente); sin datos personales. DEC-073: ADMINISTRADOR y DECANO la leen para validar el correo del personal que dan de alta. |
 | `GET` | `/api/v1/docente/asignaturas` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
 | `POST` | `/api/v1/docente/grupos/{grupoId}/estudiantes/{estudianteId}/retiro` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
 | `GET` | `/api/v1/docente/grupos/{grupoId}/resumen-asistencia` | ROLES | CULM-001 B.2: docente titular del grupo (Application + SP). |
@@ -332,5 +334,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `POST` | `/api/v1/internal/azure-events` | Webhook de Azure Event Grid: autenticado por AzureEventGridAuthFilter (aeg-sas-token), fuera del PEP. |
 | `POST` | `/api/v1/public/matricula-qr/registro` | HU176B: alta publica y matricula por QR/PIN; la credencial es el token/PIN rotativo. Exige red del campus, interruptor, correo institucional y limite de intentos por IP. No devuelve token de sesion. |
 | `POST` | `/api/v1/public/matricula-qr/validar` | HU176B: validacion publica de la matricula por QR/PIN; la credencial es el token/PIN rotativo (SHA-256 en BD, vigencia por parametros). Exige red del campus, interruptor y limite de intentos por IP (MatriculaQrRateLimitFilter); responde solo los datos minimos del curso y un error generico MQR_001 para cualquier token invalido. |
+| `GET` | `/api/v1/public/mensajes-interfaz/{codigo}` | INT-003 (MessageUcoLab 0.3.0, paso 12): textos de la interfaz para la SPA, tambien antes del login. Solo lectura; responde unicamente codigos UI### del catalogo de mensajes (cualquier otro codigo responde 404 GEN_001, igual que uno inexistente) y tiene limite de peticiones por IP (MensajesInterfazRateLimitFilter). Sin datos personales. |
 | `POST` | `/api/v1/public/verificar-correo` | IDENT-001: verificacion publica del correo; la credencial es el token de un solo uso del enlace (SHA-256 en BD, vigencia por parametro) y la ruta tiene limite de intentos por IP (VerificacionCorreoRateLimitFilter). Sin datos personales en la respuesta. |
 
