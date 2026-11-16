@@ -61,6 +61,11 @@ Los correos que genere la aplicación van al buzón de prueba (`SMTP_NOTIFICATIO
 .\AsistenciasUCO-Infra\infra.ps1 verify                       # secretos y contratos antes de un commit
 ```
 
+## Advertencias operativas de base de datos
+
+- **Orden: migraciones antes de `deploy_schema` (TD-081).** Algunas migraciones vuelven a crear SP con el texto de su época; con otro orden pisan objetos de C.1. La migración 24 requiere `:r $(MIGDIR)`.
+- **`migrar.ps1 -Modo Aplicar` con el registro vacío re-ejecuta todo.** Si `dbo.MigracionAplicada` está vacía, todas las migraciones desde la 05 (`-VersionMinima` por defecto) figuran PENDIENTE y se vuelven a ejecutar. Por eso se corre siempre antes `GestioAsistenciaDB/scripts/migrar.ps1 -Modo Estado` (es el modo por defecto y solo lee). Para una base vieja sin registro, `-Modo Detectar` y `-Modo Baseline -SoloDetectadas` registran lo ya aplicado sin ejecutarlo; una migración `PARCIAL` la decide una persona.
+
 ## Límites conocidos
 
 - Red del campus: con el backend en contenedor, las peticiones llegan desde la red de Docker (p. ej. `192.168.80.1`).
