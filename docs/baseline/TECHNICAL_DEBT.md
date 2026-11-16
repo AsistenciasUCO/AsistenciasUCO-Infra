@@ -23,6 +23,8 @@ Clasificación de lo que sigue abierto según su efecto en la entrega. La entreg
 
 Equivalencias con el registro histórico del backend (congelado al 2026-11-12): TD-055 del backend = TD-094, TD-056 del backend = TD-095, TD-057 del backend = TD-096, TD-058 del backend = TD-097. Los TD-055 y TD-056 de este registro son los de MessageUcoLab.
 
+**Pendiente de decisión (hallazgo de esta revisión):** el registro histórico del backend contiene TD-062 a TD-082 (notificaciones NOTIF-001/002A e IDENT-001: SMTP, plantillas, verificación de correo, matrícula manual) con un significado distinto al de los mismos IDs de este registro, y sin equivalente aquí. No se trasladaron en esta revisión; hasta decidirlo, ese histórico es la única fuente de esas deudas y debe leerse con sus IDs de origen. TD-059 a TD-061 sí coinciden en significado (aquí figuran cerradas).
+
 | ID | Descripción | Estado | Bloquea línea base |
 |---|---|---|---|
 | [TD-001](#td-001) | Piloto JDBC → JPA pendiente | CLOSED (LB-002.2) | no |
