@@ -9,7 +9,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## Resumen General
 
-- **Total de Endpoints Protegidos:** 192
+- **Total de Endpoints Protegidos:** 193
 - **Total de Endpoints Exentos (PÃºblicos / Webhook):** 5
 - **Roles Definidos:** ADMINISTRADOR, DECANO, COORDINADOR, DOCENTE, ESTUDIANTE
 
@@ -25,7 +25,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## CatÃ¡logo de Rutas por Rol
 
-### Rol: ADMINISTRADOR (74)
+### Rol: ADMINISTRADOR (75)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -93,6 +93,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `PUT` | `/api/v1/grupos/{id}` | ROLES | DOCENTE solo grupos propios, COORDINADOR solo de su programa (Application + SP). |
 | `POST` | `/api/v1/identidad/cuentas/acceso/consultas` | ROLES | Alcance en Application (AccesoCuentaService): administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa. Nunca asigna DECANO ni ADMINISTRADOR. |
 | `POST` | `/api/v1/identidad/cuentas/acceso/reconciliaciones` | ROLES | Alcance en Application (AccesoCuentaService): administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa. Nunca asigna DECANO ni ADMINISTRADOR. |
+| `POST` | `/api/v1/identidad/cuentas/activacion/reenvios` | ROLES | IDENT-002: alcance en Application (InstitutionalScopePort.canGestionarCuenta: administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa) y en el SP (perfil, cuenta sin activar ACT_002, espera VCE_003). |
 | `GET` | `/api/v1/jornadas-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/modalidades-programa` | AUTHENTICATED | â€” |
 | `POST` | `/api/v1/realtime/emit` | ROLES | Diagnostico: emite un tipo del catalogo con audiencia de la politica y payload JSON validados (CULM-001 D.9-c, F-TRX-016). |
@@ -104,7 +105,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: DECANO (46)
+### Rol: DECANO (47)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -146,6 +147,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/grupos/{grupoId}/programas` | ROLES | CULM-001 B2NM: titular del grupo o coordinador/decano con ambito sobre algun programa del grupo; lo fuerza usp_consultar_programas_grupo. |
 | `POST` | `/api/v1/identidad/cuentas/acceso/consultas` | ROLES | Alcance en Application (AccesoCuentaService): administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa. Nunca asigna DECANO ni ADMINISTRADOR. |
 | `POST` | `/api/v1/identidad/cuentas/acceso/reconciliaciones` | ROLES | Alcance en Application (AccesoCuentaService): administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa. Nunca asigna DECANO ni ADMINISTRADOR. |
+| `POST` | `/api/v1/identidad/cuentas/activacion/reenvios` | ROLES | IDENT-002: alcance en Application (InstitutionalScopePort.canGestionarCuenta: administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa) y en el SP (perfil, cuenta sin activar ACT_002, espera VCE_003). |
 | `GET` | `/api/v1/jornadas-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/modalidades-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/realtime/stream` | AUTHENTICATED | Ambito al suscribirse (SP): docente titular, estudiante con matricula activa, coordinador o decano con ambito sobre el grupo, administrador de la institucion; entrega por tipo segun RealtimeAudienciaPolicy. |
@@ -155,7 +157,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: COORDINADOR (73)
+### Rol: COORDINADOR (74)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -224,6 +226,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `PUT` | `/api/v1/grupos/{id}` | ROLES | DOCENTE solo grupos propios, COORDINADOR solo de su programa (Application + SP). |
 | `POST` | `/api/v1/identidad/cuentas/acceso/consultas` | ROLES | Alcance en Application (AccesoCuentaService): administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa. Nunca asigna DECANO ni ADMINISTRADOR. |
 | `POST` | `/api/v1/identidad/cuentas/acceso/reconciliaciones` | ROLES | Alcance en Application (AccesoCuentaService): administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa. Nunca asigna DECANO ni ADMINISTRADOR. |
+| `POST` | `/api/v1/identidad/cuentas/activacion/reenvios` | ROLES | IDENT-002: alcance en Application (InstitutionalScopePort.canGestionarCuenta: administrador cualquiera; decano coordinadores, docentes y estudiantes de su facultad; coordinador docentes y estudiantes de su programa) y en el SP (perfil, cuenta sin activar ACT_002, espera VCE_003). |
 | `GET` | `/api/v1/jornadas-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/modalidades-programa` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/realtime/stream` | AUTHENTICATED | Ambito al suscribirse (SP): docente titular, estudiante con matricula activa, coordinador o decano con ambito sobre el grupo, administrador de la institucion; entrega por tipo segun RealtimeAudienciaPolicy. |
