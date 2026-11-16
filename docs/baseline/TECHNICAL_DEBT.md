@@ -106,7 +106,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-084](#td-084) | Regla escrita de seguridad web (cookies HttpOnly y CSRF) contradice la implementación Bearer | ABIERTA / NON_BLOCKING | no |
 | [TD-085](#td-085) | Código aleatorio de sesión en `usp_generar_sesiones_grupo` colisiona con `UX_Sesion_Grupo_Codigo` (CI de BD intermitente) | ABIERTA / NON_BLOCKING | no |
 | [TD-086](#td-086) | Security Baseline 0.1.13: el entrypoint de Keycloak fija el Admin API en 8080 (relevo `keycloak-relay` en el compose endurecido) | ABIERTA / NON_BLOCKING | no |
-| [TD-087](#td-087) | `provision_asistencias.py verify` falla en `develop`: `extract_endpoints.py` no admite rutas constantes (`RecuperacionClaveController`, HU177) | ABIERTA / NON_BLOCKING | no |
+| [TD-087](#td-087) | `provision_asistencias.py verify` falla en `develop`: `extract_endpoints.py` no admite rutas constantes (`RecuperacionClaveController`, HU177) | CERRADA (backend PR #153) | no |
 | [TD-088](#td-088) | Catálogo de Parámetros 0.1.7: plantilla de recursos vacía, `tipos-parametro` sin semilla y sin validación de referencia en `POST /parametros` | ABIERTA / NON_BLOCKING | no |
 | [TD-089](#td-089) | Gateway Kong de MessageUcoLab degradado tras ~4 h: deja de aceptar conexiones nuevas desde contenedores | ABIERTA / NON_BLOCKING | no |
 | [TD-090](#td-090) | `/api/v1/admin/parametros` y sus SP sin uso desde la UI: la administración de parámetros es el micro frontend del Catálogo | ABIERTA / NON_BLOCKING | no |
@@ -1094,7 +1094,8 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Descripción:** `extract_endpoints.ExtractionError: RecuperacionClaveController.java: la ruta no es un literal de texto (SecurityPublicEndpoints.RECUPERACION_CLAVE_SOLICITUD)`. El inventario sin JVM no resuelve referencias a constantes, así que `verify`, `catalog` y `pdp` quedan inutilizables hasta corregirlo (la prueba Maven `AccessCatalogConsistencyTest` sí usa el mapeo real).
 - **Impacto:** Medio para la operación del laboratorio (no se puede verificar deriva PDP ↔ catálogo desde la CLI).
 - **Resolución esperada:** Que `extract_endpoints.py` resuelva constantes `static final String` del mismo árbol (`SecurityPublicEndpoints`) o que los controladores usen literales con el catálogo como única fuente.
-- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** INT-002.
+- **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** CERRADA. **Work item:** INT-002.
+- **Cierre (2026-11-16):** el PR del backend #153 (`fix/extractor-constantes-ruta`) hace que `extract_endpoints.py` resuelva constantes de ruta. Sobre develop 8530bd54: suite `test_*.py` 66 de 66 OK y `provision_asistencias.py catalog` con 193 endpoints, 0 sin regla, 0 obsoletos (VAL-oleada7).
 
 ## TD-088
 
