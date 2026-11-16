@@ -184,8 +184,6 @@ function Format-Utc([datetime]$d) {
     return $d.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
 }
 
-function New-Clave { return ("Culm1-" + [guid]::NewGuid().ToString("N").Substring(0, 10) + "-Aa1!") }
-
 function Find-SesionId($grupoId, $nombre) {
     $r = Invoke-Api GET "$BASEV2/sesiones/grupo/$grupoId" $hDoc
     $m = @($r.datos | Where-Object { $_.nombre -eq $nombre })
@@ -851,7 +849,6 @@ Run-Test "HU091" "Agregar nuevo profesor al programa academico con vinculacion a
         primerNombre = "CULME"
         primerApellido = "DOCENTE"
         correo = "culm1-e2e-doc-$doc@uco.edu.co"
-        password = (New-Clave)
         idTipoVinculacion = @($vinc)[0].id
     }
     $res = Invoke-Api POST "/coordinador/docentes" $hCoord $body
@@ -1065,7 +1062,6 @@ Run-Test "HU120" "Registrar y vincular nuevo coordinador con programa de la facu
         primerApellido = "AUTOMATIZADO"
         correo = "culm1-e2e-coord-$doc@uco.edu.co"
         idPrograma = $prog.id
-        password = (New-Clave)
     }
     $errorRestauracion = $null
     try {
@@ -1237,7 +1233,6 @@ Run-Test "HU156" "Admision demografica y creacion de usuario estudiante (adminis
         primerNombre = "CULME"
         primerApellido = "ADMISION"
         correo = "culm1-e2e-adm-$doc@uco.edu.co"
-        password = (New-Clave)
     }
     $res = Invoke-Api POST "/admin/estudiantes/admision" $hAdmin $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa al admitir estudiante" }
@@ -1272,7 +1267,6 @@ Run-Test "HU110,HU111,HU116,HU117" "Facultades: alta con decano nuevo, modificac
         primerNombre = "CULME"
         primerApellido = "DECANO"
         correo = "culm1-e2e-dec-$doc@uco.edu.co"
-        password = (New-Clave)
     }
     Invoke-Api POST "/admin/decanos" $hAdmin $bodyDec | Out-Null
     $decanos = Invoke-Api GET "/admin/decanos" $hAdmin
