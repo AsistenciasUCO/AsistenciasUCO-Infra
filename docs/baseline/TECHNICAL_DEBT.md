@@ -3,7 +3,7 @@ status: active
 type: ledger
 scope: backend
 owner: backend-team
-last-reviewed: 2026-09-29
+last-reviewed: 2026-11-16
 ---
 
 # Ledger único de deuda técnica
@@ -12,19 +12,30 @@ TD-001..TD-005 conservan los IDs del paquete; los demás consolidan la documenta
 
 Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se mantienen en [LINEA_BASE](LINEA_BASE.md) como evoluciones, no como deuda que obligue a introducirlas.
 
+## Estado para el cierre (2026-11-16)
+
+Clasificación de lo que sigue abierto según su efecto en la entrega. La entrega es una demostración con imágenes Docker; el despliegue real en servidores de la universidad es futuro y sus requisitos se documentan en [REQUISITOS_PRODUCCION](../runbooks/REQUISITOS_PRODUCCION.md), no se implementan ahora.
+
+- **Bloquea la demostración (en corrección):** TD-097 (cierre masivo con fallback, PR de BD `fix/cierre-masivo-decano-acciones`), TD-098 (`GET /api/v1/docentes` sin ámbito ni paginación), TD-102 (simulador del frontend en el bundle de producción), TD-107 (filtrado, paginación y cálculos de negocio en el cliente, por fases).
+- **Requisito para producción (no bloquea la demo):** TD-003, TD-011, TD-014, TD-018, TD-020, TD-023, TD-027, TD-063, TD-072, TD-073, TD-093, TD-099, TD-100, TD-101, TD-103, TD-104, TD-108, TD-109, TD-110.
+- **Aplazable:** TD-004, TD-006, TD-007, TD-012, TD-013, TD-015, TD-016, TD-019, TD-024 a TD-026, TD-034, TD-044, TD-045, TD-046, TD-050, TD-054, TD-056, TD-062, TD-064 a TD-071, TD-074 a TD-083, TD-085 a TD-092, TD-105, TD-106, TD-CULM001-A-01 a A-03 y TD-CULM001-D-01 a D-05.
+- **Cerradas en esta revisión (2026-11-16), con evidencia en su entrada:** TD-010, TD-022, TD-039, TD-041, TD-043, TD-047, TD-049, TD-055 y TD-084. TD-094 a TD-096 llegan cerradas desde el registro del backend.
+
+Equivalencias con el registro histórico del backend (congelado al 2026-11-12): TD-055 del backend = TD-094, TD-056 del backend = TD-095, TD-057 del backend = TD-096, TD-058 del backend = TD-097. Los TD-055 y TD-056 de este registro son los de MessageUcoLab.
+
 | ID | Descripción | Estado | Bloquea línea base |
 |---|---|---|---|
 | [TD-001](#td-001) | Piloto JDBC → JPA pendiente | CLOSED (LB-002.2) | no |
 | [TD-002](#td-002) | Contrato OpenAPI no consolidado | CLOSED (LB-001C.1) | no |
-| [TD-003](#td-003) | Realtime local efímero y por JVM | ABIERTA | sí, LB-005 |
+| [TD-003](#td-003) | Realtime local efímero y por JVM | ABIERTA | no para la demostración (una instancia); sí al escalar a varias réplicas (producción); bloqueo LB-005 obsoleto |
 | [TD-004](#td-004) | Storage local y ownership | ABIERTA | sí, LB-004 |
 | [TD-005](#td-005) | Política temporal DB/API | CLOSED_FOR_GOLDEN_PATH (wire HTTP congelado en LB-001C.1; política global no cerrada) | no para Golden Path |
 | [TD-006](#td-006) | Identificación numérica | ABIERTA | no, salvo alcance de identificación |
 | [TD-007](#td-007) | Códigos DB machine-readable | ABIERTA | sí, si bloquea contrato de errores LB-001/002 |
 | [TD-008](#td-008) | Validación runtime de sesión/asistencia | CLOSED — LB-003 | no |
 | [TD-009](#td-009) | Estados de asistencia y registro individual | CLOSED (2026-11-07, CULM-001 D.7) | no |
-| [TD-010](#td-010) | Auditoría SQL con DML directo | ABIERTA | no para LB-000; revisar release DB |
-| [TD-011](#td-011) | Outbox y consistencia durable | ABIERTA | sí, LB-005 si exige durabilidad |
+| [TD-010](#td-010) | Auditoría SQL con DML directo | CERRADA — RESUELTA POR DECISIÓN (2026-11-16; Opción A, JPA directo) | no |
+| [TD-011](#td-011) | Outbox y consistencia durable | ABIERTA | no; bloqueo LB-005 obsoleto; solo condiciona si producción exige entrega durable de eventos |
 | [TD-012](#td-012) | DataSource específico por provider | ABIERTA | no, salvo incorporar otro provider |
 | [TD-013](#td-013) | Provisioning institucional incompleto | ABIERTA | no para Golden Path; sí antes de liberar provisioning afectado |
 | [TD-014](#td-014) | Confianza del correo en IdP | ABIERTA | no para LB-000; sí release de identidad |
@@ -35,12 +46,12 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-019](#td-019) | Contratos DB ausentes o limitados | PENDIENTE DE EVIDENCIA DB | no para LB-000; sí cada vertical dependiente |
 | [TD-020](#td-020) | Hashing DB y autenticación histórica | PENDIENTE DE VALIDACIÓN | no para LB-000; sí release de credenciales |
 | [TD-021](#td-021) | Serialización común de errores de seguridad | CLOSED (LB-001C.1) | no |
-| [TD-022](#td-022) | Exposición Actuator y Prometheus | ABIERTA | sí, LB-006 |
-| [TD-023](#td-023) | CI DB reproducible y gates remotos | OPEN / PARTIAL (LB-003: ruleset/required checks OBSERVED, pendiente run sobre checkout actual) | sí, LB-003/006 según alcance |
+| [TD-022](#td-022) | Exposición Actuator y Prometheus | CERRADA (2026-11-16) | no |
+| [TD-023](#td-023) | CI DB reproducible y gates remotos | OPEN / PARTIAL | no (LB-003 y LB-006 obsoletas); evidencia de gates remotos como requisito de producción |
 | [TD-024](#td-024) | Verificación histórica de uploads | CERRADA EN ÍNDICE LOCAL; HISTORIAL NO EVALUADO | no |
 | [TD-025](#td-025) | Limpieza oportunista de helpers | ABIERTA | no |
 | [TD-026](#td-026) | Nombre FeaturesBeansConfigTest | ABIERTA | no |
-| [TD-027](#td-027) | Evidencia operacional Azure/telemetría | ABIERTA | sí, LB-006; según capacidad modificada |
+| [TD-027](#td-027) | Evidencia operacional Azure/telemetría | ABIERTA | no; requisito de producción (certificar el ambiente real Azure/telemetría); bloqueo LB-006 obsoleto |
 | [TD-028](#td-028) | Conflicto guía de métodos HTTP | CLOSED (LB-001C.1, API_DESIGN_RULES) | no |
 | [TD-029](#td-029) | Gate ArchUnit preexistente fallido | CERRADA (TECH-001) | no |
 | [TD-030](#td-030) | VAL_003 usado para fallos de autorización/titularidad en SPs internos | RESOLVED BY FROZEN DB BASELINE (LB-001B.4) | no |
@@ -52,17 +63,17 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-036](#td-036) | Mapeo determinista de errores DB (`SEC_001/SEC_002/ATT_001-3/SES_003/SES_004/GEN_002`) sin señal de clasificación formal | CLOSED (LB-001B.4) | no |
 | [TD-037](#td-037) | `SesionMateriaEstudianteSqlServerAdapter` lee `Sesion.fechaHoraInicio/fechaHoraFin` con `toLocalDateTime` dependiente de `TimeZone.getDefault()`, no UTC fijo | CLOSED (LB-001B.4) | no |
 | [TD-038](#td-038) | `ReporteAsistenciaSqlServerAdapterTest` no asevera `fechaHoraInicio`/`fechaHoraFin`; no detectaría una regresión de `toLocalDateTimeUtc` a `toLocalDateTime` | CLOSED (LB-001B.4) | no |
-| [TD-039](#td-039) | Firma exacta de parámetros de `usp_cerrar_sesion` no documentada en `DB_BASELINE_CONTRACT.md` | BLOCKED_BY_MISSING_EVIDENCE | no para Golden Path (endpoint fuera de alcance) |
+| [TD-039](#td-039) | Firma exacta de parámetros de `usp_cerrar_sesion` no documentada en `DB_BASELINE_CONTRACT.md` | CERRADA — RESUELTA POR EVIDENCIA (2026-11-16) | no |
 | [TD-040](#td-040) | `uv_estudiante_identidad`/`uv_usuario` no documentadas en el contrato DB, usadas por `GET /api/v1/grupos/{grupoId}/estudiantes` | CLOSED — EVIDENCE_RESOLVED (LB-001B.4; salvedad: TD-046) | no |
-| [TD-041](#td-041) | Rama DB origen `feat/db-golden-path-baseline-freeze` no fusionada a `main`/`develop` del repo DB | ABIERTA | sí, si el snapshot congelado se desactualiza antes del freeze de LB-001C |
+| [TD-041](#td-041) | Rama DB origen `feat/db-golden-path-baseline-freeze` no fusionada a `main`/`develop` del repo DB | CERRADA (2026-11-16) | no |
 | [TD-042](#td-042) | Test de serialización ISO-8601 UTC de `RealtimeEvent.occurredAt` sin contexto Spring real | CLOSED (LB-001B.4A, `RealtimeEventResponseSpringJsonTest` con `@SpringBootTest`) | no |
-| [TD-043](#td-043) | NON_GOLDEN_DB_CONTRACT_DRIFT: 3 SP consumidos por el backend no existen en la DB oficial (`usp_sincronizar_usuario`, `usp_registrar_o_actualizar_plan_estudio`, `usp_registrar_estudiante_en_grupo_usuario_no_existente`) | ABIERTA / DEFERRED (LB-002.1C; `NOT_GREEN_TD043`) | no (fuera del Golden Path LB-001); sí antes de liberar esas features |
+| [TD-043](#td-043) | NON_GOLDEN_DB_CONTRACT_DRIFT: 3 SP consumidos por el backend no existen en la DB oficial (`usp_sincronizar_usuario`, `usp_registrar_o_actualizar_plan_estudio`, `usp_registrar_estudiante_en_grupo_usuario_no_existente`) | CERRADA (2026-11-16) | no |
 | [TD-044](#td-044) | 2 skips de `DocenteRepositorySqlServerIT` (`assumeTrue` por datos, sin fixture propio) | ABIERTA | no (fuera del Golden Path) |
 | [TD-045](#td-045) | Riesgo de `CPI`/`CPVP` históricos en `RazonCausa` frente a la lectura fail-closed de estado | ABIERTA | no |
 | [TD-046](#td-046) | Vistas `uv_estudiante_grupo`, `uv_estudiante_identidad`, `uv_usuario` sin documentar en `DB_BASELINE_CONTRACT.md` | ABIERTA (acción equipo DB) | no |
-| [TD-047](#td-047) | `USU_001` sin mapeo formal DBCODE (cae en `ERR_DB_UNCLASSIFIED`) | ABIERTA | no (fuera del Golden Path) |
+| [TD-047](#td-047) | `USU_001` sin mapeo formal DBCODE (cae en `ERR_DB_UNCLASSIFIED`) | CERRADA (2026-11-16) | no |
 | [TD-048](#td-048) | `Sesion.nombre` es `nvarchar(50)` en DB pero el backend valida 1..150 (nombres de 51..150 fallarían en persistencia como error técnico) | CLOSED (LB-001B.4B) | no |
-| [TD-049](#td-049) | `/usuarios/perfil` responde 501 | ABIERTA / OUT_OF_GOLDEN_PATH / NON_BLOCKING | no |
+| [TD-049](#td-049) | `/usuarios/perfil` responde 501 | CERRADA (2026-11-16) | no |
 | [TD-050](#td-050) | Latencia de reconciliación realtime observada en MV-001 | ABIERTA / NON_BLOCKING | no |
 | [TD-051](#td-051) | Webhook Azure con credencial default funcional insegura | RESUELTA (LB-001D.2) | no |
 | [TD-052](#td-052) | Webhook Azure acepta credencial por URL/query | RESUELTA (LB-001D.2) | no |
@@ -71,7 +82,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-CULM001-A-01](#td-culm001-a-01) | Dos fuentes del código `I` de matrícula retirada | ABIERTA / NON_BLOCKING | no |
 | [TD-CULM001-A-02](#td-culm001-a-02) | Texto local del 409 de matrícula duplicada en el frontend | ABIERTA / NON_BLOCKING | no |
 | [TD-CULM001-A-03](#td-culm001-a-03) | `SES_017` ausente de la tabla §G del Golden Path | ABIERTA / NON_BLOCKING | no |
-| [TD-055](#td-055) | MessageUcoLab: validación operacional extremo a extremo pendiente | ABIERTA / NON_BLOCKING | no |
+| [TD-055](#td-055) | MessageUcoLab: validación operacional extremo a extremo pendiente | CERRADA (2026-11-16) | no |
 | [TD-056](#td-056) | MessageUcoLab: límites de código (10) y contenido (100) incompatibles con el catálogo canónico | DECISION_REQUIRED | no mientras `azure` sea el provider por defecto |
 | [TD-059](#td-059) | `DELETE` sobre `SolicitudRevisionAsistencia` falla con Msg 8624 (FK + índice filtrado LB-004D) | CLOSED (2026-11-08, CULM-001 D.2) | no |
 | [TD-060](#td-060) | Categoría de radicación no se persistía en `SolicitudRevisionAsistencia` | CLOSED (2026-11-07, CULM-001 D.2) | no |
@@ -88,13 +99,13 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-066](#td-066) | Prueba de la migración 19 sin comparación byte a byte del SP restaurado | ABIERTA / NON_BLOCKING | no |
 | [TD-067](#td-067) | Pruebas C-DB-50 y C-DB-46 sin ejecución en paralelo real | ABIERTA / NON_BLOCKING | no |
 | [TD-068](#td-068) | C-DB-62 (despliegue limpio) cubierta solo por el gate del lote | ABIERTA / NON_BLOCKING | no |
-| [TD-069](#td-069) | `CierreMasivoRcn012IT` pendiente de ejecución o ajuste | ABIERTA / NON_BLOCKING | no |
-| [TD-070](#td-070) | E2E PKCE de C (`test_culm001_c.ps1`) sin ejecutar | ABIERTA / NON_BLOCKING | no |
+| [TD-069](#td-069) | `CierreMasivoRcn012IT` pendiente de ejecución o ajuste | ABIERTA / NON_BLOCKING (revisada 2026-11-16) | no |
+| [TD-070](#td-070) | E2E PKCE de C (`test_culm001_c.ps1`) sin ejecutar | ABIERTA / NON_BLOCKING (revisada 2026-11-16) | no |
 | [TD-071](#td-071) | Manifiesto post-freeze de C sin modo en `freeze-manifest.ps1` (`DB_UTC_D06`) | ABIERTA / NON_BLOCKING | no |
 | [TD-072](#td-072) | `--prune` del PDP pendiente (concesiones sobrantes) | ABIERTA / NON_BLOCKING | no |
 | [TD-073](#td-073) | 32 recursos huérfanos en el PDP | ABIERTA / NON_BLOCKING | no |
 | [TD-074](#td-074) | Drift de dos SP congelados (`usp_generar_sesiones_grupo`, `usp_registrar_asistencias_sesion`) | ABIERTA / NON_BLOCKING | no |
-| [TD-075](#td-075) | Presupuesto del bundle frontend excedido en +7,6 kB | ABIERTA / NON_BLOCKING | no |
+| [TD-075](#td-075) | Presupuesto del bundle frontend excedido en +7,6 kB | ABIERTA / NON_BLOCKING (revisada 2026-11-16) | no |
 | [TD-076](#td-076) | `horasDictadas` del consolidado sin multiplicar por activos | ABIERTA / NON_BLOCKING | no |
 | [TD-077](#td-077) | `codigo_programa` y `codigo_facultad` del CSV resueltos por nombre | ABIERTA / NON_BLOCKING | no |
 | [TD-078](#td-078) | `details[]` en inglés `{field, code, message}` | ABIERTA / NON_BLOCKING | no |
@@ -103,7 +114,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-081](#td-081) | Orden de despliegue de BD: migraciones antes de `deploy_schema` | ABIERTA / NON_BLOCKING | no |
 | [TD-082](#td-082) | Detalle `esParcial` por toma sin endpoint | ABIERTA / NON_BLOCKING | no |
 | [TD-083](#td-083) | HU042 por SSE y campana de notificaciones diferidas (C.2) | ABIERTA / NON_BLOCKING | no |
-| [TD-084](#td-084) | Regla escrita de seguridad web (cookies HttpOnly y CSRF) contradice la implementación Bearer | ABIERTA / NON_BLOCKING | no |
+| [TD-084](#td-084) | Regla escrita de seguridad web (cookies HttpOnly y CSRF) contradice la implementación Bearer | CERRADA — RESUELTA POR DECISIÓN (2026-11-16) | no |
 | [TD-085](#td-085) | Código aleatorio de sesión en `usp_generar_sesiones_grupo` colisiona con `UX_Sesion_Grupo_Codigo` (CI de BD intermitente) | ABIERTA / NON_BLOCKING | no |
 | [TD-086](#td-086) | Security Baseline 0.1.13: el entrypoint de Keycloak fija el Admin API en 8080 (relevo `keycloak-relay` en el compose endurecido) | ABIERTA / NON_BLOCKING | no |
 | [TD-087](#td-087) | `provision_asistencias.py verify` falla en `develop`: `extract_endpoints.py` no admite rutas constantes (`RecuperacionClaveController`, HU177) | CERRADA (backend PR #153) | no |
@@ -113,6 +124,23 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 | [TD-091](#td-091) | `parametros-administration.js` 1.0.0: sondeo por defecto cada 60 s, CORS de un solo origen; nginx propio sin rutas a los micro frontends | ABIERTA / NON_BLOCKING | no |
 | [TD-092](#td-092) | MessageUcoLab: el micro frontend elige la aplicación por nombre y el backend por id (dos "Asistencias UCO" en el laboratorio); contingencia `azure` por defecto sin Azure en local | ABIERTA / NON_BLOCKING | no |
 | [TD-093](#td-093) | Unicidad de personas y roles: altas de decano y coordinador reutilizan a otra persona por número sin tipo; sin índices únicos ni bloqueos; segundo rol sin acceso en el PDP | ABIERTA | no; sí antes de abrir altas masivas o producción |
+| [TD-094](#td-094) | (antes TD-055 del backend) JDBC directo residual en `src/main` durante la migración JPA-only | CERRADA (LB-008 JPA-07, 2026-10-06) | no |
+| [TD-095](#td-095) | (antes TD-056 del backend) `usp_registrar_asistencia_estudiante_autonomo` sin frontera transaccional | CERRADA (2026-10-07) | no |
+| [TD-096](#td-096) | (antes TD-057 del backend) Catálogo `dbo.Estado` sin códigos de revisión: toda solicitud nacía aceptada | CERRADA (2026-10-07) | no |
+| [TD-097](#td-097) | (antes TD-058 del backend) `usp_ejecutar_cierre_masivo_periodo` resuelve el período con fallback al más reciente | EN CORRECCIÓN: PR de BD `fix/cierre-masivo-decano-acciones` | sí, la demostración |
+| [TD-098](#td-098) | `GET /api/v1/docentes` y variantes sin ámbito por coordinador ni paginación | ABIERTA — EN CORRECCIÓN | sí, la demostración |
+| [TD-099](#td-099) | El generador de entorno conecta el backend como `sa`; existen dos roles de mínimo privilegio distintos | ABIERTA | no; requisito de producción |
+| [TD-100](#td-100) | Vistas `uv_usuario_autenticacion` y `uv_administrador` exponen la columna `password`; el rol de aplicación lee toda vista `uv_%` | ABIERTA | no; requisito de producción |
+| [TD-101](#td-101) | `deploy_schema.ps1` siembra siempre cuentas con credenciales fijas | ABIERTA | no; requisito de producción |
+| [TD-102](#td-102) | El simulador del frontend viaja en el bundle de producción y se activa con `USE_MOCKS` sin fallo cerrado | ABIERTA — EN CORRECCIÓN | sí, la demostración |
+| [TD-103](#td-103) | `environment.production` queda en `false` en el build de producción | ABIERTA | no; requisito de producción |
+| [TD-104](#td-104) | SSE sin límite de conexiones por usuario ni revalidación de ámbito tras suscribir | ABIERTA | no; requisito de producción |
+| [TD-105](#td-105) | 59 llamadas `assume*` en 18 pruebas de integración del backend pueden omitirse en silencio | ABIERTA / NON_BLOCKING | no (relacionada con TD-044) |
+| [TD-106](#td-106) | Los E2E del frontend corren solo contra el simulador y en modo `legacy` | ABIERTA / NON_BLOCKING | no |
+| [TD-107](#td-107) | Frontend con filtrado, paginación y cálculos de negocio en el cliente | ABIERTA — EN CORRECCIÓN POR FASES | parcialmente, la demostración |
+| [TD-108](#td-108) | Sin configuración ni runbook de producción (Keycloak en `start-dev`, HTTP, sin TLS, sin rollback) | ABIERTA | no; requisito de producción |
+| [TD-109](#td-109) | Sin política de caché en nginx para `index.html` y los assets con hash | ABIERTA | no; requisito de producción |
+| [TD-110](#td-110) | Migración futura a sesión por cookie HttpOnly / BFF para producción (diferida) | DIFERIDA A PRODUCCIÓN | no |
 
 ## TD-001
 
@@ -146,6 +174,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 
 ## TD-003
 
+> **Reclasificada (2026-11-16).** El bloqueo "LB-005" es de una línea base ya cerrada. Hoy no bloquea la demostración (una instancia); bloquea escalar a varias réplicas, porque el canal sigue siendo SSE en memoria de una JVM (`ReactorRealtimeAdapter` sigue en `infrastructure/adapter/secondary/realtime/localsse/`). Véanse también TD-063 y TD-104.
+
 - **Descripción:** Realtime local efímero y por JVM. No distribuye entre réplicas, no replay/durabilidad; consumidor lento puede perder eventos y dropped mide rechazos globales.
 - **Impacto:** Alto al escalar.
 - **Evidencia:** [ReactorRealtimeAdapter](../../src/main/java/co/edu/uco/asistenciasuco/infrastructure/adapter/secondary/realtime/localsse/ReactorRealtimeAdapter.java); reactive-realtime.md.
@@ -164,6 +194,7 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 - **Resolución esperada:** InputPort/UseCase/Port con consumidor real, autorización contextual y almacenamiento adecuado.
 - **Bloquea línea base:** sí, LB-004.
 - **Estado:** ABIERTA.
+- **Revisada 2026-11-16: sigue vigente, acotada.** La parte de filesystem ya no aplica: `ArchivoController` depende solo de `InputPort` y el almacenamiento es MinIO con antivirus (véase su Javadoc). Sigue abierto el ownership de lectura docente: `DescargarArchivoUseCaseImpl` mantiene `DENY_BY_DEFAULT` ("sin fila autorizada en SQL no hay lectura del storage") y la descarga cae en la regla `authenticated()` de `SecurityConfig` (el ownership se resuelve en Application). No se confirmó que la lectura del docente de los soportes de un reclamo esté cubierta.
 
 ## TD-005
 
@@ -223,6 +254,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 
 ## TD-010
 
+> **Estado vigente (2026-11-16): CERRADA — RESUELTA POR DECISIÓN (Opción A).** `src/main` ya no contiene `JdbcTemplate` ni `AuditEventJdbcRepository`; la auditoría se persiste con `AuditEventJpaRepository` y `AuditEventEntity` (`infrastructure/adapter/secondary/persistence/sqlserver/jpa/`). La decisión (DML directo JPA sobre `dbo.AuditoriaEvento`, sin SP nuevo) consta en el registro histórico del backend (`docs/baseline/TECHNICAL_DEBT.md`, TD-010), que aclara que la aprobación vino de la instrucción del arquitecto y que no hay aprobación formal escrita del dueño de BD. Lo que sigue más abajo es histórico.
+
 - **Descripción:** Auditoría SQL con DML directo. AuditEventJdbcRepository escribe/consulta dbo.AuditoriaEvento directamente, excepción conocida a SP público/views. Prioridad P1 histórica.
 - **Impacto:** Alto.
 - **Evidencia:** infrastructure/audit/adapter/sqlserver/AuditEventJdbcRepository.java; [infrastructure-structure.md](../architecture/infrastructure-structure.md).
@@ -232,6 +265,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 - **Estado:** ABIERTA.
 
 ## TD-011
+
+> **Reclasificada (2026-11-16).** El bloqueo "LB-005" es de una línea base ya cerrada. Hoy no bloquea la demostración; solo condiciona si producción exige entrega durable de los eventos en tiempo real (SSE en memoria, véanse TD-003 y TD-063).
 
 - **Descripción:** Outbox y consistencia durable. Outbox puede requerir estructura DB; hoy SQL/realtime no tienen atomicidad distribuida.
 - **Impacto:** Medio.
@@ -349,6 +384,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 
 ## TD-022
 
+> **Estado vigente (2026-11-16): CERRADA.** Evidencia: `src/main/resources/application.yml` (bloque `management`) publica solo `health,prometheus` en un puerto de gestión propio (`MANAGEMENT_SERVER_PORT`, 8090) con dirección `127.0.0.1` por defecto; `SecurityConfig` ya no menciona `/actuator/**`; `ManagementEndpointsSecurityConfiguration` limita ese puerto a `GET` de `health` y `prometheus`. Condición que pasa a producción: el puerto de gestión no debe publicarse fuera de la máquina o la red interna (en el laboratorio se abre con `MANAGEMENT_SERVER_ADDRESS=0.0.0.0` para que Prometheus en Docker llegue). Lo que sigue más abajo es histórico.
+
 - **Descripción:** Exposición Actuator y Prometheus. SecurityConfig permite /actuator/** y application.yml expone health/prometheus; topología de despliegue determina restricciones.
 - **Impacto:** Alto según exposición.
 - **Evidencia:** [SecurityConfig](../../src/main/java/co/edu/uco/asistenciasuco/infrastructure/config/security/SecurityConfig.java); application.yml; archive/backend-roadmap.md.
@@ -358,6 +395,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 - **Estado:** ABIERTA.
 
 ## TD-023
+
+> **Reclasificada (2026-11-16).** Los bloqueos "LB-003/006" son de líneas base cerradas. La CI de BD reproducible ya existe (TD-085 describe una falla intermitente de ese pipeline). Sigue abierta solo la evidencia de gates remotos (ruleset y checks requeridos), que pasa a requisito de producción; no bloquea la demostración.
 
 - **Descripción:** CI DB reproducible y gates remotos. Integration workflow es manual; DB externa sin provisioning versionado cross-repo. Rulesets y umbrales Sonar remotos no se prueban desde YAML.
 - **Impacto:** Medio.
@@ -411,6 +450,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 - **Estado:** ABIERTA.
 
 ## TD-027
+
+> **Reclasificada (2026-11-16).** El bloqueo "LB-006" es de una línea base cerrada. Hoy no bloquea la demostración; certificar el ambiente real Azure/telemetría es requisito de producción (en el laboratorio el baúl y los catálogos de Azure no se usan, véase TD-092).
 
 - **Descripción:** Evidencia operacional Azure/telemetría. Existen capabilities, adapters, Composition Root, caches e invalidación Azure documentados; no hay artefacto vigente que certifique el ambiente real completo.
 - **Impacto:** Medio.
@@ -564,6 +605,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 
 ## TD-039
 
+> **Estado vigente (2026-11-16): CERRADA — RESUELTA POR EVIDENCIA.** La firma que faltaba está en el SP de `develop` de BD (`schema/stored-procedures/usp_cerrar_sesion.sql`): `@idSesion`, `@idDocente`, `@idCorrelacion`, `@idUsuarioEjecutor`, los mismos cuatro parámetros que envía `SesionJpaRepository.SQL_CERRAR_SESION`; el SP sigue siendo legacy no soportado (`SES_003`, sin escrituras), como dice el contrato. El texto de `DB_BASELINE_CONTRACT.md` no cambia (contrato congelado). Lo que sigue más abajo es histórico.
+
 - **Fecha / responsable:** 2026-09-23 / backend-team + equipo DB.
 - **Descripción:** El contrato DB congelado (`DB_BASELINE_CONTRACT.md`) documenta el comportamiento de `usp_cerrar_sesion` (legacy no soportado: retorna `SES_003`, `estadoResultado = 0`, sin escrituras) pero **no documenta su firma exacta de parámetros**. El backend (`SesionRepositorySqlServerAdapter.SQL_CERRAR_SESION`) sigue enviando `@idSesion, @idDocente, @idCorrelacion, @idUsuarioEjecutor`; no se puede confirmar si `@idDocente` ahí es un ghost param real o si el SP legacy todavía lo requiere sin abrir el repo DB. El endpoint HTTP `POST /api/v1/sesiones/cierres` sigue vivo (no es código muerto) pero fuera del Golden Path de `TASK_AUTORIZADA.md` §7.
 - **Impacto:** Medio. El comportamiento observable es correcto (el SP frozen garantiza que la llamada siempre falla con `SES_003`, nunca simula éxito), pero la firma real que el backend envía no está congelada ni verificada contra el contrato.
@@ -586,6 +629,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 - **Actualización LB-001B.4 (2026-09-23):** columnas de `uv_estudiante_grupo`, `uv_estudiante_identidad` y `uv_usuario` confirmadas contra la DB real (`GoldenPathSqlStoredProcedureContractIT` 16/16); el `SELECT` del adapter se ejecutó en solo lectura y conserva el conteo de `uv_estudiante_grupo` (2 = 2). **Salvedad del auditor:** `DB_BASELINE_CONTRACT.md` sigue sin documentar esas vistas; acción no bloqueante para el equipo DB en [TD-046](#td-046).
 
 ## TD-041
+
+> **Estado vigente (2026-11-16): CERRADA.** El commit `99190f0` de la rama `feat/db-golden-path-baseline-freeze` es ancestro de `develop` del repositorio de BD (`git merge-base --is-ancestor 99190f0 repo-antiguo/develop` devuelve verdadero), así que el snapshot ya no depende de una rama sin fusionar; el contrato DB está congelado en `docs/contracts/db/`. El bloqueo "LB-001C" era de una línea base cerrada. Lo que sigue más abajo es histórico.
 
 - **Fecha / responsable:** 2026-09-23 / backend-team + equipo DB.
 - **Descripción:** La rama de origen del snapshot DB congelado (`feat/db-golden-path-baseline-freeze`, commit `99190f0...`, repo `gestion-asistencia-db`) no está fusionada a `main`/`develop` de ese repositorio, conforme a `docs/contracts/external/db/PROVENANCE.md`. Si esa rama recibe nuevos commits antes de que `LB-001C` congele el contrato definitivo, el snapshot ya importado (`DB_BASELINE_CONTRACT.md`, SHA-256 `1fd728e43d2bdbdc6b395bc5aad9021105117281c7c18b64afc39a6d45937103`) queda desactualizado.
@@ -611,6 +656,8 @@ Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se manti
 - **Actualización LB-001B.4A (2026-09-24) — CLOSED:** `RealtimeEventResponseSpringJsonTest` usa `@SpringBootTest` (`JacksonAutoConfiguration` + `JacksonInputConfig`) con el `JsonMapper` inyectado por Spring (y un segundo test con `JacksonJsonHttpMessageConverter`), y afirma `occurredAt` ISO-8601 con `Z`. No hay `spring.jackson.*` en recursos, por lo que el auto-config es el de producción. Cumple la "Resolución esperada". Salvedad: contexto Jackson mínimo, no la aplicación completa; suficiente para el criterio. Ver [AUDIT](../work-items/LB-001B.4-final-backend-contract-closure/AUDIT.md).
 
 ## TD-043
+
+> **Estado vigente (2026-11-16): CERRADA.** Los tres SP ya no están en deriva: (1) `usp_sincronizar_usuario` no tiene consumidores, el alta genérica se retiró con `POST /api/v1/usuarios` (VAL ROL-05, 2026-11-12; comentarios en `UsuarioRepositoryPort` y `UsuarioJpaRepository`); (2) `usp_registrar_o_actualizar_plan_estudio` existe en `schema/stored-procedures/` de `develop` de BD y lo invoca `PlanEstudioJpaRepository`; (3) `usp_registrar_estudiante_en_grupo_usuario_no_existente` ya no se referencia en `src/main`: `GrupoJpaRepository.SQL_REGISTRAR_ESTUDIANTE` ejecuta `dbo.usp_registrar_estudiante_en_grupo`, que existe en `develop` de BD. No se volvió a ejecutar `-Pintegration verify` completo para esta revisión. Lo que sigue más abajo es histórico.
 
 - **Fecha / responsable:** 2026-09-23 / backend-team + equipo DB. **Clasificación:** `NON_GOLDEN_DB_CONTRACT_DRIFT`.
 - **Descripción:** tres SP invocados por adapters del backend no existen en la DB oficial (`gestionasistenciadb`, esquema `dbo`, verificado por SELECT de solo lectura sobre `sys.objects`/`sys.parameters`; ver [CONTRACT_DECISION_TD043](../work-items/LB-001B.4-final-backend-contract-closure/CONTRACT_DECISION_TD043.md)). Ningún SP existente tiene firma y semántica inequívocamente equivalentes, por lo que no se mapea por parecido de nombre.
@@ -674,8 +721,11 @@ GOLDEN PATH EFFECT:         NONE
 - **Resolución esperada:** el equipo DB las documenta en su contrato y se re-importa el snapshot (nuevo SHA-256).
 - **Bloquea línea base:** no.
 - **Estado:** ABIERTA (acción externa, equipo DB). **Work item relacionado:** [LB-001B.4](../work-items/LB-001B.4-final-backend-contract-closure/CLOSURE.md).
+- **Revisada 2026-11-16: sigue vigente, acotada.** `DB_BASELINE_CONTRACT.md` ya documenta `uv_estudiante_grupo`; `uv_estudiante_identidad` y `uv_usuario` siguen sin aparecer en ese contrato (solo se mencionan en `openapi-golden-path.yaml`, descripción de `GET /api/v1/grupos/{grupoId}/estudiantes`). El contrato está congelado: la acción corresponde al equipo de BD con un nuevo snapshot.
 
 ## TD-047
+
+> **Estado vigente (2026-11-16): CERRADA.** `DbFailureClassifier` (líneas 205-206) mapea `USU_001` a `UsuarioErrorCode.ERR_USUARIO_NO_EXISTE`; ya no cae en `ERR_DB_UNCLASSIFIED`. Lo que sigue más abajo es histórico.
 
 - **Fecha / responsable:** 2026-09-23 / backend-team + equipo DB.
 - **Descripción:** el código `USU_001` no tiene mapeo formal DBCODE en `DbFailureClassifier`; cae en `ERR_DB_UNCLASSIFIED` (500, fail-closed). No forma parte del Golden Path.
@@ -696,6 +746,8 @@ GOLDEN PATH EFFECT:         NONE
 - **Estado:** **CLOSED (2026-09-24, LB-001B.4B) — backend aligned to frozen DB NVARCHAR(50).** Decisión humana: máx. 50. `Sesion.nombre` 1..50 en `CrearSesionRequestValidator`, `CrearSesionDomain`, `ActualizarSesionDomain` y `SesionConsultadaEntity`; contrato actualizado en `BACKEND_GOLDEN_PATH_CONTRACT.md`. Evidencia: [AUDIT 4B](../work-items/LB-001B.4-final-backend-contract-closure/AUDIT.md) (PASS, sin bloqueantes), [VALIDATION](../work-items/LB-001B.4-final-backend-contract-closure/VALIDATION.md) (970 tests, 0F/0E/0S). TD-034 sigue abierta (no bloqueante). **Work item relacionado:** [LB-001B.4](../work-items/LB-001B.4-final-backend-contract-closure/CLOSURE.md).
 
 ## TD-049
+
+> **Estado vigente (2026-11-16): CERRADA.** `GET /api/v1/usuarios/perfil` está implementado (HU006): `UsuarioPerfilController` delega en `ConsultarPerfilInputPort` con el id del usuario autenticado y tiene prueba (`UsuarioPerfilControllerTest`); `PUT /perfil` y el alta genérica `POST /api/v1/usuarios` se retiraron (VAL ROL-05). Ya no responde 501. Lo que sigue más abajo es histórico.
 
 - **Fecha / responsable:** 2026-09-24 / backend-team + equipo DB.
 - **Descripción:** `GET/PUT /api/v1/usuarios/perfil` permanecen fuera del Golden Path y responden
@@ -771,6 +823,8 @@ GOLDEN PATH EFFECT:         NONE
 - **Estado:** DECISION_REQUIRED. **Work item:** [LB-001D.1](../work-items/LB-001D-governance-hardening/LB-001D.1-PLAN.md).
 
 ## TD-055
+
+> **Estado vigente (2026-11-16): CERRADA.** El provider `messageucolab` se ejecutó contra el componente real: [INT-002 ESTADO](../work-items/INT-002-complementos-seguridad-mensajes-parametros/ESTADO.md) (MessageUcoLab 0.2.0, aplicación `healthy` y consulta pública respondiendo) e [INT-003 ESTADO](../work-items/INT-003-eventos-complementos/ESTADO.md) (0.3.0); la certificación en pantalla de HU169 (2026-11-13) está descrita en TD-092 (la edición del mensaje se reflejó en lo que responde el backend). Lo que sigue más abajo es histórico.
 
 - **Fecha / responsable:** 2026-11-02 / backend-team + infra.
 - **Clasificación:** `NON_BLOCKING`.
@@ -933,6 +987,7 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Medio.
 - **Resolución esperada / propuesta:** Ejecutarla en la Fase 3 sobre BD canónica y corregir el código, no la prueba.
 - **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+- **Revisada 2026-11-16: sigue vigente porque la prueba no existe.** No hay ninguna clase `CierreMasivoRcn012IT` en `src/test` del backend (solo `CierreMasivoRequestValidatorTest`; `RCN_012` aparece únicamente en `DbFailureClassifierMrmCancelacionTest`). La resolución es crearla y ejecutarla contra la BD canónica. Su alcance se solapa con TD-097.
 
 ## TD-070
 
@@ -942,6 +997,7 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Medio.
 - **Resolución esperada / propuesta:** Ejecutarlo en la Fase 3 e incorporarlo a `test_all_hus.ps1`.
 - **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+- **Revisada 2026-11-16: sigue vigente.** El script `test_culm001_c.ps1` ya no existe en Infra. La suite vigente es `scripts/tests/test_all_hus.ps1`, que usa PKCE (`Get-SpaToken.ps1`, Security Baseline); no se confirmó que cubra los escenarios del paquete C ni se ejecutó contra un backend en esta revisión.
 
 ## TD-071
 
@@ -987,6 +1043,7 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Bajo.
 - **Resolución esperada / propuesta:** Dividir módulos con carga diferida o subir el presupuesto con decisión registrada.
 - **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+- **Revisada 2026-11-16: sigue vigente porque no se pudo medir.** Los presupuestos de `angular.json` (configuración `production`) son 500 kB de aviso y 1 MB de error para `initial`; no se compiló el frontend en esta revisión (solo lectura), así que no se confirma si el exceso de 7,6 kB persiste ni contra qué umbral se midió.
 
 ## TD-076
 
@@ -1061,6 +1118,10 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
 
 ## TD-084
+
+> **Estado vigente (2026-11-16): CERRADA — RESUELTA POR DECISIÓN.** El responsable decidió mantener el access token Bearer solo en memoria con Authorization Code + PKCE (modo `baseline`); `CONSTITUTION.md` 4.04.1 ya admite el "almacenamiento protegido en memoria" y se enmendó 4.04.2 (cookies y CSRF aplican cuando la sesión se gobierne por cookies). `AGENTS.md` 3.3.4 se corrigió en consecuencia. La migración a cookie HttpOnly se difiere a producción (TD-110).
+>
+> **Corrección sobre la CSP:** el backend sí envía cabeceras de seguridad y CSP (`SecurityHttpHeaders`: `Content-Security-Policy` con `default-src 'none'` para la API, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy`; HSTS solo detrás de HTTPS) y el nginx del frontend genera su CSP en `csp.conf` (`docker-entrypoint.d/40-env-js.sh`). Lo que sigue más abajo es histórico.
 
 - **Título:** Regla escrita de seguridad web (cookies HttpOnly y CSRF) contradice la implementación Bearer.
 - **Origen:** F-TRX-015.
@@ -1161,3 +1222,169 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
   - Backend: que un fallo posterior al SP no deje cambios a medias (resolverlo en la BD es lo preferido).
   - Seguridad: activar la sincronización de perfiles en el laboratorio o incluir la reconciliación en el guion de pruebas manuales de usuarios con varios roles.
 - **Prioridad:** MEDIA. **Bloquea línea base:** no; sí antes de abrir altas masivas o producción. **Estado:** ABIERTA.
+
+## TD-094
+
+- **Descripción:** (ID antiguo: TD-055 del registro del backend.) JDBC directo residual en `src/main` durante la migración JPA-only (45 archivos en la línea base JPA-00).
+- **Impacto:** Medio (histórico).
+- **Evidencia:** registro histórico del backend (TD-055, `DIRECT_JDBC_IN_SRC_MAIN = 0` tras LB-008 JPA-07, 2026-10-06). Comprobado el 2026-11-16: la búsqueda de `JdbcTemplate` y `NamedParameterJdbc` en `src/main` del backend no devuelve ningún archivo.
+- **Resolución esperada:** ninguna pendiente.
+- **Bloquea línea base:** no.
+- **Estado:** **CERRADA (LB-008 JPA-07, 2026-10-06).** Consecuencia documental: ya no queda ningún adaptador JDBC; la frase "JDBC legacy en coexistencia temporal" es obsoleta.
+
+## TD-095
+
+- **Descripción:** (ID antiguo: TD-056 del registro del backend.) `usp_registrar_asistencia_estudiante_autonomo` no abría una transacción que cubriera `Asistencia` y `DetalleAsistencia`.
+- **Impacto:** Medio (histórico).
+- **Evidencia:** registro histórico del backend (TD-056): cerrada el 2026-10-07 por la alineación final de la BD, que garantiza la atomicidad de ambas escrituras.
+- **Resolución esperada:** ninguna pendiente.
+- **Bloquea línea base:** no.
+- **Estado:** **CERRADA (2026-10-07).**
+
+## TD-096
+
+- **Descripción:** (ID antiguo: TD-057 del registro del backend.) El catálogo `dbo.Estado` desplegado no tenía los códigos que usaban los SP de revisión (`P`/`PEND`, `APRO`, `RECH`): los SP caían a `TOP 1 ORDER BY id` y toda solicitud nacía aceptada, también las rechazadas.
+- **Impacto:** Alto (histórico).
+- **Evidencia:** registro histórico del backend (TD-057): cerrada el 2026-10-07 por la alineación final de la BD. Comprobado en `develop` de BD el 2026-11-16: `usp_resolver_solicitud_revision_asistencia.sql` documenta que `RECHAZADA` pasa la solicitud a `R`, y `usp_radicar_solicitud_revision_asistencia.sql` resuelve el estado pendiente por `codigo IN ('P', 'PEND')`.
+- **Resolución esperada:** ninguna pendiente.
+- **Bloquea línea base:** no.
+- **Estado:** **CERRADA (2026-10-07).**
+
+## TD-097
+
+- **Descripción:** (ID antiguo: TD-058 del registro del backend.) En `dbo.usp_ejecutar_cierre_masivo_periodo` la búsqueda del período objetivo tiene dos pasos: primero por `nombre`/`codigo` y, si no encuentra nada, toma el período con mayor `anio` de toda `uv_periodo_academico` y cierra ese. Con un ejecutor ADMINISTRADOR válido, un código inexistente cierra un período real que nadie nombró.
+- **Impacto:** Alto para la integridad de los datos académicos (estados de `EstudianteGrupo`, contadores de `Grupo` y `AuditoriaEvento`).
+- **Evidencia:** `schema/stored-procedures/usp_ejecutar_cierre_masivo_periodo.sql` en `develop` de BD, "PASO 2" (líneas 98-126 al 2026-11-16): el segundo `SELECT TOP 1 ... ORDER BY anio DESC, codigo DESC` es el fallback; `VAL_002` solo se devuelve si la vista está vacía. El registro histórico del backend marcó esta deuda como cerrada el 2026-10-07 por la alineación de la BD; la comprobación en `develop` muestra que el fallback sigue presente, así que esa afirmación no se sostiene.
+- **Resolución esperada:** regla del responsable (2026-11-16): el cierre masivo se rechaza si el período no existe (`VAL_002`), sin fallback. Añadir una prueba de código inexistente con ejecutor ADMINISTRADOR que verifique que no cambia ninguna fila (relacionada con TD-069).
+- **Bloquea línea base:** no; **bloquea la demostración** hasta que se fusione la corrección.
+- **Estado:** **EN CORRECCIÓN: PR de BD `fix/cierre-masivo-decano-acciones`.**
+
+## TD-098
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** `GET /api/v1/docentes` devuelve la lista completa de docentes sin filtrar por el ámbito del coordinador y sin paginación. `DocenteController.consultarDocentes()` no recibe usuario ni parámetros de página (`consultarDocentesInputPort.execute()` sin argumentos) y responde `List<DocenteIdentidadDTO>`, y `SecurityConfig` (~línea 155) permite `/api/v1/docentes/**` a `COORDINADOR` y `ADMINISTRADOR`. Las variantes bajo esa ruta comparten la misma regla de rol; su ámbito no se verificó una por una.
+- **Impacto:** Alto: un coordinador puede ver docentes de programas ajenos, contra la regla de aislamiento jerárquico (el coordinador ve solo docentes de sus programas) y contra la regla de paginación.
+- **Evidencia:** `GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/infrastructure/adapter/primary/controller/docente/DocenteController.java` (líneas 57-60) e `infrastructure/config/security/SecurityConfig.java` (línea 155, con el comentario "hoy sin contrato funcional explícito de quién debe administrarlo"). Ya existe un caso de uso con ámbito de programa (`ConsultarDocentesProgramaUseCase`).
+- **Resolución esperada:** ámbito y paginación forzados dentro de un SP de consulta (`usp_consultar_*` sobre vista) y `ApiPageResponse<T>` en el backend; el coordinador ve solo docentes de sus programas.
+- **Bloquea línea base:** no; **bloquea la demostración**.
+- **Estado:** ABIERTA — EN CORRECCIÓN.
+
+## TD-099
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** el generador de entorno escribe `SPRING_DATASOURCE_USERNAME=sa` en el `.env` del backend, así que el mínimo privilegio no se ejerce en ningún entorno generado con él. Además existen dos roles distintos de aplicación: `db_app_executor` (Infra, `components/sqlserver/init/01-hardening-least-privilege.sql`) y `rol_asistencias_runtime` (repositorio de BD, `schema/security/rol_asistencias_runtime.sql`).
+- **Impacto:** Alto en producción (la aplicación podría hacer cualquier cosa en el motor); nulo para la demostración local. Contradice `CONSTITUTION.md` 2.07.1 ("nunca se conectan con `sa`").
+- **Evidencia:** `AsistenciasUCO-Infra/scripts/orchestration/init-env.ps1` (~línea 265) y los dos scripts de rol citados.
+- **Resolución esperada:** un solo rol y un usuario SQL dedicado de mínimo privilegio en el generador de entorno; documentar el rol vigente y retirar el otro.
+- **Bloquea línea base:** no; requisito de producción.
+- **Estado:** ABIERTA.
+
+## TD-100
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** las vistas `uv_usuario_autenticacion` y `uv_administrador` seleccionan la columna `password` de `Usuario`, y el rol de aplicación recibe `SELECT` sobre toda vista que coincida con `uv[_]%`.
+- **Impacto:** Alto en producción: cualquier lectura por vistas puede alcanzar el valor almacenado de la contraseña. Relacionada con TD-020.
+- **Evidencia:** `GestioAsistenciaDB/schema/views/uv_usuario_autenticacion.sql` (`passwordUsuario = u.password`), `schema/views/uv_administrador.sql` (`password = u.password`) y `schema/security/rol_asistencias_runtime.sql` (bucle de `GRANT SELECT` sobre `sys.views` con `LIKE N'uv[_]%'`), todos en `develop` de BD.
+- **Resolución esperada:** quitar la columna de las vistas o conceder esas vistas de forma explícita y mínima; mantener la verificación de credenciales fuera de las vistas de lectura general.
+- **Bloquea línea base:** no; requisito de producción.
+- **Estado:** ABIERTA.
+
+## TD-101
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** `deploy_schema.ps1` ejecuta siempre todos los `schema/seed/*.sql`, incluido `12_usuarios_roles.sql`, que crea cuentas con credenciales fijas versionadas en el repositorio.
+- **Impacto:** Alto en producción (cuentas conocidas en una BD real).
+- **Evidencia:** `GestioAsistenciaDB/deploy_schema.ps1` (recorrido de `schema\seed`) y `schema/seed/12_usuarios_roles.sql`, en `develop` de BD.
+- **Resolución esperada:** separar la semilla de catálogos de la de cuentas y no sembrar cuentas fuera del laboratorio.
+- **Bloquea línea base:** no; requisito de producción.
+- **Estado:** ABIERTA.
+
+## TD-102
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** el simulador del frontend (`mock-backend.interceptor`) viaja en el build de producción como un fragmento de carga diferida (`mock-backend-lazy.interceptor.ts` lo importa dinámicamente) y se activa con el flag de ejecución `USE_MOCKS === 'true'` de `assets/env.js` (`environment.useFrontendMocks`). El entrypoint `docker-entrypoint.d/40-env-js.sh` toma `USE_MOCKS` del entorno (por defecto `false`), pero no falla ni se niega a arrancar si llega en `true`.
+- **Impacto:** Alto para la demostración si el contenedor arranca con el flag mal puesto: la interfaz respondería con datos simulados sin avisar.
+- **Evidencia:** archivos citados en `GestioAsistenciaFrontend` (`origin/develop`).
+- **Resolución esperada:** fallo cerrado en el entrypoint (negarse a arrancar con `USE_MOCKS=true` en la imagen de entrega) y/o exclusión del simulador del build de producción.
+- **Bloquea línea base:** no; **bloquea la demostración**.
+- **Estado:** ABIERTA — EN CORRECCIÓN.
+
+## TD-103
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** `environment.production` vale `false` también en el build de producción: hay un único `src/environments/environment.ts` y `angular.json` no define `fileReplacements`, mientras el `Dockerfile` compila con `--configuration=production`.
+- **Impacto:** Medio en producción (cualquier lógica condicionada por `environment.production` se comporta como en desarrollo).
+- **Evidencia:** `GestioAsistenciaFrontend/src/environments/environment.ts` (`production: false`), `angular.json` (sin `fileReplacements`) y `Dockerfile`.
+- **Resolución esperada:** archivo de entorno de producción con `fileReplacements`, o derivar el valor del build.
+- **Bloquea línea base:** no; requisito de producción.
+- **Estado:** ABIERTA.
+
+## TD-104
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** el stream SSE (`GET /api/v1/realtime/stream?grupoId=`) valida la titularidad del docente una única vez al suscribir y no tiene un máximo de conexiones por usuario (no hay ningún límite en `src/main` ni en `application.yml`).
+- **Impacto:** Medio en producción (agotamiento de recursos por conexiones abiertas; un docente al que se le retira el grupo conserva el stream mientras siga abierto).
+- **Evidencia:** `RealtimeEventsController.subscribe` (Javadoc: "se valida una unica vez al establecer la suscripcion") y ausencia de configuración de límite.
+- **Resolución esperada:** tope de conexiones por usuario y revalidación periódica o por evento del ámbito.
+- **Bloquea línea base:** no; requisito de producción.
+- **Estado:** ABIERTA.
+
+## TD-105
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** hay 59 llamadas `assume*` (52 de ellas `assumeTrue`) repartidas en 18 clases de integración (`*IT`) del backend; si faltan datos o servicio, la prueba se omite en silencio y el resultado sigue en verde.
+- **Impacto:** Medio: oculta regresiones. Relacionada con TD-044.
+- **Evidencia:** búsqueda de `assume`, `assumeTrue`, `assumeFalse` y `assumeThat` en `GestioAsistenciaBackend/src/test` (conteo del 2026-11-16).
+- **Resolución esperada:** fixtures propios y fallo explícito (o un reporte de omitidas en la CI).
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING (aplazable).
+
+## TD-106
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** todos los E2E de Playwright del frontend corren contra el simulador (`USE_MOCKS=true`) y con `SECURITY_PROVIDER=legacy`; no ejercitan el modo `baseline` (Authorization Code + PKCE) ni el backend real.
+- **Impacto:** Medio: el camino de autenticación vigente y la integración real no tienen E2E de interfaz.
+- **Evidencia:** `playwright.config.ts` (comentario de cabecera) y `e2e/support/env.e2e.js` en `GestioAsistenciaFrontend`. La cobertura contra el backend real, sin interfaz, la da `scripts/tests/test_all_hus.ps1` de Infra.
+- **Resolución esperada:** un subconjunto de E2E contra el stack real en modo `baseline`.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING (aplazable).
+
+## TD-107
+
+- **Origen:** auditoría del 2026-11-16 (la auditoría cuenta 27 puntos; no se recontaron al redactar esta entrada).
+- **Descripción:** el frontend filtra, pagina y calcula datos de negocio en el cliente, contra la regla de presentación pura. Ejemplos comprobados: `dean-management.service.ts` pide los coordinadores con `pagina=1` y `tamano=100` y `dean-coordinadores.component.ts` filtra y pagina en el cliente, de modo que más de 100 se truncan; la búsqueda de `teacher-claims.component.ts` filtra solo la página ya cargada; el folio `REC-#…` se compone en el cliente (`id.slice(0, 8).toUpperCase()` en `teacher-claims.component.ts` y `group-claims-modal.component.ts`).
+- **Impacto:** Alto con datos reales: listas truncadas, búsquedas incompletas y folios que no coinciden con los del servidor.
+- **Evidencia:** archivos citados en `GestioAsistenciaFrontend` (`origin/develop`).
+- **Resolución esperada:** mover filtros, paginación y folios al servidor (SP de consulta con `ApiPageResponse<T>`), por fases.
+- **Bloquea línea base:** no; **bloquea parcialmente la demostración**.
+- **Estado:** ABIERTA — EN CORRECCIÓN POR FASES.
+
+## TD-108
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** no existe configuración ni runbook de producción: el Keycloak del compose de Infra arranca con `start-dev` (`docker-compose.yml` y `components/keycloak/docker-compose.yml`), todo va por HTTP sin terminación TLS definida (el HSTS del frontend solo se emite con `ENABLE_HSTS=true`) y no hay runbook de despliegue ni de rollback de release (`docs/runbooks/` solo trata el laboratorio local; el rollback de `MIGRATION_GUIDE.md` es del cambio de scripts).
+- **Impacto:** Alto para un despliegue real; nulo para la demostración.
+- **Evidencia:** archivos citados y lista de requisitos en [REQUISITOS_PRODUCCION](../runbooks/REQUISITOS_PRODUCCION.md).
+- **Resolución esperada:** la universidad define el entorno y se escribe el runbook correspondiente.
+- **Bloquea línea base:** no; requisito de producción.
+- **Estado:** ABIERTA.
+
+## TD-109
+
+- **Origen:** auditoría del 2026-11-16.
+- **Descripción:** el nginx del frontend solo define `Cache-Control` para `/assets/env.js` (`no-store`); `location /` no fija caché para `index.html` ni para los assets con hash (`outputHashing: all`).
+- **Impacto:** Bajo en la demostración; en producción, recargas innecesarias o un `index.html` viejo tras un despliegue.
+- **Evidencia:** `GestioAsistenciaFrontend/nginx/templates/default.conf.template`.
+- **Resolución esperada:** `no-cache` para `index.html` y caché larga e inmutable para los assets con hash.
+- **Bloquea línea base:** no; requisito de producción (menor).
+- **Estado:** ABIERTA.
+
+## TD-110
+
+- **Origen:** decisión del responsable, 2026-11-16 (cierra TD-084).
+- **Descripción:** migración futura a una sesión por cookie `HttpOnly` con protección CSRF, o a un patrón BFF, para producción. Se evaluó y se difirió. Motivos: (1) el PEP de Security Baseline exige el Bearer del usuario; (2) haría falta un cliente confidencial; (3) tres contratos congelados fijan Bearer (`docs/contracts/openapi/openapi-golden-path.yaml`, `docs/contracts/openapi/BACKEND_GOLDEN_PATH_CONTRACT.md` y `docs/contracts/events/REALTIME_EVENT_CONTRACT.md`).
+- **Impacto:** Bajo para la demostración. El modo `baseline` guarda el access token solo en memoria; el modo `legacy` (contingencia, `SECURITY_PROVIDER=legacy`) conserva además un refresh token en `sessionStorage` (`auth.service.ts`), por eso no debe usarse fuera del laboratorio.
+- **Evidencia:** cabecera de `baseline-oidc.ts` en el frontend (access token solo en memoria, sin refresh token), `CONSTITUTION.md` 4.04.1 y [SECURITY_BASELINE_INTEGRATION](../governance/SECURITY_BASELINE_INTEGRATION.md).
+- **Resolución esperada:** si la universidad lo exige, una nueva decisión con cambio de los contratos congelados y de la configuración de Security Baseline.
+- **Bloquea línea base:** no.
+- **Estado:** DIFERIDA A PRODUCCIÓN.
