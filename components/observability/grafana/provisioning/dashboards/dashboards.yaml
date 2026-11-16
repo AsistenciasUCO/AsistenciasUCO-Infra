@@ -1,0 +1,16 @@
+# ==============================================================================
+# Grafana Dashboard Provisioning (OBS-11, VAL-oleada8)
+# El JSON asistencias-uco-metricas.json es el mismo de
+# GestioAsistenciaBackend/infra/observability/grafana/provisioning/dashboards/ (seccion asis-obs del laboratorio).
+# ==============================================================================
+apiVersion: 1
+
+providers:
+  - name: AsistenciasUCO
+    orgId: 1
+    folder: Asistencias UCO
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
