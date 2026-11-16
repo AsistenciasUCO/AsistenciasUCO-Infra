@@ -31,7 +31,7 @@ la marcaba temporal y pedía cambiarla en el primer ingreso.
 
 `POST /api/v1/admin/decanos`, `POST /api/v1/decano/coordinadores`, `POST /api/v1/coordinador/docentes`,
 `POST /api/v1/admin/estudiantes/admision`, `POST /api/v1/grupos/{grupoId}/estudiantes`.
-Un `password` enviado por un cliente anterior se ignora. Respuestas sin cambios. Ninguna está en el contrato WORM
+El campo `password` sale del contrato. Como la entrada es estricta (campos desconocidos rechazados), un cliente anterior que lo envíe recibe 400; el Frontend de IDENT-002 ya no lo envía. Respuestas sin cambios. Ninguna está en el contrato WORM
 (`openapi-golden-path.yaml` solo congela el `GET` de `/grupos/{grupoId}/estudiantes`).
 
 ### `POST /api/v1/public/verificar-correo` (compatible hacia atrás)
