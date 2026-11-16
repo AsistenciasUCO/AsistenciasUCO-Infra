@@ -60,18 +60,21 @@
         "redis",
         "opa",
         "pdp",
-        "pep"
+        "pep",
+        "consola"
       ],
       "salud": [
         "contenedor:ext-seguridad-keycloak",
         "contenedor:ext-seguridad-pdp",
-        "http:http://localhost:18081/actuator/health"
+        "http:http://localhost:18081/actuator/health",
+        "contenedor:ext-seguridad-consola",
+        "http:http://localhost:5175/security-administration.js"
       ],
       "urls": [
         "Keycloak: http://keycloak.localhost:19090",
         "PDP: http://localhost:18080",
         "PEP: http://localhost:18081",
-        "Consola de seguridad: Complementos/Seguridad/security-ui (npm run preview, 5175)"
+        "Consola de seguridad: http://localhost:5175 (dist de Complementos/Seguridad/security-ui)"
       ],
       "proyectosAnteriores": [
         "asistencias-security-lab",
