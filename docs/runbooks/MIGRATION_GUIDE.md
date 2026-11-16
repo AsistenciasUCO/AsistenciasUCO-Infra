@@ -6,6 +6,9 @@ owner: architecture-and-devops-team
 last-reviewed: 2026-10-13
 ---
 
+> **Aviso (2026-11-16): guía parcialmente obsoleta.** La tabla de equivalencias de scripts sigue siendo una referencia, pero para levantar el entorno use [PRUEBAS_LOCALES.md](PRUEBAS_LOCALES.md) (Security Baseline, `infra.ps1 stack up <escenario>`). Antes de aplicar migraciones de BD lea las advertencias operativas de esa guía.
+
+
 # 🔄 Guía de Migración y Transición hacia AsistenciasUCO-Infra
 
 Este manual establece la correspondencia exacta entre los scripts y comandos heredados (*legacy*) y las nuevas utilidades centralizadas en la 4ª capa (**`AsistenciasUCO-Infra`**), junto con el procedimiento oficial de Rollback.

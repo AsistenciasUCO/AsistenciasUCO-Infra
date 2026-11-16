@@ -2,7 +2,7 @@
 > **Ecosistema:** Sistema de Gestion de Asistencia UCO  
 > **Proposito:** Registro centralizado y trazabilidad de ciclo de vida SDD/TDD para Backend, Frontend y Base de Datos.  
 > **Generacion:** Automatizada via AsistenciasUCO-Infra/scripts/quality/sync-work-items.ps1  
-> **Ultima Actualizacion:** 2026-10-26 10:44:43  
+> **Ultima Actualizacion:** 2026-11-16 (secciones 1 y 2.1 a 2.3: ultima sincronizacion automatica 2026-10-26; seccion 2.4: actualizada a mano)  
 
 ---
 
@@ -125,6 +125,28 @@
 | MAINT-003K-DB-DEV-CONSOLIDATION | 4 | VALIDATED_LOCAL_DEV | [Ver carpeta](database/MAINT-003K-DB-DEV-CONSOLIDATION/) |
 | P0-D-estabilizacion-workspace-oficial | 2 | active | [Ver carpeta](database/P0-D-estabilizacion-workspace-oficial/) |
 | UTC-D06-POST-FREEZE | 3 | active | [Ver carpeta](database/UTC-D06-POST-FREEZE/) |
+
+### 2.4 Work items nativos de Infra (carpetas en la raiz de work-items/)
+
+Actualizada a mano el 2026-11-16: `sync-work-items.ps1` copia carpetas de los otros tres repositorios hacia `backend/`, `frontend/` y `database/` (no solo genera este indice), asi que no se ejecuto. Estas carpetas se crean y editan directamente en Infra y no entran en los conteos de la seccion 1.
+
+| Work Item / Fase | Archivos | Estado Documentado | Enlace Directo |
+| :--- | :---: | :---: | :--- |
+| CULM-001-culminacion | 68 | ver [CLOSURE](CULM-001-culminacion/CLOSURE.md) y [ESTADO](CULM-001-culminacion/ESTADO.md) | [Ver carpeta](CULM-001-culminacion/) |
+| HU050-matricula-manual-docente (remanente previo a la convencion; vigente en `backend/`) | 5 | closed | [Ver carpeta](HU050-matricula-manual-docente/) |
+| IDENT-002-activacion-cuentas | 1 | contrato acordado 2026-11-15 | [Ver carpeta](IDENT-002-activacion-cuentas/) |
+| INT-002-complementos-seguridad-mensajes-parametros | 1 | N/A | [Ver carpeta](INT-002-complementos-seguridad-mensajes-parametros/) |
+| INT-003-eventos-complementos | 1 | N/A | [Ver carpeta](INT-003-eventos-complementos/) |
+| P0-D-estabilizacion-workspace-oficial | 2 | active | [Ver carpeta](P0-D-estabilizacion-workspace-oficial/) |
+| VAL-migrar-detectar | 1 | active | [Ver carpeta](VAL-migrar-detectar/) |
+| VAL-oleada2-cumplimiento | 3 | N/A | [Ver carpeta](VAL-oleada2-cumplimiento/) |
+| VAL-oleada3-baul-secretos | 2 | N/A | [Ver carpeta](VAL-oleada3-baul-secretos/) |
+| VAL-oleada3-carga | 1 | N/A | [Ver carpeta](VAL-oleada3-carga/) |
+| VAL-oleada3-mensajes | 2 | N/A | [Ver carpeta](VAL-oleada3-mensajes/) |
+| VAL-oleada7-pendientes-transversales | 2 | active | [Ver carpeta](VAL-oleada7-pendientes-transversales/) |
+| VAL-oleada8-observabilidad | 2 | N/A | [Ver carpeta](VAL-oleada8-observabilidad/) |
+
+> Los espejos de `backend/`, `frontend/` y `database/` no se regeneraron: pueden no incluir los work items de noviembre de esos repositorios (por ejemplo `MSG-001-messageucolab-catalog-switch` existe en `backend/` pero no aparece en la seccion 2.1).
 
 ---
 

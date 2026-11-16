@@ -4,7 +4,7 @@
 > **Ámbito:** Repositorio Unificado `GestioAsistencia` (Base de Datos, Backend API, Frontend Web e Infraestructura)  
 > **Rol:** Cuarta Capa Transversal — Única Fuente de Verdad (SSOT) para Gobernanza, Hardening, Contratos WORM, Orquestación de Contenedores y Automatización DevSecOps.  
 > **Versión:** 2.0.0  
-> **Fecha de Actualización:** Octubre 2026  
+> **Fecha de Actualización:** Noviembre 2026 (revisión de versiones e IAM: 2026-11-16)  
 
 ---
 
@@ -27,7 +27,7 @@ El ecosistema Asistencias UCO está diseñado en 3 capas de ejecución desacopla
         ▼                              ▼                              ▼
 ┌──────────────────┐          ┌──────────────────┐          ┌──────────────────┐
 │ 1. Base de Datos │          │    2. Backend    │          │   3. Frontend    │
-│  (SQL Server)    │          │  (Spring Boot)   │          │   (Angular 19)   │
+│  (SQL Server)    │          │  (Spring Boot)   │          │   (Angular 22)   │
 │  • Smart Database│          │  • Clean Arch    │          │  • Standalone    │
 │  • Transaccional │          │  • Puertos & Adp │          │  • Signals       │
 │  • Vistas/SPs    │          │  • REST & OTel   │          │  • Tailwind CSS  │
@@ -48,7 +48,7 @@ AsistenciasUCO-Infra/
 │   ├── sqlserver/             # SQL Server 2022 (Collation Modern_Spanish_CI_AS, RAM 2GB)
 │   │   ├── init/              # 01-hardening-least-privilege.sql (Rol db_app_executor)
 │   │   └── scripts/           # deploy-schema.ps1, seed-clean-data.ps1, test-summary.ps1
-│   ├── keycloak/              # Keycloak 26.7.1 + PostgreSQL 17 dedicado
+│   ├── keycloak/              # Keycloak propio 26.7.1 + PostgreSQL 17 (solo contingencia; el IAM por defecto es Security Baseline)
 │   │   ├── realm-import/      # asistencias-uco-realm.json (Roles, clients, idUsuario)
 │   │   └── scripts/           # bootstrap.ps1, seed-users.ps1, get-token.ps1, etc.
 │   ├── observability/         # OTel Collector Contrib + Prometheus v3 + Grafana
@@ -71,10 +71,10 @@ AsistenciasUCO-Infra/
 │   │   ├── openapi/           # openapi-golden-path.yaml, BACKEND_GOLDEN_PATH_CONTRACT.md
 │   │   ├── db/                # DB_BASELINE_CONTRACT.md, DB_DEVELOP_FREEZE_ADDENDUM.md
 │   │   └── events/            # REALTIME_EVENT_CONTRACT.md (SSE Events)
-│   ├── baseline/              # LINEA_BASE.md, TECHNICAL_DEBT.md (TD-001 a TD-054)
+│   ├── baseline/              # LINEA_BASE.md, TECHNICAL_DEBT.md (TD-001 a TD-110, registro único)
 │   ├── hardening/             # SECURITY_AND_HARDENING.md
-│   ├── runbooks/              # LOCAL_ENVIRONMENT_SETUP.md, MIGRATION_GUIDE.md
-│   └── user-stories/          # Catálogo maestro de Historias de Usuario (HU001 - HU174)
+│   ├── runbooks/              # PRUEBAS_LOCALES.md (vigente), REQUISITOS_PRODUCCION.md; LOCAL_ENVIRONMENT_SETUP.md y MIGRATION_GUIDE.md (parcialmente obsoletos)
+│   └── user-stories/          # Catálogo maestro de Historias de Usuario (HU001 - HU178)
 └── README.md                  # Este documento
 ```
 
@@ -86,7 +86,7 @@ Para evitar saturar la memoria RAM en el equipo de desarrollo, el orquestador ma
 
 | Perfil | Servicios Incluidos | RAM Máxima | Caso de Uso |
 | :--- | :--- | :---: | :--- |
-| **`core`** *(Default)* | SQL Server 2022 + Keycloak 26 + Postgres DB | ~3.5 GB | Desarrollo diario de Backend y Frontend. |
+| **`core`** *(Default del compose)* | SQL Server 2022 + Keycloak propio 26 (contingencia) + Postgres DB | ~3.5 GB | Desarrollo diario de Backend y Frontend. |
 | **`observability`** | OpenTelemetry Collector + Prometheus + Grafana | ~1.0 GB | Monitoreo de trazas OTLP, logs JSONL y métricas. |
 | **`azure`** | Azurite (Emulación de Storage Blobs/Queues) | ~512 MB | Pruebas de almacenamiento offline. |
 | **`proxy`** | Traefik v3 con Hardened Headers | ~128 MB | Terminación de cabeceras de seguridad y proxy. |
@@ -106,6 +106,8 @@ docker compose -f docker-compose.replicas.yml down     # sin -v: no tiene volúm
 ---
 
 ## 4. Comandos Rápidos del Flujo de Desarrollo
+
+> **Flujo vigente (2026-11-16):** el laboratorio se levanta por secciones con `.\AsistenciasUCO-Infra\infra.ps1 stack up <escenario>` (BD, Seguridad del equipo con Security Baseline, backend y frontend en contenedores). Las guías son [PRUEBAS_LOCALES.md](docs/runbooks/PRUEBAS_LOCALES.md) y [stack/README.md](stack/README.md). El Keycloak propio (`:8081`, realm `asistencias-uco`) queda como sección de contingencia (`asis-contingencia`, solo emergencias). Los comandos de `scripts\orchestration` de abajo corresponden al perfil `core` anterior.
 
 Todos los comandos se ejecutan desde PowerShell:
 
@@ -160,6 +162,8 @@ cd AsistenciasUCO-Infra\scripts
 * **Definition of Ready (DoR):** [`docs/governance/DEFINITION_OF_READY.md`](docs/governance/DEFINITION_OF_READY.md)
 * **Definition of Done (DoD):** [`docs/governance/DEFINITION_OF_DONE.md`](docs/governance/DEFINITION_OF_DONE.md)
 * **Guía de Hardening y Mínimo Privilegio:** [`docs/hardening/SECURITY_AND_HARDENING.md`](docs/hardening/SECURITY_AND_HARDENING.md)
-* **Runbook de Puesta en Marcha:** [`docs/runbooks/LOCAL_ENVIRONMENT_SETUP.md`](docs/runbooks/LOCAL_ENVIRONMENT_SETUP.md)
+* **Pruebas locales (guía vigente):** [`docs/runbooks/PRUEBAS_LOCALES.md`](docs/runbooks/PRUEBAS_LOCALES.md)
+* **Requisitos para un despliegue real:** [`docs/runbooks/REQUISITOS_PRODUCCION.md`](docs/runbooks/REQUISITOS_PRODUCCION.md)
+* **Runbook de Puesta en Marcha (anterior, parcialmente obsoleto):** [`docs/runbooks/LOCAL_ENVIRONMENT_SETUP.md`](docs/runbooks/LOCAL_ENVIRONMENT_SETUP.md)
 * **Guía de Migración y Rollback:** [`docs/runbooks/MIGRATION_GUIDE.md`](docs/runbooks/MIGRATION_GUIDE.md)
 * **Catálogo de Deuda Técnica:** [`docs/baseline/TECHNICAL_DEBT.md`](docs/baseline/TECHNICAL_DEBT.md)

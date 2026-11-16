@@ -111,6 +111,7 @@ Ninguna especificación funcional, solicitud de usuario, atajo de desarrollo o c
 2. **Estándar de Persistencia:**
    - La tecnología estándar para acceso a datos en adaptadores secundarios es **Spring Data JPA**. Los componentes que aún utilizan Spring JDBC (`JdbcTemplate`) operan como **JDBC legacy en coexistencia temporal**, sujetos a migración progresiva según la estrategia incremental de persistencia.
    - Las entidades JPA (`@Entity`) son modelos exclusivos de persistencia en `infrastructure/` y jamás deben usarse como entidades de dominio ni importarse en `application/`.
+   - **Lectura y escritura:** el backend puede leer vistas `uv_*` de solo lectura directamente por JPA (consistente con el `GRANT SELECT` de 2.07), además de invocar procedimientos de consulta; toda escritura se hace siempre mediante procedimientos almacenados. (Enmienda 2026-11-16.)
 3. Los controladores `@RestController`:
    - Se limitan a validar el request HTTP (`Validator`), llamar al `PrimaryPort` correspondiente y mapear la respuesta hacia `ResponseEntity<ApiDataResponse<T>>`.
    - > [!CAUTION]
@@ -142,7 +143,7 @@ Ninguna especificación funcional, solicitud de usuario, atajo de desarrollo o c
 
 ---
 
-## Artículo IV — Capa de Cliente Frontend (Angular 18/19 / TypeScript)
+## Artículo IV — Capa de Cliente Frontend (Angular 22 / TypeScript 6)
 
 ### Sección 4.01: Standalone Components y Reactividad por Signals
 1. El 100% de los componentes deben ser Standalone (`standalone: true`).
@@ -159,8 +160,10 @@ Ninguna especificación funcional, solicitud de usuario, atajo de desarrollo o c
 
 ### Sección 4.04: Seguridad de Sesión y Comunicación HTTP
 1. **Cero Almacenamiento de Tokens en Cliente (`localStorage` / `sessionStorage`):** Queda formalmente desaconsejado y prohibido almacenar tokens JWT en `localStorage` debido a riesgos de vulnerabilidad XSS. La sesión debe ser gobernada preferentemente mediante cookies `HttpOnly` / `SameSite` o almacenamiento protegido en memoria con refresh automático vía canal seguro.
-2. **Credenciales y Protección CSRF:** Las llamadas HTTP mutables (`POST`, `PUT`, `DELETE`) deben incluir la cabecera anti-CSRF (`X-XSRF-TOKEN`) y el cliente HTTP debe incorporar soporte para cookies de sesión (`withCredentials: true`).
+2. **Credenciales y Protección CSRF:** Cuando la sesión se gobierne por cookies, las llamadas HTTP mutables (`POST`, `PUT`, `DELETE`) deben incluir la cabecera anti-CSRF (`X-XSRF-TOKEN`) y el cliente HTTP debe incorporar soporte para cookies de sesión (`withCredentials: true`).
 3. **Manejo Uniforme de 401 y 403:** El interceptor de errores debe redirigir a `/login` ante `401 Unauthorized` y a `/forbidden` ante `403 Forbidden`.
+
+> **Enmienda 2026-11-16 (decisión del responsable):** la implementación vigente es el access token Bearer solo en memoria con Authorization Code + PKCE (modo `baseline` de Security Baseline), que cumple 4.04.1 ("almacenamiento protegido en memoria"). El punto 4.04.2 (`X-XSRF-TOKEN` y `withCredentials: true`) aplica únicamente cuando la sesión se gobierne por cookies; la migración a cookies `HttpOnly` o a un BFF se difiere a producción (TD-110 de `docs/baseline/TECHNICAL_DEBT.md`).
 
 ---
 

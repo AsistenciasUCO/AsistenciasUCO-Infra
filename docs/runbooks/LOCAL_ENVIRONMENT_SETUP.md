@@ -6,6 +6,9 @@ owner: devops-team
 last-reviewed: 2026-10-13
 ---
 
+> **Aviso (2026-11-16): guía parcialmente obsoleta.** Este runbook describe el flujo anterior (perfil `core` con Keycloak propio en `:8081`). La guía vigente para levantar el laboratorio es [PRUEBAS_LOCALES.md](PRUEBAS_LOCALES.md): Security Baseline y `infra.ps1 stack up <escenario>`. Úselo solo como referencia histórica.
+
+
 # 🚀 Runbook: Puesta en Marcha del Entorno Local (Local Setup)
 
 Este manual operativo guía paso a paso a los desarrolladores y agentes de IA para configurar, levantar, diagnosticar y detener el entorno local completo de **Asistencias UCO** utilizando la infraestructura centralizada en `AsistenciasUCO-Infra`.
