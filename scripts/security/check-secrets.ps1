@@ -127,6 +127,26 @@ function Find-HardcodedSecretsInFile {
     return $findings
 }
 
+# Un archivo *.env generado en local (por ejemplo stack/generado/backend.env de `infra.ps1 stack up`) que git ignora y no
+# versiona es, como .env, el almacén local legítimo de credenciales de desarrollo: no puede llegar al repositorio y no se
+# escanea. Los demás *.env (versionados o no ignorados, como .env.example) se siguen escaneando.
+function Test-IgnoredLocalEnvFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $name = Split-Path -Leaf $Path
+    if ($name -notmatch '(?i)\.env$') { return $false }
+    # git se ejecuta en la carpeta del archivo: sirve aunque la raíz escaneada sea el workspace (varios repositorios).
+    # Ante cualquier duda (fuera de un repositorio, git ausente) se escanea.
+    $dir = Split-Path -Parent $Path
+    try {
+        $tracked = git -C $dir ls-files -- $name 2>$null
+        if ($LASTEXITCODE -ne 0 -or $tracked) { return $false }
+        git -C $dir check-ignore -q -- $name 2>$null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
 # --- Modo Self-Check ---
 if ($SelfCheck) {
     Write-Host "Ejecutando Self-Check de validación del analizador de secretos..." -ForegroundColor Cyan
@@ -148,12 +168,23 @@ if ($SelfCheck) {
         $fUnsafePs1 = @(Find-HardcodedSecretsInFile -Path $unsafePs1).Count
         $fSafePs1   = @(Find-HardcodedSecretsInFile -Path $safePs1).Count
 
-        $ok = ($fUnsafeEnv -ge 1) -and ($fSafeEnv -eq 0) -and ($fUnsafePs1 -ge 1) -and ($fSafePs1 -eq 0)
+        # *.env generado e ignorado por git: se omite; el mismo nombre sin regla de ignorar: se escanea.
+        $repoDir = Join-Path $tempDir "repo"
+        New-Item -ItemType Directory -Path (Join-Path $repoDir "generado") -Force | Out-Null
+        git -C $repoDir init -q 2>$null | Out-Null
+        Set-Content -LiteralPath (Join-Path $repoDir ".gitignore") -Value "generado/" -Encoding ascii
+        Set-Content -LiteralPath (Join-Path $repoDir "generado\backend.env") -Value "DB_PASSWORD=SuperSecretPass123!" -Encoding ascii
+        Set-Content -LiteralPath (Join-Path $repoDir "backend.env") -Value "DB_PASSWORD=SuperSecretPass123!" -Encoding ascii
+        $omiteIgnorado   = Test-IgnoredLocalEnvFile -Path (Join-Path $repoDir "generado\backend.env")
+        $omiteNoIgnorado = Test-IgnoredLocalEnvFile -Path (Join-Path $repoDir "backend.env")
+
+        $ok = ($fUnsafeEnv -ge 1) -and ($fSafeEnv -eq 0) -and ($fUnsafePs1 -ge 1) -and ($fSafePs1 -eq 0) -and
+              $omiteIgnorado -and (-not $omiteNoIgnorado)
         if ($ok) {
-            Write-Host "  [OK] Self-Check superado: detecta secretos inseguros y respeta placeholders/variables." -ForegroundColor Green
+            Write-Host "  [OK] Self-Check superado: detecta secretos inseguros, respeta placeholders/variables y omite solo *.env ignorados." -ForegroundColor Green
             exit 0
         } else {
-            Write-Host "  [FAIL] Self-Check fallido: UnsafeEnv=$fUnsafeEnv (esp >=1), SafeEnv=$fSafeEnv (esp 0), UnsafePs1=$fUnsafePs1 (esp >=1), SafePs1=$fSafePs1 (esp 0)" -ForegroundColor Red
+            Write-Host "  [FAIL] Self-Check fallido: UnsafeEnv=$fUnsafeEnv (esp >=1), SafeEnv=$fSafeEnv (esp 0), UnsafePs1=$fUnsafePs1 (esp >=1), SafePs1=$fSafePs1 (esp 0), OmiteIgnorado=$omiteIgnorado (esp True), OmiteNoIgnorado=$omiteNoIgnorado (esp False)" -ForegroundColor Red
             exit 1
         }
     } finally {
@@ -221,7 +252,12 @@ foreach ($file in $allFiles) {
         }
     }
 
-    # 2. Escanear contenido
+    # 2. *.env generado en local e ignorado por git (no puede llegar al repositorio)
+    if (Test-IgnoredLocalEnvFile -Path $file.FullName) {
+        continue
+    }
+
+    # 3. Escanear contenido
     $f = @(Find-HardcodedSecretsInFile -Path $file.FullName -DisplayName $relPath)
     if ($f.Count -gt 0) {
         $allFindings += $f

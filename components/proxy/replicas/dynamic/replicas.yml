@@ -10,7 +10,18 @@ http:
     backend-replicas:
       rule: "PathPrefix(`/`)"
       entryPoints: [web]
+      middlewares: [reintento-red]
       service: backend-replicas
+
+  # VAL-oleada7 (H5): al caer una réplica, Traefik devolvía 502 hasta que su health check fallaba (≈5 s, 3 % de la
+  # corrida). `retry` vuelve a enviar la petición solo cuando la réplica no devolvió respuesta (error de red o conexión
+  # rechazada); el servicio ponderado la manda a la otra réplica. Un POST que la réplica procesó pero cuya conexión se
+  # cortó antes de responder podría repetirse: los SP de escritura ya rechazan duplicados (sesiones, tomas, matrícula).
+  middlewares:
+    reintento-red:
+      retry:
+        attempts: 2
+        initialInterval: 100ms
 
   services:
     backend-replicas:
