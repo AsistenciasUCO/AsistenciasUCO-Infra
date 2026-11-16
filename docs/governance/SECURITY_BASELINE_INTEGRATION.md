@@ -76,9 +76,15 @@ Comprobar salud:
 * `http://localhost:18081/actuator/health` ➔ `{"status":"UP"}`
 
 ### Paso 2: Servir el Microfrontend (Security UI)
+En el laboratorio por secciones lo sirve el contenedor `ext-seguridad-consola` (nginx sobre el `dist` del componente, en
+`127.0.0.1:5175`), que arranca con cualquier escenario que incluya `ext-seguridad`:
+```powershell
+.\AsistenciasUCO-Infra\infra.ps1 stack up basico
+```
+Fuera del stack, a mano (`vite preview` escucha solo en `::1` si no se indica el host):
 ```powershell
 cd Complementos\Seguridad\security-ui
-npm run preview
+npm run preview -- --host 127.0.0.1
 ```
 El bundle quedará expuesto en `http://localhost:5175/security-administration.js`.
 

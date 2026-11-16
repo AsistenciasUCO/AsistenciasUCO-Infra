@@ -22,7 +22,7 @@ otros equipos.
 | Sección | Qué tiene | Memoria | Cuándo |
 | :--- | :--- | ---: | :--- |
 | `asis-datos` | SQL Server (`sql_server_asistencias`) y MinIO | 2,5 GB | Siempre (único con reinicio automático) |
-| `ext-seguridad` | Seguridad 0.1.13 del equipo (Keycloak, PDP, PEP, OPA) | 1,6 GB | Casi siempre |
+| `ext-seguridad` | Seguridad 0.1.13 del equipo (Keycloak, PDP, PEP, OPA) y su consola de administración en `5175` | 1,6 GB | Casi siempre |
 | `ext-mensajes` | MessageUcoLab 0.3.0 (Kong, Pulsar, app; sin observabilidad ni Ollama) | 3,3 GB | Pruebas de mensajes |
 | `ext-parametros` | Catálogo de Parámetros 0.1.7 y su microfrontend | 0,6 GB | Pruebas de parámetros |
 | `asis-antivirus` | ClamAV | 1,3 GB | Pruebas de soportes |
@@ -94,4 +94,9 @@ Ajustes que salieron de estas pruebas:
 * `asis-app` vive en [`asis-app.compose.yml`](asis-app.compose.yml).
 * Al levantar una sección se detienen los contenedores de su proyecto anterior (`asistencias-security-lab`, `messageucolab`,
   `catalogo-parametros`, …), que usan los mismos puertos. Esos contenedores viejos no se borran; quedan sin reinicio automático.
+* `ext-seguridad` incluye la **consola de seguridad** (`ext-seguridad-consola`, nginx en `127.0.0.1:5175`): sirve en solo
+  lectura el `dist` ya construido de `Complementos/Seguridad/security-ui` con CORS abierto, como `vite preview`. Es lo que
+  la SPA carga en «Seguridad UCO» (asignación de roles); ya no hace falta `npm run preview`. Si hay un `vite preview` manual
+  en el 5175, detenerlo antes del `stack up` (el puerto quedaría ocupado). Si el equipo de Seguridad publica una versión
+  nueva del micro frontend, basta con actualizar ese `dist` (`npm run build` en el componente) y recargar la página.
 * `stack/.env` (fuera de Git) lleva `MSSQL_SA_PASSWORD`; plantilla en [`.env.example`](.env.example).
