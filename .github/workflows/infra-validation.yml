@@ -59,6 +59,8 @@ jobs:
             components/observability/alertmanager/alertmanager.yml
             components/observability/tempo/tempo.yaml
             components/observability/grafana/provisioning
+            components/observability/grafana/provisioning/dashboards/dashboards.yaml
+            components/observability/grafana/provisioning/dashboards/asistencias-uco-metricas.json
             components/proxy/traefik.yml
             components/proxy/dynamic
             components/proxy/dynamic/routers.yml
@@ -66,6 +68,13 @@ jobs:
           for required_path in "${required_paths[@]}"; do
             test -e "$required_path" || {
               echo "::error::Missing Compose referenced path: $required_path"
+              exit 1
+            }
+          done
+          # OBS-11 (VAL-oleada8): cada dashboard provisionado es JSON valido con uid y paneles.
+          for dashboard in components/observability/grafana/provisioning/dashboards/*.json; do
+            jq -e '(.uid | type == "string") and (.panels | length > 0)' "$dashboard" >/dev/null || {
+              echo "::error::Dashboard de Grafana invalido: $dashboard"
               exit 1
             }
           done
@@ -77,6 +86,9 @@ jobs:
           prom_dir="${GITHUB_WORKSPACE}/components/observability/prometheus"
           docker run --rm -v "${prom_dir}:/etc/prometheus:ro" --entrypoint promtool "$PROMETHEUS_IMAGE" \
             check rules /etc/prometheus/alert-rules.yml
+          # OBS-12 (VAL-oleada8): cada alerta dispara con su condicion y no con datos sanos.
+          docker run --rm -v "${prom_dir}:/etc/prometheus:ro" -w /etc/prometheus --entrypoint promtool "$PROMETHEUS_IMAGE" \
+            test rules alert-rules.test.yml
           docker run --rm -v "${prom_dir}:/etc/prometheus:ro" --entrypoint promtool "$PROMETHEUS_IMAGE" \
             check config /etc/prometheus/prometheus.yml
 

@@ -1,0 +1,157 @@
+# ==============================================================================
+# Pruebas unitarias de las reglas de alerta (OBS-12, VAL-oleada8)
+# Ejecutar: promtool test rules components/observability/prometheus/alert-rules.test.yml
+# En CI: paso "Validate Prometheus config and alert rules (promtool)" de infra-validation.yml.
+# ==============================================================================
+rule_files:
+  - alert-rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # BackendCaido dispara tras 2 minutos sin scrape y no antes.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="asistencias-backend",instance="backend:8090"}'
+        values: '1 1 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: BackendCaido
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BackendCaido
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: asistencias-backend
+              instance: backend:8090
+            exp_annotations:
+              summary: "Backend no responde al scrape de Prometheus"
+              description: "El actuator del backend (puerto de gestion 8090) no responde desde hace 2 minutos."
+
+  # Backend sano: BackendCaido no dispara.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="asistencias-backend",instance="backend:8090"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BackendCaido
+        exp_alerts: []
+
+  # Una notificacion muerta dispara la alerta critica del outbox.
+  - interval: 1m
+    input_series:
+      - series: 'notification_dispatch_total{job="asistencias-backend",outcome="dead"}'
+        values: '0 0 0 1 1 1'
+      - series: 'notification_dispatch_total{job="asistencias-backend",outcome="delivered"}'
+        values: '0 5 10 15 20 25'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: OutboxNotificacionesMuertas
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: OutboxNotificacionesMuertas
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "El outbox agoto los reintentos de una o mas notificaciones"
+              description: "Notificaciones marcadas como muertas en los ultimos 15 minutos: 1. Revisar el canal SMTP y la tabla del outbox."
+
+  # Despachos sanos (10 % de reintentos): sin alertas del outbox.
+  - interval: 1m
+    input_series:
+      - series: 'notification_dispatch_total{job="asistencias-backend",outcome="delivered"}'
+        values: '0+9x30'
+      - series: 'notification_dispatch_total{job="asistencias-backend",outcome="retry"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: OutboxReintentosSostenidos
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: OutboxNotificacionesMuertas
+        exp_alerts: []
+
+  # Reintentos sostenidos por encima del 20 % durante 10 minutos.
+  - interval: 1m
+    input_series:
+      - series: 'notification_dispatch_total{job="asistencias-backend",outcome="delivered"}'
+        values: '0+2x40'
+      - series: 'notification_dispatch_total{job="asistencias-backend",outcome="retry"}'
+        values: '0+3x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: OutboxReintentosSostenidos
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Mas del 20 % de los despachos del outbox terminan en reintento"
+              description: "Proporcion de reintentos en 10 minutos: 60%."
+
+  # Fallo al encolar en el outbox.
+  - interval: 1m
+    input_series:
+      - series: 'notification_publish_total{job="asistencias-backend",provider="outbox",outcome="failed"}'
+        values: '0 0 2 2'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OutboxPublicacionFallida
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "No se pudo encolar una notificacion en el outbox"
+              description: "Publicaciones fallidas en el outbox en los ultimos 10 minutos: 2."
+
+  # SMTP: rechazo permanente, fallos sostenidos y tope de envios.
+  - interval: 1m
+    input_series:
+      - series: 'notification_email_send_total{job="asistencias-backend",outcome="sent"}'
+        values: '0+1x40'
+      - series: 'notification_email_send_total{job="asistencias-backend",outcome="retry"}'
+        values: '0+2x40'
+      - series: 'notification_email_send_total{job="asistencias-backend",outcome="permanent"}'
+        values: '0+1x40'
+      - series: 'notification_email_throttled_total{job="asistencias-backend"}'
+        values: '0 0 0 4 4 4'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: SmtpRechazosPermanentes
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "El servidor SMTP rechazo correos de forma permanente"
+              description: "Envios con error permanente en los ultimos 15 minutos: 15. Revisar credenciales y remitente."
+      - eval_time: 30m
+        alertname: SmtpFallosSostenidos
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "Mas de la mitad de los envios SMTP fallan"
+              description: "Proporcion de envios con reintento o error permanente en 10 minutos: 75%."
+      - eval_time: 5m
+        alertname: SmtpTopeDeEnviosAlcanzado
+        exp_alerts:
+          - exp_labels:
+              severity: info
+            exp_annotations:
+              summary: "Se alcanzo el tope de envios de correo"
+              description: "Envios aplazados por el tope por minuto o por dia en los ultimos 15 minutos: 4."
+
+  # SMTP sano: ninguna alerta de correo.
+  - interval: 1m
+    input_series:
+      - series: 'notification_email_send_total{job="asistencias-backend",outcome="sent"}'
+        values: '0+5x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: SmtpFallosSostenidos
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: SmtpRechazosPermanentes
+        exp_alerts: []

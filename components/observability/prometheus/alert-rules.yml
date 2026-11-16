@@ -75,3 +75,71 @@ groups:
         annotations:
           summary: "Heap de la JVM por encima del 90 %"
           description: "Uso de heap sostenido: {{ $value | humanizePercentage }}."
+
+  # OBS-12 (VAL-oleada8): notificaciones. Metricas del Backend (Micrometer -> Prometheus):
+  #   notification_dispatch_total{outcome=delivered|retry|dead|lost_lease}  (NotificacionOutboxDispatcher)
+  #   notification_publish_total{provider="outbox",outcome=accepted|skipped|failed}  (OutboxNotificacionAdapter)
+  #   notification_email_send_total{outcome=sent|retry|permanent|no_recipients}  (SmtpNotificacionChannelSender)
+  #   notification_email_throttled_total  (TopeEnvios)
+  # Pruebas: promtool test rules components/observability/prometheus/alert-rules.test.yml
+  - name: asistencias-notificaciones
+    rules:
+      - alert: OutboxNotificacionesMuertas
+        expr: sum(increase(notification_dispatch_total{job="asistencias-backend",outcome="dead"}[15m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "El outbox agoto los reintentos de una o mas notificaciones"
+          description: "Notificaciones marcadas como muertas en los ultimos 15 minutos: {{ $value }}. Revisar el canal SMTP y la tabla del outbox."
+
+      - alert: OutboxReintentosSostenidos
+        expr: |
+          sum(rate(notification_dispatch_total{job="asistencias-backend",outcome="retry"}[10m]))
+            /
+          clamp_min(sum(rate(notification_dispatch_total{job="asistencias-backend"}[10m])), 1e-9) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mas del 20 % de los despachos del outbox terminan en reintento"
+          description: "Proporcion de reintentos en 10 minutos: {{ $value | humanizePercentage }}."
+
+      - alert: OutboxPublicacionFallida
+        expr: sum(increase(notification_publish_total{job="asistencias-backend",provider="outbox",outcome="failed"}[10m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No se pudo encolar una notificacion en el outbox"
+          description: "Publicaciones fallidas en el outbox en los ultimos 10 minutos: {{ $value }}."
+
+      - alert: SmtpRechazosPermanentes
+        expr: sum(increase(notification_email_send_total{job="asistencias-backend",outcome="permanent"}[15m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "El servidor SMTP rechazo correos de forma permanente"
+          description: "Envios con error permanente en los ultimos 15 minutos: {{ $value }}. Revisar credenciales y remitente."
+
+      - alert: SmtpFallosSostenidos
+        expr: |
+          sum(rate(notification_email_send_total{job="asistencias-backend",outcome=~"retry|permanent"}[10m]))
+            /
+          clamp_min(sum(rate(notification_email_send_total{job="asistencias-backend"}[10m])), 1e-9) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mas de la mitad de los envios SMTP fallan"
+          description: "Proporcion de envios con reintento o error permanente en 10 minutos: {{ $value | humanizePercentage }}."
+
+      - alert: SmtpTopeDeEnviosAlcanzado
+        expr: sum(increase(notification_email_throttled_total{job="asistencias-backend"}[15m])) > 0
+        for: 0m
+        labels:
+          severity: info
+        annotations:
+          summary: "Se alcanzo el tope de envios de correo"
+          description: "Envios aplazados por el tope por minuto o por dia en los ultimos 15 minutos: {{ $value }}."
