@@ -9,7 +9,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## Resumen General
 
-- **Total de Endpoints Protegidos:** 193
+- **Total de Endpoints Protegidos:** 195
 - **Total de Endpoints Exentos (PÃºblicos / Webhook):** 5
 - **Roles Definidos:** ADMINISTRADOR, DECANO, COORDINADOR, DOCENTE, ESTUDIANTE
 
@@ -25,7 +25,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## CatÃ¡logo de Rutas por Rol
 
-### Rol: ADMINISTRADOR (75)
+### Rol: ADMINISTRADOR (70)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -79,11 +79,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/configuracion/identidad` | AUTHENTICATED | HU159: indica si la correccion del documento esta habilitada (parametro IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO); sin datos personales. |
 | `GET` | `/api/v1/configuracion/registro-estudiante` | ROLES | Configuracion publica del registro manual (dominio institucional vigente); sin datos personales. DEC-073: ADMINISTRADOR y DECANO la leen para validar el correo del personal que dan de alta. |
 | `GET` | `/api/v1/coordinador/periodos-academicos` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
-| `GET` | `/api/v1/docentes` | ROLES | Alcance del programa del coordinador. |
-| `GET` | `/api/v1/docentes/{docenteId}` | ROLES | Alcance del programa del coordinador. |
-| `GET` | `/api/v1/docentes/{docenteId}/asignaciones` | ROLES | Alcance del programa del coordinador. |
-| `POST` | `/api/v1/docentes/consultas/asignaciones` | ROLES | Alcance del programa del coordinador. |
-| `POST` | `/api/v1/docentes/consultas/id` | ROLES | Alcance del programa del coordinador. |
 | `GET` | `/api/v1/estudiantes` | ROLES | Ambito en el SP usp_consultar_directorio_estudiantes_paginado (ADMINISTRADOR institucion, COORDINADOR programas, DOCENTE grupos propios). |
 | `GET` | `/api/v1/estudiantes/{estudianteId}` | ROLES | Ambito en el SP usp_consultar_directorio_estudiantes_paginado (ADMINISTRADOR institucion, COORDINADOR programas, DOCENTE grupos propios). |
 | `GET` | `/api/v1/grupos` | ROLES | DOCENTE solo grupos propios, COORDINADOR solo de su programa (Application + SP). |
@@ -105,7 +100,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: DECANO (47)
+### Rol: DECANO (48)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -123,6 +118,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/decano/asignaturas` | ROLES | HU143: el decano busca en su facultad y el administrador en su institucion; el ambito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/decano/comparativa-programas` | ROLES | Alcance de la facultad del decano autenticado; el ámbito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/decano/consolidado-asistencia` | ROLES | HU061: grupos de la facultad del decano (administrador: su institucion); el ambito lo fuerza el procedimiento almacenado. |
+| `GET` | `/api/v1/decano/consolidado-asistencia/opciones` | ROLES | CIERRE-W2A: asignaturas y docentes con grupos de la facultad del decano (administrador: su institucion); el ambito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/decano/coordinadores` | ROLES | Alcance de la facultad del decano autenticado. |
 | `POST` | `/api/v1/decano/coordinadores` | ROLES | Alcance de la facultad del decano autenticado. |
 | `PUT` | `/api/v1/decano/coordinadores/{id}` | ROLES | Alcance de la facultad del decano autenticado. |
@@ -157,7 +153,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: COORDINADOR (74)
+### Rol: COORDINADOR (70)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -174,6 +170,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/coordinador/caracteres-asignatura` | ROLES | Catalogo de solo consulta sin ambito. |
 | `GET` | `/api/v1/coordinador/componentes-formacion` | ROLES | HU147: catalogo de componentes de formacion (BAS, INS, ESP); solo lectura. |
 | `GET` | `/api/v1/coordinador/consolidado-asistencia` | ROLES | HU061: grupos del programa del coordinador (administrador: su institucion); el ambito lo fuerza el procedimiento almacenado. |
+| `GET` | `/api/v1/coordinador/consolidado-asistencia/opciones` | ROLES | CIERRE-W2A: asignaturas y docentes con grupos del programa del coordinador (administrador: su institucion); el ambito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/coordinador/docentes` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `POST` | `/api/v1/coordinador/docentes` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
 | `PUT` | `/api/v1/coordinador/docentes/{idDocente}` | ROLES | Alcance del programa del coordinador autenticado (InstitutionalScopePort / titularidad en SP). |
@@ -209,11 +206,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `POST` | `/api/v1/coordinador/sesiones/{sesionId}/rechazo` | ROLES | DEC-065 (2): coordinador de al menos uno de los programas del grupo de la sesion (SP; fuera de ambito = 403 SEC_002; motivo fuera del catalogo = 400 SES_019; sin solicitud = 409 SES_025; ya resuelta = 409 SES_024). |
 | `GET` | `/api/v1/coordinador/sesiones/motivos-cancelacion` | ROLES | DEC-064: catalogo de motivos de cancelacion de sesiones manuales; solo lectura, sin datos personales. |
 | `GET` | `/api/v1/coordinador/sesiones/solicitudes` | ROLES | DEC-065 (2): solicitudes de sesion extraordinaria de los programas adscritos al coordinador autenticado; el ambito lo fuerza usp_consultar_solicitudes_sesion_coordinador_paginado. |
-| `GET` | `/api/v1/docentes` | ROLES | Alcance del programa del coordinador. |
-| `GET` | `/api/v1/docentes/{docenteId}` | ROLES | Alcance del programa del coordinador. |
-| `GET` | `/api/v1/docentes/{docenteId}/asignaciones` | ROLES | Alcance del programa del coordinador. |
-| `POST` | `/api/v1/docentes/consultas/asignaciones` | ROLES | Alcance del programa del coordinador. |
-| `POST` | `/api/v1/docentes/consultas/id` | ROLES | Alcance del programa del coordinador. |
 | `GET` | `/api/v1/estudiantes` | ROLES | Ambito en el SP usp_consultar_directorio_estudiantes_paginado (ADMINISTRADOR institucion, COORDINADOR programas, DOCENTE grupos propios). |
 | `GET` | `/api/v1/estudiantes/{estudianteId}` | ROLES | Ambito en el SP usp_consultar_directorio_estudiantes_paginado (ADMINISTRADOR institucion, COORDINADOR programas, DOCENTE grupos propios). |
 | `GET` | `/api/v1/grupos` | ROLES | DOCENTE solo grupos propios, COORDINADOR solo de su programa (Application + SP). |
@@ -236,7 +228,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: DOCENTE (59)
+### Rol: DOCENTE (63)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -249,12 +241,16 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/configuracion/reclamos` | ROLES | CULM-001 D.2 (HU015): configuración institucional del formulario de reclamos (tope de soportes, tamaño y tipos de archivo, límite de subidas, días del plazo); sin datos personales, el procedimiento almacenado valida el rol. |
 | `GET` | `/api/v1/configuracion/registro-estudiante` | ROLES | Configuracion publica del registro manual (dominio institucional vigente); sin datos personales. DEC-073: ADMINISTRADOR y DECANO la leen para validar el correo del personal que dan de alta. |
 | `GET` | `/api/v1/docente/asignaturas` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
+| `GET` | `/api/v1/docente/grupos/{grupoId}/estudiantes` | ROLES | CIERRE-W1A: padron paginado del grupo del docente titular (Application canDocenteAccessGrupo + SP usp_consultar_estudiantes_grupo_ambito_paginado, SEC_002 -> 403). |
 | `POST` | `/api/v1/docente/grupos/{grupoId}/estudiantes/{estudianteId}/retiro` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
+| `GET` | `/api/v1/docente/grupos/{grupoId}/matriz-asistencia` | ROLES | CIERRE-W3M: matriz estudiantes x sesiones del grupo del docente titular, paginada por estudiante (Application canDocenteAccessGrupo + SP usp_consultar_matriz_asistencia_grupo_docente_paginado, SEC_002 -> 403). |
 | `GET` | `/api/v1/docente/grupos/{grupoId}/resumen-asistencia` | ROLES | CULM-001 B.2: docente titular del grupo (Application + SP). |
+| `GET` | `/api/v1/docente/grupos/{grupoId}/resumen-sesiones` | ROLES | CIERRE-W3M: resumen de sesiones del grupo del docente titular (Application canDocenteAccessGrupo + SP usp_consultar_resumen_sesiones_grupo_docente, SEC_002 -> 403). |
 | `GET` | `/api/v1/docente/horarios` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
 | `GET` | `/api/v1/docente/reclamos` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
 | `GET` | `/api/v1/docente/reclamos/{id}` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
 | `PATCH` | `/api/v1/docente/reclamos/{id}` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
+| `GET` | `/api/v1/docente/resumen-grupos` | ROLES | CIERRE-W3I: totales de los grupos habilitados donde el docente autenticado es titular (SP usp_consultar_resumen_grupos_docente valida perfil DOCENTE y acota por titularidad). |
 | `GET` | `/api/v1/docente/revisiones-cancelacion` | ROLES | Solo grupos donde es titular (SP usp_consultar_revisiones_cancelacion_docente_paginado; grupo ajeno = SEC_002; DEC-065). |
 | `PATCH` | `/api/v1/docente/revisiones-cancelacion/{revisionId}` | ROLES | Docente titular del grupo de la revision (SP; ajena = 404). |
 | `PATCH` | `/api/v1/docente/sesiones/{sesionId}/cancelar` | ROLES | Titularidad del docente autenticado (Usuario->Docente del token): solo sus grupos, sesiones y reclamos; la DB y Application validan el grupo. |
@@ -300,7 +296,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `PATCH` | `/api/v2/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 | `GET` | `/api/v2/sesiones/grupo/{grupoId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 
-### Rol: ESTUDIANTE (25)
+### Rol: ESTUDIANTE (26)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -316,6 +312,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/estudiante/horarios` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `GET` | `/api/v1/estudiante/materias` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `GET` | `/api/v1/estudiante/materias/{materiaId}/sesiones` | ROLES | Solo la matricula inscrita del estudiante autenticado: el SP usp_consultar_sesiones_materia_estudiante resuelve el ambito, pagina (pagina y tamano opcionales) y entrega la fecha limite de justificacion (CULM-001 D.1). |
+| `GET` | `/api/v1/estudiante/materias/resumen` | ROLES | Solo datos del estudiante autenticado: el SP usp_consultar_resumen_materias_estudiante valida el perfil y calcula los indicadores sobre las mismas matriculas inscritas del listado (CIERRE-W2B). |
 | `POST` | `/api/v1/estudiante/matricular-grupo` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `GET` | `/api/v1/estudiante/oferta-academica` | ROLES | Programas del estudiante autenticado (EstudiantePrograma); el ámbito lo fuerza el procedimiento almacenado. |
 | `GET` | `/api/v1/estudiante/plan-estudio` | ROLES | HU018: solo los planes activos de los programas del estudiante autenticado (EstudiantePrograma); el ámbito lo fuerza usp_consultar_plan_estudio_estudiante. |
