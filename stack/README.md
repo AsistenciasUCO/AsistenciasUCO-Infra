@@ -12,6 +12,7 @@ secciones** o por **escenarios de prueba**. Todo está descrito en [`secciones.j
 .\AsistenciasUCO-Infra\infra.ps1 stack status            # estado y memoria por sección
 .\AsistenciasUCO-Infra\infra.ps1 stack down              # todo menos asis-datos (nunca borra volúmenes)
 .\AsistenciasUCO-Infra\infra.ps1 stack build             # imágenes asistencias-backend/frontend:develop
+.\AsistenciasUCO-Infra\infra.ps1 stack up asis-app -Conservar       # recrea solo la app tras un build; se configura con lo que ya está arriba
 ```
 
 ## Secciones
