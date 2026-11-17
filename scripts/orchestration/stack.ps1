@@ -122,6 +122,28 @@ function Stop-Seccion([string]$nombre) {
     }
 }
 
+# Secciones con las que se genera la configuracion de asis-app: las pedidas mas, con -Conservar, las que ya estan arriba.
+# Sin esto `stack up asis-app -Conservar` (recrear solo la app tras un `stack build`) generaba backend.env como si
+# Seguridad, Mensajes y Parametros no existieran: el Backend quedaba en modo legado contra un Keycloak apagado.
+function Get-SeccionesConfiguracion([string[]]$secciones) {
+    $efectivas = @($secciones)
+    if ($Conservar) {
+        foreach ($n in $nombresSecciones) {
+            if ($efectivas -contains $n) { continue }
+            $arriba = @(Get-ContenedoresSeccion $n | Where-Object { (docker inspect -f '{{.State.Running}}' $_ 2>$null) -eq 'true' })
+            if ($arriba.Count -gt 0) { $efectivas += $n }
+        }
+    }
+    return $efectivas
+}
+
+# El Backend no arranca en un estado util sin proveedor de identidad: se rechaza antes de detener o recrear nada.
+function Assert-ProveedorIdentidad([string[]]$seccionesConfiguracion) {
+    if (($seccionesConfiguracion -contains 'ext-seguridad') -or ($seccionesConfiguracion -contains 'asis-contingencia')) { return }
+    throw ("asis-app necesita un proveedor de identidad y no hay ninguno entre las secciones ($($seccionesConfiguracion -join ', ')). " +
+        "Use un escenario (.\infra.ps1 stack up basico) o, si Seguridad ya esta arriba, agregue -Conservar.")
+}
+
 function Initialize-Recursos {
     foreach ($red in $manifiesto.redesExternas) {
         docker network inspect $red 2>$null | Out-Null
@@ -339,6 +361,8 @@ switch ($Accion) {
                 if ($LASTEXITCODE -ne 0) { throw "Falta la imagen $img. Construyala con: .\infra.ps1 stack build" }
             }
         }
+        $seccionesConfiguracion = Get-SeccionesConfiguracion $secciones
+        if ($secciones -contains 'asis-app') { Assert-ProveedorIdentidad $seccionesConfiguracion }
         Initialize-Recursos
         if (-not $Conservar) { foreach ($n in $nombresSecciones) { if ($secciones -notcontains $n) { Stop-Seccion $n } } }
         foreach ($n in $secciones) {
@@ -347,7 +371,11 @@ switch ($Accion) {
             # Contenedores de los proyectos anteriores (antes de la reorganizacion) usan los mismos puertos: se detienen.
             $ant = @(Get-ContenedoresSeccion $n -Anteriores | Where-Object { (docker inspect -f '{{.State.Running}}' $_ 2>$null) -eq 'true' })
             if ($ant.Count -gt 0) { docker stop -t 60 $ant | Out-Null; Write-Host "    (detenidos $($ant.Count) contenedores del proyecto anterior)" -ForegroundColor DarkYellow }
-            if ($n -eq 'asis-app') { New-ConfiguracionApp $secciones }
+            if ($n -eq 'asis-app') {
+                $extra = @($seccionesConfiguracion | Where-Object { $secciones -notcontains $_ })
+                if ($extra.Count -gt 0) { Write-Host "  * Configuracion con las secciones que ya estan arriba: $($extra -join ', ')" -ForegroundColor Gray }
+                New-ConfiguracionApp $seccionesConfiguracion
+            }
             Invoke-Compose $n (@('up', '-d', '--no-build', '--remove-orphans') + @($s.servicios))
             if (-not $SinEsperar) { Wait-Salud $n }
         }
