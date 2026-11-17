@@ -2,7 +2,7 @@
 > **Ecosistema:** Sistema de Gestion de Asistencia UCO  
 > **Proposito:** Registro centralizado y trazabilidad de ciclo de vida SDD/TDD para Backend, Frontend y Base de Datos.  
 > **Generacion:** Automatizada via AsistenciasUCO-Infra/scripts/quality/sync-work-items.ps1  
-> **Ultima Actualizacion:** 2026-11-16 (secciones 1 y 2.1 a 2.3: ultima sincronizacion automatica 2026-10-26; seccion 2.4: actualizada a mano)  
+> **Ultima Actualizacion:** 2026-11-17 (secciones 1 y 2.1 a 2.3: ultima sincronizacion automatica 2026-10-26; seccion 2.4: actualizada a mano)  
 
 ---
 
@@ -133,6 +133,7 @@ Actualizada a mano el 2026-11-16: `sync-work-items.ps1` copia carpetas de los ot
 | Work Item / Fase | Archivos | Estado Documentado | Enlace Directo |
 | :--- | :---: | :---: | :--- |
 | CULM-001-culminacion | 68 | ver [CLOSURE](CULM-001-culminacion/CLOSURE.md) y [ESTADO](CULM-001-culminacion/ESTADO.md) | [Ver carpeta](CULM-001-culminacion/) |
+| CIERRE-001-cierre-proyecto | 2 | active: [README](CIERRE-001-cierre-proyecto/README.md) y [guion de pruebas manuales](CIERRE-001-cierre-proyecto/GUION-PRUEBAS-MANUALES.md) | [Ver carpeta](CIERRE-001-cierre-proyecto/) |
 | HU050-matricula-manual-docente (remanente previo a la convencion; vigente en `backend/`) | 5 | closed | [Ver carpeta](HU050-matricula-manual-docente/) |
 | IDENT-002-activacion-cuentas | 1 | contrato acordado 2026-11-15 | [Ver carpeta](IDENT-002-activacion-cuentas/) |
 | INT-002-complementos-seguridad-mensajes-parametros | 1 | N/A | [Ver carpeta](INT-002-complementos-seguridad-mensajes-parametros/) |
