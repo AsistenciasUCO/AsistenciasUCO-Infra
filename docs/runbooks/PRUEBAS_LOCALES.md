@@ -61,6 +61,8 @@ Los correos que genere la aplicación van al buzón de prueba (`SMTP_NOTIFICATIO
 .\AsistenciasUCO-Infra\infra.ps1 verify                       # secretos y contratos antes de un commit
 ```
 
+Guion de pruebas manuales por rol para la demostración (qué cambió en el cierre y qué sigue abierto): [GUION-PRUEBAS-MANUALES](../work-items/CIERRE-001-cierre-proyecto/GUION-PRUEBAS-MANUALES.md).
+
 ## Advertencias operativas de base de datos
 
 - **Orden: migraciones antes de `deploy_schema` (TD-081).** Algunas migraciones vuelven a crear SP con el texto de su época; con otro orden pisan objetos de C.1. La migración 24 requiere `:r $(MIGDIR)`.
