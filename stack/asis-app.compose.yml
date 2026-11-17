@@ -40,7 +40,15 @@ services:
       - ./generado/backend.env
     # Comparte la red de `enlaces`: sus puertos (8080, 8090) y sus reenvios en 127.0.0.1.
     network_mode: "service:enlaces"
+    # Tope de memoria del laboratorio: sin el, la JVM dimensiona el heap con toda la VM de Docker (25 % de 10 GB). Con
+    # 1200 MB (el presupuesto de la seccion en secciones.json) y el heap al 50 % queda margen para metaspace e hilos; en
+    # reposo usa ~410 MB.
+    mem_limit: 1200m
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=50"
     volumes:
+      # Cache de clases de la JVM (CDS): sobrevive a recrear el contenedor y baja el arranque de ~22 s a ~12 s.
+      - asis-app-cache-jvm:/app/cache
       # Logs JSONL en la carpeta que lee Alloy (asis-obs -> Loki), igual que el Backend local.
       - ../../GestioAsistenciaBackend/infra/observability/logs:/app/infra/observability/logs
     depends_on:
@@ -67,6 +75,10 @@ services:
         condition: service_started
     labels:
       asistencias.seccion: asis-app
+
+volumes:
+  asis-app-cache-jvm:
+    name: asis-app-cache-jvm
 
 networks:
   asis-red:
