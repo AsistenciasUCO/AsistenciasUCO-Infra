@@ -3,7 +3,7 @@ status: active
 type: ledger
 scope: backend
 owner: backend-team
-last-reviewed: 2026-11-16
+last-reviewed: 2026-11-17
 ---
 
 # Ledger único de deuda técnica
@@ -12,14 +12,17 @@ TD-001..TD-005 conservan los IDs del paquete; los demás consolidan la documenta
 
 Las propuestas Redis, RabbitMQ, CQRS, MinIO, SBOM y técnicas avanzadas se mantienen en [LINEA_BASE](LINEA_BASE.md) como evoluciones, no como deuda que obligue a introducirlas.
 
-## Estado para el cierre (2026-11-16)
+## Estado para el cierre (2026-11-17)
 
 Clasificación de lo que sigue abierto según su efecto en la entrega. La entrega es una demostración con imágenes Docker; el despliegue real en servidores de la universidad es futuro y sus requisitos se documentan en [REQUISITOS_PRODUCCION](../runbooks/REQUISITOS_PRODUCCION.md), no se implementan ahora.
 
-- **Bloquea la demostración (en corrección):** TD-097 (cierre masivo con fallback, PR de BD `fix/cierre-masivo-decano-acciones`), TD-098 (`GET /api/v1/docentes` sin ámbito ni paginación), TD-102 (simulador del frontend en el bundle de producción), TD-107 (filtrado, paginación y cálculos de negocio en el cliente, por fases).
-- **Requisito para producción (no bloquea la demo):** TD-003, TD-011, TD-014, TD-018, TD-020, TD-023, TD-027, TD-063, TD-072, TD-073, TD-093, TD-099, TD-100, TD-101, TD-103, TD-104, TD-108, TD-109, TD-110.
-- **Aplazable:** TD-004, TD-006, TD-007, TD-012, TD-013, TD-015, TD-016, TD-019, TD-024 a TD-026, TD-034, TD-044, TD-045, TD-046, TD-050, TD-054, TD-056, TD-062, TD-064 a TD-071, TD-074 a TD-083, TD-085 a TD-092, TD-105, TD-106, TD-CULM001-A-01 a A-03 y TD-CULM001-D-01 a D-05.
+- **Bloquea la demostración:** ninguna. Las cuatro que la bloqueaban el 2026-11-16 (TD-097, TD-098, TD-102 y TD-107) quedaron cerradas con el cierre del 2026-11-16/17 (ver "Cerradas" más abajo y el work item [CIERRE-001](../work-items/CIERRE-001-cierre-proyecto/README.md)).
+- **Pendiente de decisión del responsable (no bloquea):** TD-116 (cifras de pérdida: matrículas frente a personas), TD-117 (enlace directo a las decisiones de cancelación pendientes del docente) y TD-118 (semántica de `esResolutorActual` del docente).
+- **Requisito para producción (no bloquea la demo):** TD-003, TD-011, TD-014, TD-018, TD-020, TD-023, TD-027, TD-063, TD-072, TD-073, TD-093, TD-099, TD-100, TD-101, TD-103, TD-104, TD-108, TD-110.
+- **Aplazable:** TD-004, TD-006, TD-007, TD-012, TD-013, TD-015, TD-016, TD-019, TD-024 a TD-026, TD-034, TD-044, TD-045, TD-046, TD-050, TD-054, TD-056, TD-062, TD-064 a TD-071, TD-074 a TD-083, TD-085 a TD-092, TD-105, TD-106, TD-111 a TD-115, TD-119 a TD-123, TD-CULM001-A-01 a A-03 y TD-CULM001-D-01 a D-05.
 - **Cerradas en esta revisión (2026-11-16), con evidencia en su entrada:** TD-010, TD-022, TD-039, TD-041, TD-043, TD-047, TD-049, TD-055 y TD-084. TD-094 a TD-096 llegan cerradas desde el registro del backend.
+- **Cerradas en la revisión del 2026-11-17 (cierre en `develop`), con evidencia en su entrada:** TD-097 (BD PR 140), TD-098 (W1B), TD-102 en cuanto al arranque (Frontend PR 140; el simulador sigue en el bundle, ver TD-106), TD-107 (los seis paquetes W1A a W3I; lo que quedó expresamente sin mover en el cliente está en TD-119; relacionadas: TD-113, TD-114 y TD-117) y TD-109 (Frontend PR 140).
+- **Datos medidos el 2026-11-17:** TD-072 y TD-073 con cifras nuevas; TD-075 (aviso del presupuesto); TD-105 (17 pruebas omitidas en la última corrida de integración).
 
 Equivalencias con el registro histórico del backend (congelado al 2026-11-12): TD-055 del backend = TD-094, TD-056 del backend = TD-095, TD-057 del backend = TD-096, TD-058 del backend = TD-097. Los TD-055 y TD-056 de este registro son los de MessageUcoLab.
 
@@ -104,10 +107,10 @@ Equivalencias con el registro histórico del backend (congelado al 2026-11-12): 
 | [TD-069](#td-069) | `CierreMasivoRcn012IT` pendiente de ejecución o ajuste | ABIERTA / NON_BLOCKING (revisada 2026-11-16) | no |
 | [TD-070](#td-070) | E2E PKCE de C (`test_culm001_c.ps1`) sin ejecutar | ABIERTA / NON_BLOCKING (revisada 2026-11-16) | no |
 | [TD-071](#td-071) | Manifiesto post-freeze de C sin modo en `freeze-manifest.ps1` (`DB_UTC_D06`) | ABIERTA / NON_BLOCKING | no |
-| [TD-072](#td-072) | `--prune` del PDP pendiente (concesiones sobrantes) | ABIERTA / NON_BLOCKING | no |
-| [TD-073](#td-073) | 32 recursos huérfanos en el PDP | ABIERTA / NON_BLOCKING | no |
+| [TD-072](#td-072) | `--prune` del PDP pendiente (128 concesiones sobrantes medidas el 2026-11-17) | ABIERTA / NON_BLOCKING | no |
+| [TD-073](#td-073) | 48 recursos huérfanos en el PDP (medidos el 2026-11-17) | ABIERTA / NON_BLOCKING | no |
 | [TD-074](#td-074) | Drift de dos SP congelados (`usp_generar_sesiones_grupo`, `usp_registrar_asistencias_sesion`) | ABIERTA / NON_BLOCKING | no |
-| [TD-075](#td-075) | Presupuesto del bundle frontend excedido en +7,6 kB | ABIERTA / NON_BLOCKING (revisada 2026-11-16) | no |
+| [TD-075](#td-075) | Presupuesto del bundle frontend excedido (aviso de ~3,2 kB sobre 500 kB en los builds del 2026-11-16; antes +7,6 kB) | ABIERTA / NON_BLOCKING (revisada 2026-11-17) | no |
 | [TD-076](#td-076) | `horasDictadas` del consolidado sin multiplicar por activos | ABIERTA / NON_BLOCKING | no |
 | [TD-077](#td-077) | `codigo_programa` y `codigo_facultad` del CSV resueltos por nombre | ABIERTA / NON_BLOCKING | no |
 | [TD-078](#td-078) | `details[]` en inglés `{field, code, message}` | ABIERTA / NON_BLOCKING | no |
@@ -129,20 +132,33 @@ Equivalencias con el registro histórico del backend (congelado al 2026-11-12): 
 | [TD-094](#td-094) | (antes TD-055 del backend) JDBC directo residual en `src/main` durante la migración JPA-only | CERRADA (LB-008 JPA-07, 2026-10-06) | no |
 | [TD-095](#td-095) | (antes TD-056 del backend) `usp_registrar_asistencia_estudiante_autonomo` sin frontera transaccional | CERRADA (2026-10-07) | no |
 | [TD-096](#td-096) | (antes TD-057 del backend) Catálogo `dbo.Estado` sin códigos de revisión: toda solicitud nacía aceptada | CERRADA (2026-10-07) | no |
-| [TD-097](#td-097) | (antes TD-058 del backend) `usp_ejecutar_cierre_masivo_periodo` resuelve el período con fallback al más reciente | EN CORRECCIÓN: PR de BD `fix/cierre-masivo-decano-acciones` | sí, la demostración |
-| [TD-098](#td-098) | `GET /api/v1/docentes` y variantes sin ámbito por coordinador ni paginación | ABIERTA — EN CORRECCIÓN | sí, la demostración |
+| [TD-097](#td-097) | (antes TD-058 del backend) `usp_ejecutar_cierre_masivo_periodo` resuelve el período con fallback al más reciente | CERRADA (BD PR 140, 2026-11-17) | no |
+| [TD-098](#td-098) | `GET /api/v1/docentes` y variantes sin ámbito por coordinador ni paginación | CERRADA (CIERRE-W1B, 2026-11-17) | no |
 | [TD-099](#td-099) | El generador de entorno conecta el backend como `sa`; existen dos roles de mínimo privilegio distintos | ABIERTA | no; requisito de producción |
 | [TD-100](#td-100) | Vistas `uv_usuario_autenticacion` y `uv_administrador` exponen la columna `password`; el rol de aplicación lee toda vista `uv_%` | ABIERTA | no; requisito de producción |
 | [TD-101](#td-101) | `deploy_schema.ps1` siembra siempre cuentas con credenciales fijas | ABIERTA | no; requisito de producción |
-| [TD-102](#td-102) | El simulador del frontend viaja en el bundle de producción y se activa con `USE_MOCKS` sin fallo cerrado | ABIERTA — EN CORRECCIÓN | sí, la demostración |
+| [TD-102](#td-102) | El simulador del frontend viaja en el bundle de producción y se activa con `USE_MOCKS` sin fallo cerrado | CERRADA en cuanto al arranque (Frontend PR 140, 2026-11-17); el simulador sigue en el bundle (TD-106) | no |
 | [TD-103](#td-103) | `environment.production` queda en `false` en el build de producción | ABIERTA | no; requisito de producción |
 | [TD-104](#td-104) | SSE sin límite de conexiones por usuario ni revalidación de ámbito tras suscribir | ABIERTA | no; requisito de producción |
-| [TD-105](#td-105) | 59 llamadas `assume*` en 18 pruebas de integración del backend pueden omitirse en silencio | ABIERTA / NON_BLOCKING | no (relacionada con TD-044) |
+| [TD-105](#td-105) | 59 llamadas `assume*` en 18 pruebas de integración del backend pueden omitirse en silencio (17 omitidas en la última corrida) | ABIERTA / NON_BLOCKING | no (relacionada con TD-044) |
 | [TD-106](#td-106) | Los E2E del frontend corren solo contra el simulador y en modo `legacy` | ABIERTA / NON_BLOCKING | no |
-| [TD-107](#td-107) | Frontend con filtrado, paginación y cálculos de negocio en el cliente | ABIERTA — EN CORRECCIÓN POR FASES | parcialmente, la demostración |
+| [TD-107](#td-107) | Frontend con filtrado, paginación y cálculos de negocio en el cliente | CERRADA (seis paquetes W1A a W3I, 2026-11-17); remanentes en TD-119 | no |
 | [TD-108](#td-108) | Sin configuración ni runbook de producción (Keycloak en `start-dev`, HTTP, sin TLS, sin rollback) | ABIERTA | no; requisito de producción |
-| [TD-109](#td-109) | Sin política de caché en nginx para `index.html` y los assets con hash | ABIERTA | no; requisito de producción |
+| [TD-109](#td-109) | Sin política de caché en nginx para `index.html` y los assets con hash | CERRADA (Frontend PR 140, 2026-11-17) | no |
 | [TD-110](#td-110) | Migración futura a sesión por cookie HttpOnly / BFF para producción (diferida) | DIFERIDA A PRODUCCIÓN | no |
+| [TD-111](#td-111) | Dos pruebas de BD inestables ajenas a los cambios (`CULM001_D3_13`, `LB004D_W2_ATTACH_STATE_UTC`) | ABIERTA / NON_BLOCKING | no |
+| [TD-112](#td-112) | Simulador del frontend incompleto o divergente del backend real | ABIERTA / NON_BLOCKING | no |
+| [TD-113](#td-113) | Textos de interfaz literales fuera del catálogo y rótulos de período escritos a mano | ABIERTA / NON_BLOCKING | no |
+| [TD-114](#td-114) | Código del frontend sin uso tras el cierre y servicio duplicado | ABIERTA / NON_BLOCKING | no |
+| [TD-115](#td-115) | RBAC por perfil acepta código o nombre; ~120 llamadores pasan el nombre; perfiles y estados literales en SP y vistas | ABIERTA / NON_BLOCKING | no |
+| [TD-116](#td-116) | Cifras de pérdida: el consolidado cuenta matrículas y el indicador del decano cuenta personas (958 frente a 675) | ABIERTA — DECISION_REQUIRED | no |
+| [TD-117](#td-117) | F-DOC-03: el tablero del docente no enlaza directo a las decisiones de cancelación pendientes | ABIERTA — DECISION_REQUIRED | no |
+| [TD-118](#td-118) | `esResolutorActual` del docente queda siempre en 0 | ABIERTA — DECISION_REQUIRED | no |
+| [TD-119](#td-119) | Restos de filtrado, conteo y valores por defecto en el cliente declarados por los paquetes del cierre | ABIERTA / NON_BLOCKING | no |
+| [TD-120](#td-120) | El interceptor global de errores solo avisa 403 y 5xx; 400/409/422 dependen de cada pantalla | ABIERTA / NON_BLOCKING | no |
+| [TD-121](#td-121) | `/admin/docentes` muestra solo docentes con vínculo activo (HU136): un docente sin vínculo no aparece en el selector del administrador | ABIERTA / NON_BLOCKING | no |
+| [TD-122](#td-122) | 14 cuentas de prueba posteriores al conjunto de datos alteran los conteos de `verificar_datos_prueba.py` (26 de 28) | ABIERTA / NON_BLOCKING | no |
+| [TD-123](#td-123) | Incidente operativo del 2026-11-16: contenedor desechable montó el volumen de MinIO del laboratorio; verificación de objetos pendiente | ABIERTA / NON_BLOCKING (verificación) | no |
 
 ## TD-001
 
@@ -1014,16 +1030,17 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 
 - **Título:** `--prune` del PDP pendiente (concesiones sobrantes).
 - **Origen:** DEC-046.
-- **Descripción:** La revocación de concesiones obsoletas (ADMINISTRADOR 76, COORDINADOR 10, ESTUDIANTE 5, DOCENTE 4, DECANO 2 en la última medición, 2026-11-07) solo ocurre con `provision_asistencias.py pdp --prune`, no ejecutado sin autorización del responsable.
+- **Descripción:** La revocación de concesiones obsoletas solo ocurre con `provision_asistencias.py pdp --prune`, no ejecutado sin autorización del responsable.
 - **Impacto:** Medio (permisos mayores a los necesarios).
 - **Resolución esperada / propuesta:** Autorizar y ejecutar `--prune`; después `verify` y `verify-decisions`.
 - **Prioridad:** MEDIA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
+- **Medición del 2026-11-17 (laboratorio, tras aprovisionar el PDP de forma incremental: 0 recursos y 0 permisos faltantes):** 128 concesiones sobrantes (ADMINISTRADOR 86, DECANO 7, COORDINADOR 19, DOCENTE 9, ESTUDIANTE 7; la medición anterior, del 2026-11-07, era ADMINISTRADOR 76, COORDINADOR 10, ESTUDIANTE 5, DOCENTE 4, DECANO 2). Sigue sin ejecutarse `--prune`: no se autorizó. Medida en el aprovisionamiento del cierre; esta revisión documental no la repitió.
 
 ## TD-073
 
-- **Título:** 32 recursos huérfanos en el PDP.
+- **Título:** 48 recursos huérfanos en el PDP (medición del 2026-11-17; antes 32).
 - **Origen:** DEC-046; ESTADO.
-- **Descripción:** Rutas retiradas (solicitudes de ingreso, `qr-token`, catálogos admin; y `POST /asistencias` por D.7) siguen como recursos; `verify` queda `clean=false`.
+- **Descripción:** Rutas retiradas (solicitudes de ingreso, `qr-token`, catálogos admin; `POST /asistencias` por D.7 y, desde CIERRE-W1B, las cinco rutas de `/api/v1/docentes/**`) siguen como recursos; `verify` queda `clean=false`. Medición del 2026-11-17: 48 recursos huérfanos, incluidos los de las rutas `/docentes` retiradas; sigue sin `--prune` (TD-072).
 - **Impacto:** Bajo.
 - **Resolución esperada / propuesta:** Se resuelve con el mismo `--prune` de TD-072.
 - **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
@@ -1039,13 +1056,14 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 
 ## TD-075
 
-- **Título:** Presupuesto del bundle frontend excedido en +7,6 kB.
+- **Título:** Presupuesto del bundle frontend excedido (aviso de ~3,2 kB sobre 500 kB en los builds del 2026-11-16; antes +7,6 kB).
 - **Origen:** Gate de frontend.
 - **Descripción:** El build de producción supera el presupuesto del bundle en 7,6 kB tras los paquetes de CULM-001.
 - **Impacto:** Bajo.
 - **Resolución esperada / propuesta:** Dividir módulos con carga diferida o subir el presupuesto con decisión registrada.
 - **Prioridad:** BAJA. **Bloquea línea base:** no. **Estado:** ABIERTA / NON_BLOCKING. **Work item:** CULM-001.
 - **Revisada 2026-11-16: sigue vigente porque no se pudo medir.** Los presupuestos de `angular.json` (configuración `production`) son 500 kB de aviso y 1 MB de error para `initial`; no se compiló el frontend en esta revisión (solo lectura), así que no se confirma si el exceso de 7,6 kB persiste ni contra qué umbral se midió.
+- **Revisada 2026-11-17: sigue abierta.** `angular.json` conserva `initial` con `maximumWarning` 500 kB y `maximumError` 1 MB (líneas 49-54). Esta revisión no compiló el frontend; la cifra de ~3,2 kB sobre los 500 kB es el aviso que reportaron los builds de producción del 2026-11-16 de los paquetes del cierre (no se midió aquí). Es un aviso, no un error.
 
 ## TD-076
 
@@ -1258,8 +1276,9 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Alto para la integridad de los datos académicos (estados de `EstudianteGrupo`, contadores de `Grupo` y `AuditoriaEvento`).
 - **Evidencia:** `schema/stored-procedures/usp_ejecutar_cierre_masivo_periodo.sql` en `develop` de BD, "PASO 2" (líneas 98-126 al 2026-11-16): el segundo `SELECT TOP 1 ... ORDER BY anio DESC, codigo DESC` es el fallback; `VAL_002` solo se devuelve si la vista está vacía. El registro histórico del backend marcó esta deuda como cerrada el 2026-10-07 por la alineación de la BD; la comprobación en `develop` muestra que el fallback sigue presente, así que esa afirmación no se sostiene.
 - **Resolución esperada:** regla del responsable (2026-11-16): el cierre masivo se rechaza si el período no existe (`VAL_002`), sin fallback. Añadir una prueba de código inexistente con ejecutor ADMINISTRADOR que verifique que no cambia ninguna fila (relacionada con TD-069).
-- **Bloquea línea base:** no; **bloquea la demostración** hasta que se fusione la corrección.
-- **Estado:** **EN CORRECCIÓN: PR de BD `fix/cierre-masivo-decano-acciones`.**
+- **Bloquea línea base:** no.
+- **Estado:** **CERRADA (2026-11-17), BD PR 140** (`fix/cierre-masivo-decano-acciones`, mezclado en `develop` con CI en verde).
+- **Evidencia de cierre (comprobada en `develop` de BD el 2026-11-17):** `schema/stored-procedures/usp_ejecutar_cierre_masivo_periodo.sql`: el PASO 2 resuelve el período solo por `@codigoPeriodoDefecto` (nombre o código); sin código responde `GEN_002` y con un código que no existe responde `PER_001`, ambos con `estadoResultado = 0` y sin cerrar ni auditar nada. El `SELECT TOP 1 ... ORDER BY anio DESC` que queda solo desempata entre coincidencias exactas; ya no hay fallback al período más reciente. Pruebas `FIX001_CIE_01` a `_03` en `test/test_fix_cierre_001_cierre_masivo.sql`; `FIX001_CIE_01` fallaba en RED con el SP anterior (`GestioAsistenciaDB/docs/work-items/FIX-CIERRE-001-cierre-decano-acciones/VALIDATION.md`). Los códigos de la regla son `GEN_002` y `PER_001`, no `VAL_002`. Sigue pendiente la prueba de integración del backend de TD-069.
 
 ## TD-098
 
@@ -1268,8 +1287,9 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Alto: un coordinador puede ver docentes de programas ajenos, contra la regla de aislamiento jerárquico (el coordinador ve solo docentes de sus programas) y contra la regla de paginación.
 - **Evidencia:** `GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/infrastructure/adapter/primary/controller/docente/DocenteController.java` (líneas 57-60) e `infrastructure/config/security/SecurityConfig.java` (línea 155, con el comentario "hoy sin contrato funcional explícito de quién debe administrarlo"). Ya existe un caso de uso con ámbito de programa (`ConsultarDocentesProgramaUseCase`).
 - **Resolución esperada:** ámbito y paginación forzados dentro de un SP de consulta (`usp_consultar_*` sobre vista) y `ApiPageResponse<T>` en el backend; el coordinador ve solo docentes de sus programas.
-- **Bloquea línea base:** no; **bloquea la demostración**.
-- **Estado:** ABIERTA — EN CORRECCIÓN.
+- **Bloquea línea base:** no.
+- **Estado:** **CERRADA (2026-11-17), CIERRE-W1B** (Backend PR 168, BD PR 142, Frontend PR 142).
+- **Evidencia de cierre (comprobada en `develop` el 2026-11-17):** el paquete retiró las cinco rutas de `/api/v1/docentes/**` (`GET /docentes`, `GET /docentes/{id}`, `GET /docentes/{id}/asignaciones`, `POST /docentes/consultas/id` y `/consultas/asignaciones`; contrato en `CIERRE-W1B-directorios-ambito/CONTRACT.md` del backend, sección 1). `DocenteController` ya no existe (el directorio `controller/docente/` solo contiene controladores de `/docente/**`); `SecurityConfig.java:151-152` deja solo el comentario de la retirada; `infra/security-baseline/access-catalog.json` ya no lista rutas `/api/v1/docentes` y conserva los sustitutos con ámbito validado en el SP: `/admin/docentes` (línea 31), `/decano/docentes` (línea 124) y `/coordinador/docentes` (líneas 76-82). El selector de personas del frontend (`user-picker-modal`) consulta esos sustitutos con búsqueda y paginación en servidor. La copia vieja `scripts/general/tests/test_all_hus.ps1` de la raíz del workspace (fuera de git) todavía llama a `GET /docentes` (línea 657); la suite vigente `scripts/tests/test_all_hus.ps1` de este repositorio no referencia ninguna ruta retirada.
 
 ## TD-099
 
@@ -1308,10 +1328,9 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Alto para la demostración si el contenedor arranca con el flag mal puesto: la interfaz respondería con datos simulados sin avisar.
 - **Evidencia:** archivos citados en `GestioAsistenciaFrontend` (`origin/develop`).
 - **Resolución esperada:** fallo cerrado en el entrypoint (negarse a arrancar con `USE_MOCKS=true` en la imagen de entrega) y/o exclusión del simulador del build de producción.
-- **Bloquea línea base:** no; **bloquea la demostración**.
-- **Estado:** ABIERTA — EN CORRECCIÓN.
-
-## TD-103
+- **Bloquea línea base:** no.
+- **Estado:** **CERRADA en cuanto al arranque (2026-11-17), Frontend PR 140.** El simulador sigue viajando en el bundle: queda como nota de TD-106 (no se abrió una entrada aparte).
+- **Evidencia de cierre (comprobada en `develop` del frontend el 2026-11-17):** `docker-entrypoint.d/40-env-js.sh` (líneas 8-13) termina con error si `USE_MOCKS=true` sin `ALLOW_MOCKS=true` (falla cerrada, solo laboratorio); `docker-compose.yml` (línea 14) lo documenta. Lo que no cambia: `src/app/core/interceptors/mock-backend-lazy.interceptor.ts:8` sigue importando dinámicamente `mock-backend.interceptor`, es decir, el fragmento del simulador se sigue generando en el build de producción; solo no se activa sin las dos variables.
 
 - **Origen:** auditoría del 2026-11-16.
 - **Descripción:** `environment.production` vale `false` también en el build de producción: hay un único `src/environments/environment.ts` y `angular.json` no define `fileReplacements`, mientras el `Dockerfile` compila con `--configuration=production`.
@@ -1334,7 +1353,7 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 ## TD-105
 
 - **Origen:** auditoría del 2026-11-16.
-- **Descripción:** hay 59 llamadas `assume*` (52 de ellas `assumeTrue`) repartidas en 18 clases de integración (`*IT`) del backend; si faltan datos o servicio, la prueba se omite en silencio y el resultado sigue en verde.
+- **Descripción:** hay 59 llamadas `assume*` (52 de ellas `assumeTrue`) repartidas en 18 clases de integración (`*IT`) del backend; si faltan datos o servicio, la prueba se omite en silencio y el resultado sigue en verde. Cifra observada más reciente: 17 pruebas omitidas en la última corrida de integración (`mvnw clean verify -Pintegration` de CIERRE-W2B, 2026-11-16/17: 367 de integración según su VALIDATION, 0 fallos, 17 omitidas; el reporte de la sesión de cierre habla de 368).
 - **Impacto:** Medio: oculta regresiones. Relacionada con TD-044.
 - **Evidencia:** búsqueda de `assume`, `assumeTrue`, `assumeFalse` y `assumeThat` en `GestioAsistenciaBackend/src/test` (conteo del 2026-11-16).
 - **Resolución esperada:** fixtures propios y fallo explícito (o un reporte de omitidas en la CI).
@@ -1347,6 +1366,7 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Descripción:** todos los E2E de Playwright del frontend corren contra el simulador (`USE_MOCKS=true`) y con `SECURITY_PROVIDER=legacy`; no ejercitan el modo `baseline` (Authorization Code + PKCE) ni el backend real.
 - **Impacto:** Medio: el camino de autenticación vigente y la integración real no tienen E2E de interfaz.
 - **Evidencia:** `playwright.config.ts` (comentario de cabecera) y `e2e/support/env.e2e.js` en `GestioAsistenciaFrontend`. La cobertura contra el backend real, sin interfaz, la da `scripts/tests/test_all_hus.ps1` de Infra.
+- **Nota (2026-11-17):** con el cierre de TD-102 el contenedor ya no arranca con `USE_MOCKS=true` sin `ALLOW_MOCKS=true`, pero el simulador sigue en el bundle de producción (`mock-backend-lazy.interceptor.ts:8`, importación dinámica). Excluirlo del build de producción queda como parte de esta deuda, junto con ampliar los E2E contra el stack real. Ver también TD-112 (el simulador diverge del backend real).
 - **Resolución esperada:** un subconjunto de E2E contra el stack real en modo `baseline`.
 - **Bloquea línea base:** no.
 - **Estado:** ABIERTA / NON_BLOCKING (aplazable).
@@ -1358,8 +1378,16 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Alto con datos reales: listas truncadas, búsquedas incompletas y folios que no coinciden con los del servidor.
 - **Evidencia:** archivos citados en `GestioAsistenciaFrontend` (`origin/develop`).
 - **Resolución esperada:** mover filtros, paginación y folios al servidor (SP de consulta con `ApiPageResponse<T>`), por fases.
-- **Bloquea línea base:** no; **bloquea parcialmente la demostración**.
-- **Estado:** ABIERTA — EN CORRECCIÓN POR FASES.
+- **Bloquea línea base:** no.
+- **Estado:** **CERRADA (2026-11-17)** por los seis paquetes del cierre; lo que quedó expresamente sin mover está en TD-119 y relacionadas (TD-113, TD-114, TD-117).
+- **Evidencia de cierre (contratos en `GestioAsistenciaBackend/docs/work-items/CIERRE-*/CONTRACT.md`; los seis paquetes mezclados en `develop` con CI en verde):**
+  - **W1A (docente: reclamos y padrón; BD 141, Backend 167, Frontend 141):** `GET /docente/reclamos` filtra por `busqueda` y `grupoId` en el SP y devuelve el folio `REC-XXXXXXXX` generado por el servidor (campo `nombre`); ruta nueva `GET /docente/grupos/{grupoId}/estudiantes` paginada en servidor. En el frontend ya no se compone el folio con `id.slice(0, 8)` (solo queda un `slice` en un adaptador de simulación).
+  - **W1B (directorios; BD 142, Backend 168, Frontend 142):** `GET /decano/coordinadores` filtra (`busqueda`, `estaActivo`, `sinPrograma`) y pagina con el SP `usp_consultar_coordinadores_facultad_paginado`, sin el tope de 100 y con el total real; nombres y apellidos separados desde el backend.
+  - **W2A (coordinador; BD 143, Backend 169, Frontend 143):** `GET /coordinador/grupos` pasa a `ApiPageResponse` con `franjas`; filtro `caracter` en materias; `consolidado-asistencia/opciones` para coordinador y decano; `estado` del período calculado por `uv_periodo_academico` (PLANEACION, ACTIVO, CERRADO); totales con `totalElementos`.
+  - **W2B (estudiante; BD 145, Backend 171, Frontend 146):** `GET /estudiante/materias/resumen` (materias, en riesgo, horas de falta y créditos desde la base); sesiones del estudiante ordenadas y paginadas en servidor.
+  - **W3M (matriz del docente; BD 144, Backend 170, Frontend 144):** `GET /docente/grupos/{grupoId}/matriz-asistencia` y `.../resumen-sesiones`; el estado de cada sesión se decide en la base con el reloj del servidor (UTC).
+  - **W3I (indicadores; BD 146, Backend 172, Frontend 145):** los totales de portada de administrador, decano, coordinador y docente (`GET /docente/resumen-grupos`) y el nivel de permanencia (`codigoPermanencia`, `codigoPermanenciaActual`) vienen del servidor con `ufn_clasificar_permanencia`; el cliente distingue "cargando" de "sin datos".
+- **Sin mover, declarado por los paquetes:** ver TD-119 (restos menores en el cliente), TD-113 (textos y rótulos), TD-114 (código sin uso) y TD-117 (F-DOC-03). La diferencia de definición de las cifras de pérdida pasó a TD-116.
 
 ## TD-108
 
@@ -1378,8 +1406,9 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Bajo en la demostración; en producción, recargas innecesarias o un `index.html` viejo tras un despliegue.
 - **Evidencia:** `GestioAsistenciaFrontend/nginx/templates/default.conf.template`.
 - **Resolución esperada:** `no-cache` para `index.html` y caché larga e inmutable para los assets con hash.
-- **Bloquea línea base:** no; requisito de producción (menor).
-- **Estado:** ABIERTA.
+- **Bloquea línea base:** no.
+- **Estado:** **CERRADA (2026-11-17), Frontend PR 140.**
+- **Evidencia de cierre (comprobada en `develop` del frontend el 2026-11-17):** `nginx/templates/default.conf.template`: `location = /index.html` con `Cache-Control "no-cache"` (líneas 46-47) y un `location` para los assets con hash (`js`, `css`, fuentes) con `Cache-Control "public, max-age=31536000, immutable"` (líneas 55-56); `/assets/env.js` conserva `no-store` (línea 38).
 
 ## TD-110
 
@@ -1390,3 +1419,133 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Resolución esperada:** si la universidad lo exige, una nueva decisión con cambio de los contratos congelados y de la configuración de Security Baseline.
 - **Bloquea línea base:** no.
 - **Estado:** DIFERIDA A PRODUCCIÓN.
+
+## TD-111
+
+- **Origen:** gates de BD de los paquetes W1B, W2B y otros del cierre del 2026-11-16/17.
+- **Descripción:** dos pruebas de la suite de BD fallaron una vez y pasaron al repetir sin cambios, en tres paquetes distintos, sin relación con lo que cada paquete cambiaba: `CULM001_D3_13` (consulta de parámetros; el reporte del cierre la atribuye a un empate de marcas de tiempo) y `LB004D_W2_ATTACH_STATE_UTC` (comparación de marcas de tiempo; el VALIDATION de CIERRE-W2B anota que "paso al repetir sin cambios").
+- **Impacto:** Bajo-medio: una compuerta de CI roja intermitente que obliga a repetir y puede ocultar una falla real. Relacionada con TD-085 (otra falla intermitente del mismo pipeline).
+- **Evidencia:** `GestioAsistenciaDB/test/test_culm001_d3_parametros.sql` (aserciones `CULM001_D3_13`, líneas 318-322) y `test/test_lb004d_support_binding.sql` (línea 288, `W2_ATTACH_STATE_UTC`); `GestioAsistenciaBackend/docs/work-items/CIERRE-W2B-estudiante-resumen/VALIDATION.md` (última línea). La causa exacta no se analizó en esta revisión documental.
+- **Resolución esperada:** hacer deterministas las comparaciones de tiempo (instante fijo del fixture o tolerancia explícita y justificada en el contrato de la prueba); no relajar la aserción para que pase (regla de integridad de pruebas de `AGENTS.md`).
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-112
+
+- **Origen:** recorrido de los paquetes del cierre, 2026-11-16/17.
+- **Descripción:** el simulador del frontend (`mock-backend.interceptor`, solo laboratorio) diverge del backend real: (1) no atiende `GET /api/v2/sesiones/grupo/{id}` (el servicio de sesiones v2 la pide), de modo que cae en la respuesta por defecto del simulador (501 `MOCK_ROUTE_NOT_IMPLEMENTED`) al elegir un grupo, y la matriz simulada sale sin sesiones (`sesiones: []`, `celdas: []`); (2) los reclamos simulados no traen `grupoId`, así que el filtro por grupo del listado de reclamos devuelve vacío; (3) el estado de matrícula sale `ACTIVO` en el padrón simulado y `A` en las rutas nuevas (matriz y resumen).
+- **Impacto:** Bajo (solo laboratorio con `USE_MOCKS=true` y `ALLOW_MOCKS=true`). Relacionada con TD-106.
+- **Evidencia:** `GestioAsistenciaFrontend/src/app/core/interceptors/mock-backend.interceptor.ts` (respuesta 501 por defecto en las líneas ~1105-1112; el padrón copia `e.estadoMatricula`, líneas 116-117, mientras `codigoMatriculaMock` mapea `ACTIVO` a `A`, líneas 94-96, y la matriz declara que no simula sesiones, líneas 779-780; el filtro `grupoId` de reclamos está en la línea 760); `core/services/session-v2.service.ts:44` (la ruta v2 que el simulador no atiende); `core/mocks/role-management.mock.ts` (`MOCK_SOLICITUDES_REVISION` sin campo `grupoId`). El 501 al elegir un grupo es lo observado en el recorrido; esta revisión lo dedujo de la lectura del código y no lo reprodujo.
+- **Resolución esperada:** completar el simulador con las rutas y los códigos del backend real, o retirarlo del build de producción (TD-106).
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-113
+
+- **Origen:** paquetes W3M y W3I (declarado como fuera de alcance).
+- **Descripción:** hay textos de interfaz literales fuera del catálogo de mensajes y rótulos de período escritos a mano: "Ningún estudiante del grupo coincide con la búsqueda." en la planilla y en la lista de estudiantes del docente, y "Semestre 2026-II" en los tableros del docente y del estudiante.
+- **Impacto:** Bajo. El texto no cambia con el catálogo (SSOT de mensajes) y el rótulo del período queda desactualizado al cambiar de semestre.
+- **Evidencia:** `GestioAsistenciaFrontend/src/app/features/teacher/teacher-grupos/components/teacher-grupo-sabana.component.ts:111` y `teacher-grupo-estudiantes.component.ts:44`; `features/dashboard/overview/components/overview-teacher.component.ts:30` y `overview-student.component.ts:30`; ninguno figura en `core/messages/mensajes-ui.ts`. `GestioAsistenciaBackend/docs/work-items/CIERRE-W3I-indicadores/PLAN.md` (sección "Fuera de alcance") reporta los rótulos de período escritos a mano.
+- **Resolución esperada:** códigos nuevos en `MENSAJES_UI` (y en el catálogo de MessageUcoLab) y el nombre del período tomado del servidor.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-114
+
+- **Origen:** paquetes W2A, W3M y W1B.
+- **Descripción:** tras el cierre quedó código del frontend sin llamadores en la aplicación (solo en pruebas): `CourseService.getDeanCourses` y `CoordinatorManagementService.getEstudiantesDirectorio` (descarga todas las páginas); y `GroupService.getStudentsByGroup` y `StudentService.getStudentsByGroup` duplican la misma responsabilidad (la primera la usa `attendance-control`, la segunda `teacher-grupos`).
+- **Impacto:** Bajo: confusión y riesgo de reintroducir lectura sin paginar.
+- **Evidencia:** `GestioAsistenciaFrontend/src/app/core/services/course.service.ts:70`, `coordinator-management.service.ts:569`, `group.service.ts:45` y `student.service.ts:87`; búsqueda de llamadores sobre `src/app` (solo `getDeanCoursesPage` y `getEstudiantesDirectorioPagina` se usan).
+- **Resolución esperada:** eliminar los dos métodos sin uso y unificar los dos `getStudentsByGroup` en un servicio.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-115
+
+- **Origen:** CIERRE-W1B (`CONTRACT.md`, sección 5).
+- **Descripción:** `usp_validar_permiso_rbac_usuario_interno` ya no acepta subcadenas: compara el perfil por código (`AD`, `DE`, `CD`, `DO`, `ES`) o por el nombre completo exacto, sin distinguir mayúsculas, y descarta los elementos vacíos de la lista. Unos 120 llamadores (cifra del contrato) pasan el nombre (`'DOCENTE'`); solo `usp_resolver_revision_cancelacion` pasa el código. Migrarlos a códigos es deuda opcional. Se relaciona con los perfiles y estados literales en SP y vistas (por ejemplo, `estado` de `uv_periodo_academico`, con `PLANEACION`, `ACTIVO` y `CERRADO` escritos en la vista como los códigos de `uv_grupo`).
+- **Impacto:** Bajo: funciona y es exacto; el costo es de coherencia con la regla de cero datos quemados.
+- **Evidencia:** `GestioAsistenciaDB/schema/stored-procedures/usp_validar_permiso_rbac_usuario_interno.sql` (líneas 56-67: `STRING_SPLIT` y comparación exacta con `codigoPerfil` o `nombrePerfil`); `schema/views/uv_periodo_academico.sql` (líneas 20-22). Referencias a `usp_validar_permiso_rbac_usuario_interno` en 92 archivos de `schema/` (conteo propio del 2026-11-17).
+- **Resolución esperada:** si se decide, migrar los llamadores a códigos de perfil y resolver los estados contra catálogos; mientras tanto, mantener la comparación exacta.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-116
+
+- **Origen:** CIERRE-W3I (`CONTRACT.md`, sección 3).
+- **Descripción:** DECISION_REQUIRED. El consolidado de asistencia por grupo del decano cuenta MATRÍCULAS en pérdida (incluye canceladas por inasistencia y todos los períodos del filtro), y el indicador del decano cuenta PERSONAS con matrícula activa en el período vigente (decisión D3: la peor clasificación de cada persona). Caso observado: 958 frente a 675. No es un error: son dos definiciones intencionales. Un estudiante que pierde dos grupos suma 2 en la tabla y 1 en el indicador.
+- **Impacto:** Bajo-medio: dos cifras con rótulos parecidos pueden leerse como contradicción en la demostración.
+- **Evidencia:** `CIERRE-W3I-indicadores/CONTRACT.md` sección 3 y la prueba de BD `W3I_DIF_01_PERDIDA` (fixture con un estudiante que pierde dos grupos: consolidado 2, indicador 1 de 3).
+- **Resolución esperada:** decisión del responsable: unificar la definición o aclarar los rótulos de las dos cifras.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA — DECISION_REQUIRED.
+
+## TD-117
+
+- **Origen:** hallazgo F-DOC-03 del recorrido del 2026-11-15 (`FASE-2B-certificacion-integral/VALIDATION.md` del backend).
+- **Descripción:** DECISION_REQUIRED. El tablero del docente muestra las revisiones pendientes pero no enlaza directo a las decisiones de cancelación pendientes: viven en el hub de cada grupo ("Decisiones pendientes" dentro de Mis Grupos). Un enlace directo exige una pantalla global de decisiones del docente.
+- **Impacto:** Bajo: la función existe; es de descubrimiento.
+- **Evidencia:** F-DOC-03 en el VALIDATION citado; `GestioAsistenciaFrontend/src/app/features/teacher/teacher-grupos/components/teacher-grupo-decisiones.component.ts` (las decisiones son un componente del hub del grupo) y `app.routes.ts` (no hay ruta global de decisiones del docente; `docente/grupos`, `docente/horarios` y `docente/reclamos`).
+- **Resolución esperada:** decidir si se crea una pantalla global o se deja el recorrido por grupo.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA — DECISION_REQUIRED.
+
+## TD-118
+
+- **Origen:** FIX-CIERRE-001 de BD.
+- **Descripción:** `esResolutorActual` queda siempre en 0 en `usp_consultar_revisiones_cancelacion_docente_paginado`: la columna significa "es resolutor de esta revisión" (coordinador), el docente nunca resuelve (DEC-065) y el cliente del docente no la usa. Si se quisiera la semántica "quién debe actuar ahora", hay que decidirla; no se puede derivar del código.
+- **Impacto:** Bajo.
+- **Evidencia:** `GestioAsistenciaDB/schema/stored-procedures/usp_consultar_revisiones_cancelacion_docente_paginado.sql:95` (`esResolutorActual = CAST(0 AS BIT)`) y su comentario de cabecera; `GestioAsistenciaDB/docs/work-items/FIX-CIERRE-001-cierre-decano-acciones/VALIDATION.md`.
+- **Resolución esperada:** decisión de producto sobre la semántica (o retirar la columna del contrato del docente).
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA — DECISION_REQUIRED.
+
+## TD-119
+
+- **Origen:** declarado por los paquetes W3I, W1B y W3M como fuera de alcance o sin cambio.
+- **Descripción:** restos menores de lógica o de valores por defecto en el cliente: (1) `dean-programas` suma los créditos y asignaturas de un catálogo pequeño cargado completo página a página; (2) `admin-decanos` y `admin-facultades` filtran y cuentan en el cliente catálogos pequeños y completos; (3) los formularios de alta preseleccionan el primer tipo de identificación y usan `|| 'CC'` como respaldo; (4) las reglas de marcado masivo y la ventana de toma de asistencia viven en el cliente (el backend revalida).
+- **Impacto:** Bajo mientras los catálogos sigan pequeños; el valor por defecto `'CC'` puede mostrar un tipo de documento que el servidor no entregó.
+- **Evidencia:** `GestioAsistenciaFrontend/src/app/features/dean/dean-programas/dean-programas.component.ts:205`; `features/admin/admin-decanos/admin-decanos.component.ts:438` y `:595-596`; `features/admin/admin-facultades/admin-facultades.component.ts:63`; `core/services/admin-management.service.ts:144`, `dean-management.service.ts:76`, `shared/components/user-picker-modal/datos-persona-seleccionada.ts:35` y `features/coordinator/coordinator-docentes/components/coordinator-docente-form-modal.component.ts:62,161`; `core/utils/session-attendance-window.util.ts` y `session-selection.util.ts` (fuera de alcance de W3M, sección 6); `CIERRE-W3I-indicadores/PLAN.md` (decisión por pantalla).
+- **Resolución esperada:** mover los totales al SP si los catálogos crecen; sin valores por defecto de negocio en los formularios; decidir si la ventana de toma sale del cliente.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-120
+
+- **Origen:** revisión de código, 2026-11-17.
+- **Descripción:** el interceptor global de errores del frontend solo muestra aviso para 403 y para 5xx; los 400, 409 y 422 dependen de cada pantalla (los modales de alta se apoyan en el aviso flotante, cuya capa se corrigió en Frontend PR 140). Una pantalla nueva que no maneje esos códigos queda sin mensaje (el síntoma de los hallazgos F-COORD-02 y F-EST-02).
+- **Impacto:** Bajo-medio: riesgo de silencio ante rechazos del backend en pantallas nuevas.
+- **Evidencia:** `GestioAsistenciaFrontend/src/app/core/interceptors/error.interceptor.ts:20-29` (solo `FORBIDDEN` y `status >= 500`).
+- **Resolución esperada:** decidir una política común para 400/409/422 (aviso global con opt-out, como ya existe `BYPASS_GLOBAL_ERROR_TOAST`) o una regla de revisión por pantalla.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-121
+
+- **Origen:** CIERRE-W1B y regla HU136.
+- **Descripción:** `GET /api/v1/admin/docentes` devuelve por defecto solo docentes con vínculo activo en las facultades de la institución del administrador (regla HU136). Un docente que nunca tuvo vínculo con un programa no aparece en el selector del administrador (por ejemplo, para nombrarlo decano).
+- **Impacto:** Bajo: comportamiento definido, pero puede sorprender en una demostración.
+- **Evidencia:** `GestioAsistenciaBackend/infra/security-baseline/access-catalog.json:31` ("HU136: docentes con vinculo activo en las facultades de la institucion del administrador") y `CIERRE-W1B-directorios-ambito/CONTRACT.md` sección 1.
+- **Resolución esperada:** decidir si el administrador necesita ver también docentes sin vínculo (parámetro o ruta aparte).
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-122
+
+- **Origen:** verificación de solo lectura por rol del 2026-11-17.
+- **Descripción:** `scripts/tests/verificar_datos_prueba.py` dio 26 de 28 contra el laboratorio real. Las dos diferencias son de CONTEO, no de permisos: coordinadores de Ingeniería 9 frente a 4 esperados y estudiantes de Sistemas 10 frente a 8. La causa son 14 cuentas de prueba creadas después de cargar el conjunto de datos: `culm1-e2e-*`, `PAULA PASAPORTE`, `VALENTINA PRERREGISTRO PRUEBA`, `LAURA ACTIVACION` y `TEST HOY`. Las otras 20 rutas nuevas de los paquetes dieron correctas por rol.
+- **Impacto:** Bajo: usar ese script como compuerta sin limpiar da falsos rojos; el guion de pruebas manuales lo advierte.
+- **Evidencia:** `scripts/tests/verificar_datos_prueba.py` (casos "Ingeniería: coordinadores de su facultad" con 4 esperados y "Sistemas: sus 8 estudiantes" con 8 esperados); la medición la hizo la sesión de cierre contra el laboratorio (no se repitió en esta revisión documental).
+- **Resolución esperada:** eliminar esas cuentas o recargar la base con `infra.ps1 datos-prueba cargar -Yes` antes de usar el script como compuerta.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-123
+
+- **Origen:** incidente operativo del 2026-11-16 (nota, no deuda de código).
+- **Descripción:** un contenedor desechable de pruebas montó por error el volumen `asistencias-minio-data` del laboratorio. Se eliminó ese contenedor y el servicio quedó sano, con el bucket `asistencias-soportes` (22 archivos), pero no hubo un conteo previo contra el cual comparar, así que no se puede afirmar que no se perdió ni se modificó ningún objeto.
+- **Impacto:** Bajo (laboratorio; los soportes de prueba se pueden recrear).
+- **Evidencia:** reporte de la sesión de cierre; sin conteo previo.
+- **Resolución esperada:** conservar el conteo de objetos antes de operar sobre volúmenes del laboratorio; no montar volúmenes con nombre en contenedores desechables.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING (verificación pendiente).
