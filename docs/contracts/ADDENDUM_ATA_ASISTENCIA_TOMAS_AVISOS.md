@@ -168,3 +168,55 @@ sin cambios de comportamiento. Las pruebas que esperaban TOM_003 se actualizan p
 ### I.4 Verificación
 Igual que G, más la simulación de laboratorio (`scratch/reloj-sesion.ps1`): 4 tomas manuales cada 30 min sin cerrar a
 mano ⇒ cada "Nueva toma" cierra la anterior con faltas a los sin marca, y el cierre automático cierra la última.
+
+## J. D10 — Faltas por reclamar en la plataforma (2026-11-18, sesión 1b)
+
+Decisión del usuario (2026-11-18): además del correo de D1, el estudiante ve en la plataforma las tomas en falta que aún
+puede reclamar. Sin bandeja de notificaciones ni estado leído/no leído: la lista se vacía sola cuando el estudiante radica
+el reclamo, vence el plazo o el docente corrige la marca. Aparece en el mismo momento en que sale el correo (sesión con
+fila en `AvisoFaltaSesion`).
+
+### J.1 Base de datos
+| Objeto | Definición |
+| :--- | :--- |
+| Vista `uv_falta_reclamable_estudiante` (nueva) | Una fila por (matrícula activa, toma reclamable) de sesiones ya avisadas: `uv_asistencia_toma_estudiante` con `esReclamable = 1` ∩ `AvisoFaltaSesion` ∩ matrícula en estado `MATRICULA/ESTADO_INSCRITA`. Columnas: `idUsuarioEstudiante, idEstudianteGrupo, idGrupo, nombreGrupo, idAsignatura, nombreAsignatura, idSesion, numeroSesion, fechaHoraInicioUtc, fechaHoraFinUtc, idToma, numeroToma, fechaPuntoControlUtc, fechaLimiteReclamoUtc` (`ufn_calcular_fecha_limite_justificacion` sobre el fin de la sesión, el mismo criterio de `esReclamable`). Sin literales nuevos. |
+| `usp_consultar_faltas_reclamables_estudiante (@idUsuarioEjecutor, @idCorrelacion, @numeroPagina INT = 1, @tamanoPagina INT = 20)` (nuevo) | READ_QUERY_RESULTSET paginado con el patrón de `usp_consultar_alertas_estudiante` (THROW 51000: correlación, `idUsuarioEjecutor` GEN_002, RBAC ESTUDIANTE, PAG_001). Solo filas del propio usuario. Columnas de la vista sin `idUsuarioEstudiante` + `totalRegistros` (`COUNT(*) OVER()`). Orden `fechaHoraFinUtc DESC, numeroToma ASC`. GRANT al rol de la aplicación como los demás SP de consulta. |
+| `usp_consultar_faltas_sesion_aviso` | Sin cambios (ya devuelve `idUsuarioEstudiante` para los destinatarios del evento). |
+| Migración `54_ata_faltas_reclamables_estudiante` (up/down) | Crea/elimina la vista y el SP; marcadores en `scripts/migrar-marcadores.json`; manifiesto post-freeze. |
+
+Pruebas BD: estudiante con SJC en tomas 1 y 3 de una sesión avisada ⇒ 2 filas; antes de registrar el aviso ⇒ 0; con
+reclamo radicado de la toma 1 ⇒ solo la toma 3; con reclamo retirado ⇒ vuelve la toma; plazo vencido ⇒ 0; marca
+corregida a AN ⇒ desaparece; matrícula cancelada ⇒ 0; otro estudiante no ve filas ajenas; usuario sin perfil ESTUDIANTE ⇒
+THROW; paginación con `totalRegistros`.
+
+### J.2 Backend
+- `GET /api/v1/estudiante/faltas-reclamables?numeroPagina=&tamanoPagina=` (rol ESTUDIANTE, fuera del Golden Path) →
+  `ApiPageResponse<FaltaReclamableResponse>` con `{ idGrupo, nombreGrupo, idAsignatura, nombreAsignatura, idSesion,
+  numeroSesion, fechaHoraInicioUtc, fechaHoraFinUtc, idToma, numeroToma, fechaPuntoControlUtc, fechaLimiteReclamoUtc }`.
+  Flujo Controller → PrimaryPort → UseCase → SecondaryPort → adaptador JPA que invoca el SP. Alta en
+  `access-catalog.json` y `HTTP_AS_IS_MATRIX.md`.
+- Evento SSE nuevo `FALTA_SESION_AVISADA`, payload `{ grupo, sesion }` (sin nombres, tomas ni correos), audiencia
+  `DESTINATARIO` = `idUsuarioEstudiante` de los estudiantes a los que `AvisarFaltasSesionUseCase` envió el correo. Se
+  publica tras registrar la marca de la sesión (`usp_registrar_aviso_falta_sesion` exitoso), de mejor esfuerzo; un fallo del
+  evento no revierte la marca ni el correo. Se agrega a `RealtimeAudienciaPolicy` y a `REALTIME_EVENT_CONTRACT.md` por
+  este addendum.
+- Pruebas: unitarias del caso de uso y del controlador, `SqlStoredProcedureContractIT` del SP nuevo, IT del adaptador, y
+  del caso de uso de aviso (el evento sale con los destinatarios avisados; no sale si no se registró la marca).
+
+### J.3 Frontend
+- **Mis Alertas de Asistencia** (`/app/estudiante/alertas`): sección **"Faltas por reclamar"** antes de las alertas de
+  porcentaje, alimentada por el endpoint de J.2. Una tarjeta por sesión (materia, grupo, fecha y horario en hora
+  institucional, fecha límite) con una fila por toma ("Toma N · HH:mm") y el botón **"Reclamar esta toma"**, que lleva al
+  detalle de la materia (`/app/estudiante/mis-materias/materias?materia={idAsignatura}&grupo={idGrupo}`) donde ya se radica
+  el reclamo. Sin faltas: la sección no se muestra (el estado vacío de alertas se mantiene).
+- **Contador del menú:** el número junto a "Mis alertas" suma las alertas vigentes y las faltas reclamables
+  (`totalElementos` del endpoint).
+- **Recarga sin polling:** la sección y el contador se recargan al recibir `FALTA_SESION_AVISADA` o
+  `ASISTENCIAS_TOMA_ACTUALIZADAS`, y al volver de radicar un reclamo.
+- Simulador: atender `GET /estudiante/faltas-reclamables`. Pruebas: specs de la sección, del contador y de la recarga por
+  evento.
+
+### J.4 Verificación
+Igual que G, más laboratorio: con la sesión de prueba ya avisada, el estudiante con faltas ve el contador y la sección; al
+radicar el reclamo de una toma esa toma sale de la lista; con `scratch/reloj-sesion.ps1` una sesión nueva que termina
+hace subir el contador sin recargar la página.
