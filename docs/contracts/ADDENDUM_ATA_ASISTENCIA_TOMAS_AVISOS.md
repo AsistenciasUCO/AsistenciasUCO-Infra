@@ -122,3 +122,49 @@ segunda pasada no repite; sesión de hace > 24 h no se avisa).
   solo en `usp_consultar_tomas_sesion`.
 - D1: si `SMTP_NOTIFICATION_PLATFORM_URL` está vacía, `enlaceReclamo` se rellena con "la plataforma de asistencia". Si
   fallan todos los envíos de una sesión, no se marca y se reintenta en la siguiente pasada.
+
+## I. D9 — Nueva toma cierra la anterior y el grupo sin modo "Hoy" (2026-11-18, sesión 1b)
+
+Decisiones del usuario (2026-11-18): (1) quien quede sin marca al cerrarse una toma queda con falta — **ya vigente**: el
+seed `35_catalogos_toma_asistencia.sql` deja `marcaAusentesAlCerrar = 1` en MANUAL y QR, así que el cierre manual con
+`@marcarAusentes = NULL` y `usp_cerrar_tomas_vencidas` marcan SJC; solo se corrige el comentario desactualizado de la
+cabecera de `usp_cerrar_toma_asistencia` ("MANUAL 0"). (2) "Nueva toma" con una toma abierta la cierra sola, en el
+servidor y en la misma transacción. (3) El texto del recordatorio de cierre ya es correcto. (4) Se retira el modo "Hoy"
+del grupo del docente y "Padrón y retiros" abre directo la matrícula.
+
+### I.1 Base de datos
+| Objeto | Cambio |
+| :--- | :--- |
+| `usp_internal_cerrar_toma` (nuevo, interno, sin GRANT) | Extrae de `usp_cerrar_toma_asistencia` el cierre de una toma ya bloqueada: si `@marcarAusentes` (NULL ⇒ `ModoTomaAsistencia.marcaAusentesAlCerrar`) y la ventana de la sesión sigue abierta, marca SJC con `usp_internal_marcar_ausentes_toma`; cierra el token QR activo; pone estado CERRADA, `fechaCierreUtc`, `idCorrelacionCierre`, `totalAusentesMarcados`. Devuelve por OUTPUT `@totalAusentesMarcados` y `@fechaCierreUtc`. Sin transacción propia (la gobierna el llamador). `usp_cerrar_toma_asistencia` pasa a usarlo sin cambiar firma, resultset ni mensajes. |
+| `usp_abrir_toma_asistencia` | Orden de validación: titularidad → modo → ventana → **máximo de tomas (TOM_004, sin cerrar nada)** → si hay toma abierta, la cierra con `usp_internal_cerrar_toma` (`@marcarAusentes = NULL`, mismo `@idCorrelacion`) y continúa → inserta la nueva. **TOM_003 deja de emitirse** (se conserva en el catálogo). Todo en la misma transacción; si algo falla no se cierra la anterior. Resultset: mismas columnas y orden + al final `idTomaCerradaAnterior UNIQUEIDENTIFIER NULL`, `numeroTomaCerradaAnterior SMALLINT NULL`, `totalAusentesMarcadosAnterior INT NULL` (NULL si no había toma abierta o si `estadoResultado = 0`). |
+| Migración `53_ata_nueva_toma_cierra_anterior` (up/down) | Crea/elimina `usp_internal_cerrar_toma` y recompila los dos SP; marcadores en `scripts/migrar-marcadores.json`; manifiesto post-freeze. |
+
+Pruebas BD: abrir con toma abierta ⇒ la anterior queda CERRADA con SJC a los sin marca y la nueva ABIERTA (numero + 1);
+con 20 tomas y una abierta ⇒ TOM_004 y la abierta sigue abierta; sin toma abierta ⇒ columnas nuevas NULL; cierre manual
+sin cambios de comportamiento. Las pruebas que esperaban TOM_003 se actualizan por este addendum.
+
+### I.2 Backend
+- `POST /api/v1/sesiones/{sesionId}/tomas` (sin cambio de ruta ni de petición): `TomaAsistenciaResponse` gana el campo
+  aditivo `tomaCerradaAnterior` (`{ idToma, numero, totalAusentesMarcados }` o `null`).
+- Si se cerró una anterior, tras el commit se emiten, en este orden, `TOMA_CERRADA` (payload vigente, `automatico =
+  false`, `totalFaltantes` de la toma cerrada si el puerto ya lo provee; si no, se omite como en el cierre automático) y
+  `ASISTENCIAS_TOMA_ACTUALIZADAS` de la anterior, y luego `TOMA_ABIERTA` de la nueva. Sin cambio del
+  `REALTIME_EVENT_CONTRACT`.
+- `SqlStoredProcedureContractIT` con las tres columnas nuevas; pruebas unitarias del caso de uso y del controlador.
+
+### I.3 Frontend
+- **Nueva toma:** habilitada aunque haya una toma abierta (se retira "Hay una toma abierta; ciérrala para abrir otra.").
+  Con una toma abierta, el botón pide confirmación: "Se cerrará la toma {n}: quien no tenga marca quedará con falta.
+  Podrás corregirla hasta que termine la sesión." Si la toma abierta tiene cambios sin guardar, el diálogo lo dice y no
+  deja confirmar hasta guardarlos o descartarlos. Tras abrir, el aviso de éxito usa `tomaCerradaAnterior` del servidor
+  ("Se cerró la toma {n} ({k} ausentes) y se abrió la toma {n+1}").
+- **Grupo del docente (Mis Grupos):** se retira el modo "Hoy" (y su conmutador Hoy/Grupo); el grupo abre en "Planilla".
+  Las decisiones por inasistencia se mantienen. Si el encabezado del grupo no tiene acceso a la toma, se agrega la acción
+  primaria "Tomar asistencia" (lleva a `/app/asistencia?courseId=…`).
+- **"Padrón y retiros"** (menú "Más" de Tomar Asistencia) navega a `/app/docente/grupos?grupo={id}&pestana=ESTUDIANTES`
+  y el grupo abre en la pestaña "Matrícula". Un valor de `pestana` desconocido abre "Planilla".
+- Pruebas: specs del panel/diálogo de nueva toma, del hub sin modo Hoy y de la navegación con `pestana`.
+
+### I.4 Verificación
+Igual que G, más la simulación de laboratorio (`scratch/reloj-sesion.ps1`): 4 tomas manuales cada 30 min sin cerrar a
+mano ⇒ cada "Nueva toma" cierra la anterior con faltas a los sin marca, y el cierre automático cierra la última.
