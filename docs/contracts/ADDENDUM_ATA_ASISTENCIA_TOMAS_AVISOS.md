@@ -220,3 +220,32 @@ THROW; paginación con `totalRegistros`.
 Igual que G, más laboratorio: con la sesión de prueba ya avisada, el estudiante con faltas ve el contador y la sección; al
 radicar el reclamo de una toma esa toma sale de la lista; con `scratch/reloj-sesion.ps1` una sesión nueva que termina
 hace subir el contador sin recargar la página.
+
+## K. D11 — Retiro de la oferta de grupos del estudiante (HU008 descartada, 2026-11-18)
+
+Decisión del usuario (2026-11-18): el sistema solo gestiona asistencia. La inscripción a grupos la gestiona otro sistema;
+el estudiante solo se matricula por QR/PIN del docente (HU176B) o lo matricula el docente (HU050). La consulta de oferta
+de grupos y cupos del estudiante (HU008) se retira **en las tres capas**. "Plan de estudios" del estudiante **se
+conserva**. La oferta del docente para crear grupos (`usp_consultar_oferta_creacion_grupo_docente`) no se toca.
+
+### K.1 Base de datos
+| Objeto | Cambio |
+| :--- | :--- |
+| `usp_consultar_oferta_grupos_estudiante` | Se elimina (archivo del esquema, GRANT de `rol_asistencias_runtime_hu008.sql`, entradas de manifiestos y pruebas que lo ejercen; las pruebas que solo lo usaban se retiran por este addendum). |
+| Parámetro `OFERTA/INCLUIR_TRANSVERSALES` | Se retira del seed (`24_parametro_oferta_grupos.sql`) y de `CatalogoParametro`: solo lo usaba ese SP. Si otro objeto lo usa, se conserva y se informa. |
+| Migración `55_ata_retiro_oferta_grupos_estudiante` (up/down) | Up: `DROP PROCEDURE IF EXISTS` y borrado del parámetro. Down: recrea el SP en su última versión y el parámetro. Marcadores en `scripts/migrar-marcadores.json`; manifiesto post-freeze. |
+
+### K.2 Backend
+- Se retira `GET /api/v1/estudiante/oferta-academica`: controlador `EstudianteOfertaAcademicaController`, feature
+  `application/features/estudiante/consultarofertagrupos`, puerto `OfertaGruposEstudianteQueryPort`, proyecciones
+  `GrupoOfertaEstudianteProjection` y `OfertaGruposEstudiantePagina`, repositorio `OfertaGruposEstudianteJpaRepository`
+  y su adaptador, cableado y pruebas propias. Alta de baja en `access-catalog.json`, `HTTP_AS_IS_MATRIX.md`,
+  `SqlStoredProcedureContractIT`, `JpaRepositoryBeanUniquenessTest` (conteo) y matriz HU. Sin cambios del Golden Path.
+
+### K.3 Frontend
+- Se retira la pestaña "Oferta de grupos" de Mis Materias (`/app/estudiante/mis-materias/oferta`) y el redirect
+  `/app/estudiante/oferta`; ambas rutas llevan a "Materias". Se eliminan `StudentGroupOfferComponent`,
+  `OfertaAcademicaService`, su simulación y sus pruebas, y cualquier enlace a la oferta.
+
+### K.4 Catálogo de HU
+HU008 pasa a `[DESCARTADA]` ("el sistema solo gestiona asistencia; la inscripción la gestiona otro sistema").
