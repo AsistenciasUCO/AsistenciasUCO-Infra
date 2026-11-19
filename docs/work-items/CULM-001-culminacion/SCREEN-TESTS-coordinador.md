@@ -9,7 +9,7 @@ Usuario: `uco-coordinador` (Ingenieria de Sistemas). Clave: documento de credenc
 3. `/app/coordinador/docentes`: lista paginada (1 docente: Maria Elena Rostagno Valencia), contadores por estado/tipo (HU095). Red: `GET /coordinador/docentes`, `/docentes/resumen`. [M]
 4. Buscar por cedula (`1017112233`) y por nombre; buscar "Dos" (docente ajeno) -> 0 resultados, estado vacio legible.
 5. Ficha del docente (HU094): historial de grupos y carga; cerrar con Esc y con el boton; foco vuelve al disparador (a11y). [M]
-6. Alta de docente (HU091): modal; enviar vacio -> mensajes del backend; crear persona nueva `CULM1-Docente` con tipo de vinculacion (HU090, lista controlada). Esperado toast del backend. Verificar luego en lista.
+6. Alta de docente (HU091): modal; enviar vacio -> mensajes del backend; crear persona nueva `CULM1-Docente` (el tipo de vinculacion, HU090, se retiro el 2026-11-18: ya no se pide). Esperado toast del backend. Verificar luego en lista.
 7. Editar docente (HU092) incluyendo correccion de documento con motivo; activar/inactivar con confirmacion (HU093). Esperado: estado actualizado sin recargar manual.
 
 ## Planes, malla y asignaturas (HU071, HU073-HU075, HU079-HU087)

@@ -9,7 +9,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## Resumen General
 
-- **Total de Endpoints Protegidos:** 195
+- **Total de Endpoints Protegidos:** 194
 - **Total de Endpoints Exentos (PÃºblicos / Webhook):** 5
 - **Roles Definidos:** ADMINISTRADOR, DECANO, COORDINADOR, DOCENTE, ESTUDIANTE
 
@@ -25,7 +25,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## CatÃ¡logo de Rutas por Rol
 
-### Rol: ADMINISTRADOR (70)
+### Rol: ADMINISTRADOR (69)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -97,10 +97,9 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/sesiones/{sesionId}` | AUTHENTICATED | Docente titular, estudiante matriculado, coordinador del programa o decano de la facultad del grupo de la sesion (Application, InstitutionalScopePort); cualquier otro solicitante recibe 403. |
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
-| `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: DECANO (48)
+### Rol: DECANO (47)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -150,10 +149,9 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/sesiones/{sesionId}` | AUTHENTICATED | Docente titular, estudiante matriculado, coordinador del programa o decano de la facultad del grupo de la sesion (Application, InstitutionalScopePort); cualquier otro solicitante recibe 403. |
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
-| `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: COORDINADOR (70)
+### Rol: COORDINADOR (69)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -225,10 +223,9 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/sesiones/{sesionId}` | AUTHENTICATED | Docente titular, estudiante matriculado, coordinador del programa o decano de la facultad del grupo de la sesion (Application, InstitutionalScopePort); cualquier otro solicitante recibe 403. |
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
-| `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
-### Rol: DOCENTE (63)
+### Rol: DOCENTE (62)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -282,7 +279,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `POST` | `/api/v1/sesiones/grupo/{grupoId}/generacion` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort). |
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
-| `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tomas/{tomaId}/asistencias` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma (Application + SP). |
 | `POST` | `/api/v1/tomas/{tomaId}/asistencias` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma (Application + SP). |
 | `POST` | `/api/v1/tomas/{tomaId}/cierre` | ROLES | CULM-001 B.2: docente titular de la sesion de la toma (Application + SP). |
@@ -296,7 +292,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `PATCH` | `/api/v2/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 | `GET` | `/api/v2/sesiones/grupo/{grupoId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 
-### Rol: ESTUDIANTE (26)
+### Rol: ESTUDIANTE (25)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -324,7 +320,6 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/sesiones/{sesionId}` | AUTHENTICATED | Docente titular, estudiante matriculado, coordinador del programa o decano de la facultad del grupo de la sesion (Application, InstitutionalScopePort); cualquier otro solicitante recibe 403. |
 | `GET` | `/api/v1/tipos-identificacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/tipos-programa` | AUTHENTICATED | â€” |
-| `GET` | `/api/v1/tipos-vinculacion` | AUTHENTICATED | â€” |
 | `GET` | `/api/v1/usuarios/perfil` | AUTHENTICATED | Solo el perfil del usuario autenticado; el procedimiento almacenado lee el ejecutor. |
 
 ## Endpoints Exentos del PEP (PÃºblicos / IntegraciÃ³n)
