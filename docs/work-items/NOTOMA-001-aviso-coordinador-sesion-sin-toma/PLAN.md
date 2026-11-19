@@ -27,7 +27,7 @@ del scheduler + plantilla + outbox) sin inventar mecanismos nuevos.
 ## Reglas aplicadas
 
 - Sesion no cancelada (una solicitud rechazada ya queda cancelada), con procedencia temporal confirmada, sin solicitud pendiente de aprobacion.
-- `totalTomas = 0` y sin registros de asistencia (`DetalleAsistencia`) en la sesion.
+- `totalTomas = 0` (todo registro de asistencia cuelga de una toma: `DetalleAsistencia.toma` es NOT NULL).
 - `ventanaCierreUtc <= ahora` (fin + `ASISTENCIA/MARGEN_RETARDO_MINUTOS`) y no mas de `HORAS_MAXIMAS_ATRASO` horas despues (evita correos masivos al cargar datos).
 - Sin fila en `AvisoSesionSinToma`.
 - Destinatarios: coordinadores activos de TODOS los programas vigentes del grupo (`ufn_programas_grupo`), sin duplicar por persona, con usuario activo y correo.
