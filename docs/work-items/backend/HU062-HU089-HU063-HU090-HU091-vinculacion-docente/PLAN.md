@@ -8,6 +8,8 @@ last-reviewed: 2026-10-21
 
 # PLAN — HU062 / HU089 / HU063 / HU090 / HU091: Directorio, búsqueda y vinculación de docentes al programa (Rol Coordinador)
 
+> **HU090 RETIRADA (2026-11-18):** por orden de John y reporte de Sergio (MEJORAS-SERGIO-2026-11-18) el sistema no administra el tipo de vinculacion del docente; se retiraron el catalogo `TipoVinculacion`, `GET /api/v1/tipos-vinculacion` y el campo `idTipoVinculacion` (migracion BD 50). Lo que este documento dice de HU090 queda como historial.
+
 Fase 01: Planificación y Definition of Ready (DoR), según `GUIA_METODICA_IMPLEMENTACION_HU.md`, `HOJA_DE_RUTA_JERARQUIA_ROLES.md`, `docs/governance/DEFINITION_OF_READY.md` y `AGENTS.md`.
 Programa padre: [`REG-000`](../REG-000-programa-registro-vinculacion-roles/PLAN.md), grupo **B**. Depende de: grupo **A** (`HU076-HU077-HU078`, el programa debe existir con su coordinador).
 

@@ -8,6 +8,8 @@ last-reviewed: 2026-10-21
 
 # TEST_PLAN — HU062 / HU089 / HU063 / HU090 / HU091: Vinculación de docentes al programa
 
+> **HU090 RETIRADA (2026-11-18):** por orden de John y reporte de Sergio (MEJORAS-SERGIO-2026-11-18) el sistema no administra el tipo de vinculacion del docente; se retiraron el catalogo `TipoVinculacion`, `GET /api/v1/tipos-vinculacion` y el campo `idTipoVinculacion` (migracion BD 50). Lo que este documento dice de HU090 queda como historial.
+
 **Estado:** `RED_PLANNED` (borrador). Las pruebas se escriben en la fase 03, en orden DB → Backend → Frontend, en ramas `feature/HU091-vinculacion-docente` creadas desde `develop` después del merge de HU035/036 y del cierre del grupo A.
 
 ## Fuentes
