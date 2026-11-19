@@ -14,12 +14,12 @@ Una fila = sesion ya avisada. Sin permisos directos al rol runtime; solo la escr
 `HABILITADO` BOOLEAN `true`; `LOTE` INT `50`; `HORAS_MAXIMAS_ATRASO` INT `24`. Con `HABILITADO = false` el SP de pendientes devuelve 0 filas.
 
 ### `usp_consultar_sesiones_pendientes_aviso_sin_toma (@idCorrelacion, @tamanoLote = NULL)`
-Comando de sistema (sin usuario). Resultset: `idSesion`, `idGrupo`, `fechaHoraFinUtc`; orden fin, id. Reglas del PLAN. Lote: `@tamanoLote` o `LOTE`.
+Comando de sistema (sin usuario). Resultset: `idSesion`, `idGrupo`, `fechaHoraFinUtc`; orden fin, id. Reglas del PLAN, incluida la exclusion (sin marca) de grupos sin estudiantes activos y de docente con usuario inactivo. Lote: `@tamanoLote` o `LOTE`.
 
 ### `usp_consultar_destinatarios_aviso_sin_toma (@idSesion, @idCorrelacion)`
 Comando de sistema. Una fila por coordinador destinatario (sin duplicar por persona): `idSesion`, `idGrupo`, `idAsignatura`, `nombreAsignatura`,
 `nombreGrupo`, `nombreDocente`, `fechaHoraInicioUtc`, `fechaHoraFinUtc`, `idUsuarioCoordinador`, `nombreCoordinador`, `correoCoordinador`.
-Devuelve 0 filas si la sesion no existe, esta cancelada o tiene alguna toma. El correo es de uso interno del `NotificacionPort`.
+Devuelve 0 filas si la sesion no existe, esta cancelada o tiene alguna toma. No repite la exclusion por estudiantes o docente: esa decision es solo del SP de pendientes (asi un cambio entre ambas llamadas no marca la sesion con 0 por esa causa). El correo es de uso interno del `NotificacionPort`.
 
 ### `usp_registrar_aviso_sesion_sin_toma (@idSesion, @totalCoordinadoresAvisados, @idCorrelacion)`
 Tupla canonica (`idCorrelacion`, `mensajeUsuarioResultado`, `mensajeTecnicoResultado`, `estadoResultado`). Transaccional e idempotente (`UPDLOCK, HOLDLOCK`);
@@ -41,9 +41,10 @@ Cuerpo: `Hola {coordinador}. El docente {docente} no tomó asistencia en la sesi
 - Paso nuevo del scheduler tras el aviso de faltas; nunca propaga excepciones; correlacion propia por pasada.
 - `enlaceSesiones` = `<platform-url>/app/coordinador/asistencia`; sin URL configurada se nombra la plataforma sin enlace (igual que el aviso de falta).
 
-## Decisiones abiertas para el dueno del producto
+## Decisiones del usuario (2026-11-19)
 
-1. Momento del aviso: al vencer la ventana de cierre (fin + margen), como el aviso de faltas. Alternativa: al terminar la hora de fin.
-2. Decano: no se avisa (la regla pedida es solo coordinacion).
-3. Grupos compartidos: se avisa a los coordinadores de cada programa vigente del grupo, una vez por persona.
-4. Evento realtime: no se publica ninguno.
+1. Momento del aviso: al vencer la ventana de cierre (fin + margen).
+2. Destinatarios: solo coordinadores; no se avisa al decano.
+3. Un correo por coordinador; grupos compartidos: coordinadores de cada programa vigente, una vez por persona.
+4. Exclusion: no se avisan las sesiones de grupos sin estudiantes activos (matricula activa y usuario activo) ni las de docente titular con usuario inactivo. Se decide NO marcarlas (solo no seleccionarlas): si dentro de `HORAS_MAXIMAS_ATRASO` el grupo recibe estudiantes o el docente se reactiva, se avisa; pasado ese plazo la sesion ya no se avisa.
+5. Sin evento realtime.

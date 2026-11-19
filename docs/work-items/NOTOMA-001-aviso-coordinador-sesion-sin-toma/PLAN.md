@@ -30,9 +30,15 @@ del scheduler + plantilla + outbox) sin inventar mecanismos nuevos.
 - `totalTomas = 0` (todo registro de asistencia cuelga de una toma: `DetalleAsistencia.toma` es NOT NULL).
 - `ventanaCierreUtc <= ahora` (fin + `ASISTENCIA/MARGEN_RETARDO_MINUTOS`) y no mas de `HORAS_MAXIMAS_ATRASO` horas despues (evita correos masivos al cargar datos).
 - Sin fila en `AvisoSesionSinToma`.
+- Decision 2026-11-19: se EXCLUYEN los grupos sin estudiantes activos (matricula `MATRICULA/ESTADO_INSCRITA` con usuario activo) y los de docente titular con usuario inactivo. Solo no se seleccionan, SIN crear marca: si el grupo recibe estudiantes o el docente se reactiva dentro de `HORAS_MAXIMAS_ATRASO`, se avisa en una pasada posterior y la exclusion no oculta el problema.
 - Destinatarios: coordinadores activos de TODOS los programas vigentes del grupo (`ufn_programas_grupo`), sin duplicar por persona, con usuario activo y correo.
 - Mejor esfuerzo; si falla el envio la sesion no se marca (reintento en la siguiente pasada); sin coordinadores con correo se marca con total 0.
 
-## Fuera de alcance / decisiones abiertas
+## Decisiones del usuario (2026-11-19)
 
-Ver seccion final de `CONTRATO.md` (momento exacto del aviso, decano, evento realtime).
+1. Momento del aviso: al vencer la ventana (fin + `MARGEN_RETARDO_MINUTOS`).
+2. Destinatarios: solo coordinadores, sin decano.
+3. Un correo por coordinador.
+4. Excluir sesiones de grupos sin estudiantes activos y de docente inactivo, sin marcarlas (ver Reglas).
+
+Sin evento realtime (ver `CONTRATO.md`).

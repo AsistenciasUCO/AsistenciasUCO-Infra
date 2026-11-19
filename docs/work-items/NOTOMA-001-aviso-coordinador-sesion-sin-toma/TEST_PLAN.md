@@ -7,6 +7,8 @@
 - NOTOMA_03_REGISTRAR_IDEMPOTENTE: una sola marca; el segundo registro es exito sin escribir; la sesion sale de las pendientes.
 - NOTOMA_04_SESION_INEXISTENTE: SES_001 y GEN_002 sin escribir.
 - NOTOMA_05_HABILITADO_FALSE y NOTOMA_06_ATRASO_MAXIMO.
+- NOTOMA_07_SIN_ESTUDIANTES: grupo sin matriculas, con matricula no activa o con usuario inactivo no se selecciona y no se marca; al llegar un estudiante activo se selecciona.
+- NOTOMA_08_DOCENTE_INACTIVO: docente con usuario inactivo no se selecciona ni se marca; al reactivarlo se selecciona.
 - NOTOMA_TRANCOUNT_ZERO. Migracion: up -> down -> up.
 
 ## Backend (JUnit, sin BD)
