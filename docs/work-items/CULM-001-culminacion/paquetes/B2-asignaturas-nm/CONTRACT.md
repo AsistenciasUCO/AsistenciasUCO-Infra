@@ -387,7 +387,7 @@ Regla de cierre: antes del RED se repite el inventario con `git grep -nE "idProg
 | `ASI_003` | CONFLICT / 409 | La asignatura ya está asociada a este plan de estudios. |
 | `ASI_004` | RESOURCE_NOT_FOUND / 404 | La asignatura no está asociada a este plan de estudios. |
 | `ASI_005` | CONFLICT / 409 | No puedes quitar la asignatura de este plan: tiene grupos o estudiantes del programa en el periodo vigente o en periodos futuros. |
-| `ASI_006` | CONFLICT / 409 | La asignatura es compartida con programas que no coordinas; solo puedes cambiar su semestre y su carácter en tu plan. |
+| `ASI_006` | CONFLICT / 409 (desde HU074, 2026-11-19, el `code` del cuerpo es `ASI_006` con el texto del catálogo) | La asignatura es compartida con programas que no coordinas; solo puedes cambiar su semestre y su carácter en tu plan. |
 | `ASI_007` | VALIDATION / 400 | El carácter de la asignatura no es válido. |
 | `EST_005` | VALIDATION / 400 | El grupo pertenece a varios programas: indica el programa. |
 | `EST_006` | VALIDATION / 400 | El programa indicado no corresponde a los programas del grupo. |
