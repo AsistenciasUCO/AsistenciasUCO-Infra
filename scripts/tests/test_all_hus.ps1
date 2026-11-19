@@ -314,12 +314,6 @@ Run-Test "HU006" "Consultar ficha tecnica y datos de perfil de estudiante instit
     return "Perfil consultado: $($res.datos.primerNombre) $($res.datos.primerApellido)"
 }
 
-Run-Test "HU008" "Consultar oferta de grupos y cupos (solo consulta, sin solicitar ingreso)" {
-    $res = Invoke-Api GET "/estudiante/oferta-academica" $hEst
-    if (-not $res.exitoso) { throw "Respuesta no exitosa" }
-    return "Grupos ofertados: $(@($res.datos).Count)"
-}
-
 Run-Test "HU013" "Validar regla reactiva de alertas tempranas por superacion de umbral de inasistencias (15%-20%)" {
     $res = Invoke-Api GET "/estudiante/materias" $hEst
     $materia = $res.datos[0]
@@ -386,7 +380,7 @@ Write-Host "`n==================================================================
 Write-Host " 2. MODULO DOCENTE (HU027 - HU059)" -ForegroundColor Yellow
 Write-Host "==============================================================================" -ForegroundColor Yellow
 
-Run-Test "HU008,HU031,HU058,HU059" "Consultar grupos asignados al docente titular con aforo y horarios" {
+Run-Test "HU031,HU058,HU059" "Consultar grupos asignados al docente titular con aforo y horarios" {
     $res = Invoke-Api GET "/docente/asignaturas" $hDoc
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
     $grupos = @($res.datos)

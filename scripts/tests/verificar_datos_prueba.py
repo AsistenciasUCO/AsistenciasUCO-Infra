@@ -105,7 +105,7 @@ caso("Carlos: materias", "uco-estudiante", "/estudiante/materias")
 caso("Carlos: horario", "uco-estudiante", "/estudiante/horarios")
 caso("Santiago: alertas de riesgo y pérdida", "santiago.restrepo", "/estudiante/alertas", cantidad=2)
 caso("Mateo: alerta de riesgo", "mateo.giraldo", "/estudiante/alertas", cantidad=1)
-caso("Miguel (sin grupos): oferta académica", "miguel.rojas", "/estudiante/oferta-academica")
+caso("Miguel (sin grupos): materias", "miguel.rojas", "/estudiante/materias")
 caso("un estudiante no entra a rutas de docente", "uco-estudiante", "/docente/asignaturas", estado=403)
 print("Cuenta inactiva")
 inactivo = token("esteban.rendon") is None

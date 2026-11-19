@@ -265,7 +265,7 @@ try {
         $globalSesionDocenteId = $null
         $globalQrToken = $null
 
-        Run-TestItem "HU008,HU031,HU058,HU059" "Consultar grupos asignados al docente titular con aforo y horarios" {
+        Run-TestItem "HU031,HU058,HU059" "Consultar grupos asignados al docente titular con aforo y horarios" {
             $res = Invoke-RestMethod "$BASE/grupos" -Headers $hDoc
             if (-not $res.exitoso) { throw "Respuesta no exitosa" }
             if ($res.datos.Count -gt 0) {
