@@ -1,4 +1,4 @@
-# Seccion ext-seguridad: componente de Seguridad del equipo (Security Baseline 0.1.13).
+# Seccion ext-seguridad: componente de Seguridad del equipo (Security Baseline 0.1.14).
 # Se aplica sobre GestioAsistenciaBackend/infra/security-baseline/compose.yaml con --env-file %USERPROFILE%\.asistencias-security-lab\lab.env.
 # Solo renombra contenedores, conserva los volumenes existentes y expone en asis-red lo que usa el Backend en contenedor:
 #   keycloak.localhost:19090 (mismo emisor de los tokens que ve el navegador), PDP (8080) y PEP (8081).
@@ -38,6 +38,40 @@ services:
     networks:
       asis-red:
         aliases: [ext-seguridad-pep]
+    labels:
+      asistencias.seccion: ext-seguridad
+  # SEC-BASELINE-020 (0.1.14): broker de eventos de asignacion del PDP. El Backend en contenedor lo alcanza por asis-red
+  # (asis-app-enlaces reenvia 127.0.0.1:25672 -> ext-seguridad-rabbitmq:5672); en el PC queda en 127.0.0.1:25672/25673.
+  rabbitmq:
+    container_name: ext-seguridad-rabbitmq
+    networks:
+      asis-red:
+        aliases: [ext-seguridad-rabbitmq]
+    labels:
+      asistencias.seccion: ext-seguridad
+  # El exchange compartido security.assignment.events (direct, durable) lo aprovisiona la plataforma, no cada aplicacion
+  # (manual de eventos del PDP 0.1.14, seccion 4; el Backend solo declara su cola y su binding). Sin el, el binding del
+  # Backend falla con 404 NOT_FOUND y no llega ningun evento. Declaracion idempotente con rabbitmqadmin de la misma imagen.
+  rabbitmq-init:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:4.4.1-management}
+    container_name: ext-seguridad-rabbitmq-init
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQADMIN_TARGET_HOST: rabbitmq
+      RABBITMQADMIN_TARGET_PORT: "15672"
+      RABBITMQADMIN_TARGET_VHOST: /security
+      RABBITMQADMIN_NON_INTERACTIVE_MODE: "true"
+      RABBITMQ_INIT_USERNAME: ${RABBITMQ_USERNAME:?Configure RABBITMQ_USERNAME}
+      RABBITMQ_INIT_PASSWORD: ${RABBITMQ_PASSWORD:?Configure RABBITMQ_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        rabbitmqadmin --username "$$RABBITMQ_INIT_USERNAME" --password "$$RABBITMQ_INIT_PASSWORD"
+        declare exchange --name security.assignment.events --type direct --durable true --auto-delete false
+    networks: [lab]
+    restart: "no"
     labels:
       asistencias.seccion: ext-seguridad
 
@@ -89,6 +123,9 @@ volumes:
   asistencias-security-lab-redis-data:
     name: asistencias-security-lab_asistencias-security-lab-redis-data
     external: true
+  # Nuevo en 0.1.14: no es externo (compose lo crea la primera vez), con el mismo prefijo que los demas volumenes.
+  asistencias-security-lab-rabbitmq-data:
+    name: asistencias-security-lab_asistencias-security-lab-rabbitmq-data
 
 networks:
   lab:

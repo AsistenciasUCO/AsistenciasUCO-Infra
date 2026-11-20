@@ -228,6 +228,20 @@ function New-ConfiguracionApp([string[]]$secciones) {
         $b['SECURITY_BASELINE_ISSUER_URI'] = "$kc/realms/security-baseline"
         $b['SECURITY_BASELINE_JWK_SET_URI'] = "$kcLoopback/realms/security-baseline/protocol/openid-connect/certs"
         $b['KEYCLOAK_ISSUER_URI'] = "$kc/realms/security-baseline"
+        # SEC-BASELINE-020 (0.1.14): consumidor de eventos de asignacion del PDP por RabbitMQ (asis-app-enlaces reenvia
+        # 127.0.0.1:25672 al broker). Sin credenciales o sin applicationId en lab.env queda apagado (Seguridad 0.1.13).
+        if ($lab['RABBITMQ_USERNAME'] -and $lab['RABBITMQ_PASSWORD'] -and $lab['ASISTENCIAS_PDP_APPLICATION_ID']) {
+            $b['APP_ADAPTERS_ASSIGNMENT_EVENTS_ENABLED'] = 'true'
+            $b['RABBITMQ_HOST'] = 'localhost'
+            $b['RABBITMQ_PORT'] = '25672'
+            $b['RABBITMQ_VIRTUAL_HOST'] = '/security'
+            $b['RABBITMQ_USERNAME'] = $lab['RABBITMQ_USERNAME']
+            $b['RABBITMQ_PASSWORD'] = $lab['RABBITMQ_PASSWORD']
+            $b['SECURITY_BASELINE_ASSIGNMENT_EVENTS_APPLICATION_ID'] = $lab['ASISTENCIAS_PDP_APPLICATION_ID']
+        } else {
+            $b['APP_ADAPTERS_ASSIGNMENT_EVENTS_ENABLED'] = 'false'
+            Write-Host '  * Eventos de asignacion (RabbitMQ) apagados: lab.env sin RABBITMQ_USERNAME/RABBITMQ_PASSWORD o ASISTENCIAS_PDP_APPLICATION_ID.' -ForegroundColor DarkYellow
+        }
     } elseif ($secciones -contains 'asis-contingencia') {
         # El Keycloak propio emite tokens con http://localhost:8081 (lo que ve el navegador); asis-app-enlaces lo reenvia.
         $b['APP_ADAPTERS_SECURITY_PROVIDER'] = 'legacy'
@@ -276,8 +290,9 @@ function New-ConfiguracionApp([string[]]$secciones) {
     $f['MENSAJES_UI_DESDE_CATALOGO'] = $(if ($secciones -contains 'ext-mensajes') { 'true' } else { 'false' })
     Write-EnvGenerado (Join-Path $gen 'frontend.env') $f 'Frontend de Asistencias UCO en contenedor (asis-app)'
 
-    Write-Host ("  * Configuracion de asis-app: seguridad={0}, mensajes={1}, parametros={2}" -f `
-        $b['APP_ADAPTERS_SECURITY_PROVIDER'], $b['APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER'], $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER']) -ForegroundColor Gray
+    $eventosAsignacion = $(if ($b['APP_ADAPTERS_ASSIGNMENT_EVENTS_ENABLED'] -eq 'true') { 'rabbitmq' } else { 'apagados' })
+    Write-Host ("  * Configuracion de asis-app: seguridad={0}, mensajes={1}, parametros={2}, eventos-asignacion={3}" -f `
+        $b['APP_ADAPTERS_SECURITY_PROVIDER'], $b['APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER'], $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'], $eventosAsignacion) -ForegroundColor Gray
 }
 
 function Invoke-Compose([string]$nombre, [string[]]$argumentos) {

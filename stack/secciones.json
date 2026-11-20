@@ -43,7 +43,7 @@
       ]
     },
     "ext-seguridad": {
-      "descripcion": "Componente de Seguridad del equipo (Security Baseline 0.1.13: Keycloak, PDP, PEP, OPA).",
+      "descripcion": "Componente de Seguridad del equipo (Security Baseline 0.1.14: Keycloak, PDP, PEP, OPA y RabbitMQ de eventos).",
       "memoriaMb": 1600,
       "directorio": "GestioAsistenciaBackend/infra/security-baseline",
       "compose": [
@@ -61,11 +61,14 @@
         "opa",
         "pdp",
         "pep",
+        "rabbitmq",
+        "rabbitmq-init",
         "consola"
       ],
       "salud": [
         "contenedor:ext-seguridad-keycloak",
         "contenedor:ext-seguridad-pdp",
+        "contenedor:ext-seguridad-rabbitmq",
         "http:http://localhost:18081/actuator/health",
         "contenedor:ext-seguridad-consola",
         "http:http://localhost:5175/security-administration.js"
@@ -74,6 +77,7 @@
         "Keycloak: http://keycloak.localhost:19090",
         "PDP: http://localhost:18080",
         "PEP: http://localhost:18081",
+        "RabbitMQ (eventos del PDP): amqp://localhost:25672, consola http://localhost:25673",
         "Consola de seguridad: http://localhost:5175 (dist de Complementos/Seguridad/security-ui)"
       ],
       "proyectosAnteriores": [
