@@ -200,9 +200,13 @@ function New-ConfiguracionApp([string[]]$secciones) {
     $b['ASISTENCIAS_UCO_LOG_FILE_PATTERN'] = 'infra/observability/logs/backend-contenedor.%d{yyyy-MM-dd}.%i.jsonl'
     if ($secciones -contains 'asis-obs') {
         $b['MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT'] = 'http://asis-obs-alloy:4318/v1/traces'
+        $b['MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED'] = 'true'
         # Prometheus recolecta por host.docker.internal:8090 (publicado solo en 127.0.0.1 del PC).
         $b['MANAGEMENT_SERVER_ADDRESS'] = '0.0.0.0'
     } else {
+        # Sin asis-obs no hay recolector de trazas: el exportador OTLP fallaba cada pocos segundos ("Failed to export N spans",
+        # ERROR con traza completa) y tapaba los logs utiles. Las trazas siguen activas (traceId/spanId en los logs JSONL).
+        $b['MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED'] = 'false'
         $b['MANAGEMENT_SERVER_ADDRESS'] = '127.0.0.1'
     }
     if ($b.Contains('APP_ADAPTERS_IDENTITY_PROVIDER')) { $b.Remove('APP_ADAPTERS_IDENTITY_PROVIDER') }
