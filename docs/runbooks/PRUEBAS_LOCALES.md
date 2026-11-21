@@ -80,3 +80,9 @@ Guion de pruebas manuales por rol para la demostración (qué cambió en el cier
 - El historial de asistencia se registra hasta el momento de la carga; las cifras exactas cambian según el día.
 - Los scripts siembran el período 2026-2 (1 de agosto a 15 de diciembre de 2026): después de esa fecha el generador
   de sesiones rechaza el período y hay que mover las fechas en `generar_datos_prueba.py`.
+
+## Auto-registro de Keycloak desactivado (laboratorio)
+
+El realm `security-baseline` del componente de Seguridad llega con `registrationAllowed=true`, lo que muestra el enlace "Register" en el login y permite crear cuentas fuera del flujo de la app. `infra.ps1 stack up` (seccion `ext-seguridad`) ejecuta `scripts/security/Disable-KeycloakSelfRegistration.ps1`, idempotente, que lo pone en `false` por el Admin REST con las credenciales de `lab.env`. Manual: `powershell -File AsistenciasUCO-Infra\scripts\security\Disable-KeycloakSelfRegistration.ps1`.
+
+Recomendacion para el equipo de Seguridad: que el realm importado de Security Baseline traiga `registrationAllowed=false` (hoy el realm propio de contingencia, `components/keycloak/realm-import/asistencias-uco-realm.json`, ya lo tiene asi) o que `provision_asistencias.py` lo fije; mientras tanto el script de Infra lo corrige en cada `stack up`.

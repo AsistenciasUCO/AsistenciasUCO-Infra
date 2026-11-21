@@ -397,6 +397,11 @@ switch ($Accion) {
             }
             Invoke-Compose $n (@('up', '-d', '--no-build', '--remove-orphans') + @($s.servicios))
             if (-not $SinEsperar) { Wait-Salud $n }
+            if ($n -eq 'ext-seguridad' -and -not $SinEsperar) {
+                # El realm del laboratorio no debe permitir auto-registro (cuentas solo por el flujo de la app).
+                try { & (Join-Path $infraRoot 'scripts\security\Disable-KeycloakSelfRegistration.ps1') }
+                catch { Write-Host "    !!  no se pudo desactivar el auto-registro de Keycloak: $($_.Exception.Message)" -ForegroundColor Red }
+            }
         }
         Write-Host "`nListo. Direcciones:" -ForegroundColor Cyan
         foreach ($n in $secciones) { foreach ($u in (Get-Seccion $n).urls) { Write-Host "  [$n] $u" } }
