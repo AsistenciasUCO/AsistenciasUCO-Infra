@@ -9,7 +9,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 
 ## Resumen General
 
-- **Total de Endpoints Protegidos:** 205
+- **Total de Endpoints Protegidos:** 206
 - **Total de Endpoints Exentos (PÃºblicos / Webhook):** 5
 - **Roles Definidos:** ADMINISTRADOR, DECANO, COORDINADOR, DOCENTE, ESTUDIANTE
 
@@ -302,7 +302,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `PATCH` | `/api/v2/sesiones/{sesionId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 | `GET` | `/api/v2/sesiones/grupo/{grupoId}` | ROLES | Docente titular del grupo/sesion: validado en Application (InstitutionalScopePort) y en usp_*_sesion_v2. |
 
-### Rol: ESTUDIANTE (26)
+### Rol: ESTUDIANTE (27)
 
 | MÃ©todo | Ruta | Tipo de Acceso | Ãmbito / Ownership |
 | :--- | :--- | :--- | :--- |
@@ -320,6 +320,7 @@ sus mÃ©todos HTTP permitidos, roles con acceso y polÃ­ticas de propiedad o �
 | `GET` | `/api/v1/estudiante/materias` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `GET` | `/api/v1/estudiante/materias/{materiaId}/sesiones` | ROLES | Solo la matricula inscrita del estudiante autenticado: el SP usp_consultar_sesiones_materia_estudiante resuelve el ambito, pagina (pagina y tamano opcionales) y entrega la fecha limite de justificacion (CULM-001 D.1). |
 | `GET` | `/api/v1/estudiante/materias/resumen` | ROLES | Solo datos del estudiante autenticado: el SP usp_consultar_resumen_materias_estudiante valida el perfil y calcula los indicadores sobre las mismas matriculas inscritas del listado (CIERRE-W2B). |
+| `POST` | `/api/v1/estudiante/matricula-qr/validar` | ROLES | Solo el estudiante autenticado: devuelve los datos minimos del curso y los programas comunes entre sus programas (EstudiantePrograma) y los del grupo (usp_validar_token_matricula_publico con @idUsuarioEjecutor); no escribe. |
 | `POST` | `/api/v1/estudiante/matricular-grupo` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
 | `GET` | `/api/v1/estudiante/plan-estudio` | ROLES | HU018: solo los planes activos de los programas del estudiante autenticado (EstudiantePrograma); el ámbito lo fuerza usp_consultar_plan_estudio_estudiante. |
 | `GET` | `/api/v1/estudiante/reclamos` | ROLES | Solo datos del estudiante autenticado (Usuario->Estudiante del token). |
