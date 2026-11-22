@@ -160,6 +160,8 @@ Equivalencias con el registro histórico del backend (congelado al 2026-11-12): 
 | [TD-122](#td-122) | 14 cuentas de prueba posteriores al conjunto de datos alteran los conteos de `verificar_datos_prueba.py` (26 de 28) | ABIERTA / NON_BLOCKING | no |
 | [TD-123](#td-123) | Incidente operativo del 2026-11-16: contenedor desechable montó el volumen de MinIO del laboratorio; verificación de objetos pendiente | ABIERTA / NON_BLOCKING (verificación) | no |
 | [TD-124](#td-124) | Notificaciones: autenticación entre servicios con `X-Api-Key` (secreto compartido); falta OAuth2 client-credentials | ABIERTA | no; requisito de producción |
+| [TD-125](#td-125) | Prueba inestable del Backend `CatalogoParametrosHttpParameterCatalogAdapterTest.fallo_sincrono_al_lanzar_el_refresco` (TooManyActualInvocations por tiempos) | ABIERTA | no |
+| [TD-126](#td-126) | Notificaciones: el token de verificación de correo vive en memoria (`VerificacionCorreoMarcadorProvider`); un reinicio entre intentos reemite y revoca el enlace previo | ABIERTA | no |
 
 ## TD-001
 
@@ -1560,3 +1562,23 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Resolución esperada:** cuando Seguridad ofrezca client-credentials para servicios, registrar al Backend como cliente, validar el JWT en el componente (y retirar `X-Api-Key`), publicar el cambio como addendum del contrato con hash nuevo y rotar el secreto.
 - **Bloquea línea base:** no.
 - **Estado:** ABIERTA; requisito de producción.
+
+## TD-125
+
+- **Origen:** extracción de Notificaciones, corridas del Backend del 2026-11-22.
+- **Descripción:** la prueba `CatalogoParametrosHttpParameterCatalogAdapterTest.fallo_sincrono_al_lanzar_el_refresco` es inestable: a veces falla con `TooManyActualInvocations` (2 esperadas frente a 3 reales) porque depende de los tiempos del refresco asíncrono del adaptador. No hay cambio de código de por medio: la misma prueba pasa y falla en corridas consecutivas.
+- **Impacto:** Bajo: falsos rojos en `mvnw test` y en la CI.
+- **Evidencia:** `GestioAsistenciaBackend`, clase `CatalogoParametrosHttpParameterCatalogAdapterTest` (corridas intermitentes).
+- **Resolución esperada:** volver determinista la prueba (ejecutor síncrono o sincronización explícita en lugar de depender de los tiempos), sin relajar la aserción de invocaciones.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-126
+
+- **Origen:** extracción de Notificaciones, 2026-11-22.
+- **Descripción:** `VerificacionCorreoMarcadorProvider` recuerda en memoria el token de verificación de correo ya emitido. Si el proceso se reinicia entre dos intentos de despacho, el marcador se pierde: se emite un token nuevo, se revoca el enlace anterior y el correo ya entregado queda con un enlace inválido.
+- **Impacto:** Bajo/Medio: caso residual acotado a reinicios entre intentos de despacho.
+- **Evidencia:** `GestioAsistenciaBackend`, `VerificacionCorreoMarcadorProvider`.
+- **Resolución esperada:** persistir el marcador con un procedimiento almacenado idempotente (emitir-o-reutilizar token vigente por usuario y propósito) en la BD, en vez de memoria del proceso; cambio de DB y Backend con su contrato.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
