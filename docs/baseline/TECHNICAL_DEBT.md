@@ -18,7 +18,7 @@ Clasificación de lo que sigue abierto según su efecto en la entrega. La entreg
 
 - **Bloquea la demostración:** ninguna. Las cuatro que la bloqueaban el 2026-11-16 (TD-097, TD-098, TD-102 y TD-107) quedaron cerradas con el cierre del 2026-11-16/17 (ver "Cerradas" más abajo y el work item [CIERRE-001](../work-items/CIERRE-001-cierre-proyecto/README.md)).
 - **Pendiente de decisión del responsable (no bloquea):** TD-116 (cifras de pérdida: matrículas frente a personas), TD-117 (enlace directo a las decisiones de cancelación pendientes del docente) y TD-118 (semántica de `esResolutorActual` del docente).
-- **Requisito para producción (no bloquea la demo):** TD-003, TD-011, TD-014, TD-018, TD-020, TD-023, TD-027, TD-063, TD-072, TD-073, TD-093, TD-099, TD-100, TD-101, TD-103, TD-104, TD-108, TD-110.
+- **Requisito para producción (no bloquea la demo):** TD-003, TD-011, TD-014, TD-018, TD-020, TD-023, TD-027, TD-063, TD-072, TD-073, TD-093, TD-099, TD-100, TD-101, TD-103, TD-104, TD-108, TD-110, TD-124.
 - **Aplazable:** TD-004, TD-006, TD-007, TD-012, TD-013, TD-015, TD-016, TD-019, TD-024 a TD-026, TD-034, TD-044, TD-045, TD-046, TD-050, TD-054, TD-056, TD-062, TD-064 a TD-071, TD-074 a TD-083, TD-085 a TD-092, TD-105, TD-106, TD-111 a TD-115, TD-119 a TD-123, TD-CULM001-A-01 a A-03 y TD-CULM001-D-01 a D-05.
 - **Cerradas en esta revisión (2026-11-16), con evidencia en su entrada:** TD-010, TD-022, TD-039, TD-041, TD-043, TD-047, TD-049, TD-055 y TD-084. TD-094 a TD-096 llegan cerradas desde el registro del backend.
 - **Cerradas en la revisión del 2026-11-17 (cierre en `develop`), con evidencia en su entrada:** TD-097 (BD PR 140), TD-098 (W1B), TD-102 en cuanto al arranque (Frontend PR 140; el simulador sigue en el bundle, ver TD-106), TD-107 (los seis paquetes W1A a W3I; lo que quedó expresamente sin mover en el cliente está en TD-119; relacionadas: TD-113, TD-114 y TD-117) y TD-109 (Frontend PR 140).
@@ -159,6 +159,7 @@ Equivalencias con el registro histórico del backend (congelado al 2026-11-12): 
 | [TD-121](#td-121) | `/admin/docentes` muestra solo docentes con vínculo activo (HU136): un docente sin vínculo no aparece en el selector del administrador | ABIERTA / NON_BLOCKING | no |
 | [TD-122](#td-122) | 14 cuentas de prueba posteriores al conjunto de datos alteran los conteos de `verificar_datos_prueba.py` (26 de 28) | ABIERTA / NON_BLOCKING | no |
 | [TD-123](#td-123) | Incidente operativo del 2026-11-16: contenedor desechable montó el volumen de MinIO del laboratorio; verificación de objetos pendiente | ABIERTA / NON_BLOCKING (verificación) | no |
+| [TD-124](#td-124) | Notificaciones: autenticación entre servicios con `X-Api-Key` (secreto compartido); falta OAuth2 client-credentials | ABIERTA | no; requisito de producción |
 
 ## TD-001
 
@@ -1549,3 +1550,13 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Resolución esperada:** conservar el conteo de objetos antes de operar sobre volúmenes del laboratorio; no montar volúmenes con nombre en contenedores desechables.
 - **Bloquea línea base:** no.
 - **Estado:** ABIERTA / NON_BLOCKING (verificación pendiente).
+
+## TD-124
+
+- **Origen:** fase F3 (Infra) del plan del componente propio de Notificaciones, 2026-11-22.
+- **Descripción:** el Backend y el Servicio de Notificaciones UCO se autentican entre sí con un secreto compartido en la cabecera `X-Api-Key` (`NOTIFICACIONES_API_KEY`, generado por `infra.ps1 stack up` en `stack/.env`). Es suficiente para el laboratorio y la demostración, pero no da identidad por servicio, rotación ni revocación individual. El destino es OAuth2 client-credentials emitido por Seguridad para servicios, como ya hace MessageUcoLab; hoy Seguridad no lo ofrece para este tipo de cliente.
+- **Impacto:** Medio para producción; sin efecto en la demostración.
+- **Evidencia:** `docs/contracts/notificaciones/NOTIFICACIONES_CONTRACT.md` (sección 4); `Complementos/Notificaciones/Guia-integracion-Notificaciones.md` (sección 2).
+- **Resolución esperada:** cuando Seguridad ofrezca client-credentials para servicios, registrar al Backend como cliente, validar el JWT en el componente (y retirar `X-Api-Key`), publicar el cambio como addendum del contrato con hash nuevo y rotar el secreto.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA; requisito de producción.

@@ -17,7 +17,7 @@ Del equipo limpio a una demostración funcional. El alcance de TD-108 se limita 
 
 | Herramienta | Detalle |
 | :--- | :--- |
-| Docker Desktop | 4.30+ con Compose v2. Memoria de la VM: **10 GB** en `%USERPROFILE%\.wslconfig` (`[wsl2] memory=10GB`), luego `wsl --shutdown` y reiniciar Docker. El escenario `completo` usa unos 9,2 GB |
+| Docker Desktop | 4.30+ con Compose v2. Memoria de la VM: **10 GB** en `%USERPROFILE%\.wslconfig` (`[wsl2] memory=10GB`), luego `wsl --shutdown` y reiniciar Docker. El escenario `completo` usa unos 9,65 GB estimados |
 | PowerShell | Windows PowerShell 5.1 o 7.x |
 | Python 3 de Windows | Solo para Seguridad y los datos de prueba. Defina `ASISTENCIAS_PYTHON` con la ruta a `python.exe` si no hay lanzador `py` (el alias de la Microsoft Store no sirve) |
 | Git | Para clonar los repos |
@@ -58,12 +58,13 @@ Copy-Item .\GestioAsistenciaDB\.env.example          .\GestioAsistenciaDB\.env
 
 ```powershell
 .\AsistenciasUCO-Infra\infra.ps1 stack build            # una vez: imágenes asistencias-backend/frontend:develop
+.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones   # una vez: imagen notificaciones-uco:0.1.0 (componente propio)
 .\AsistenciasUCO-Infra\infra.ps1 stack up basico        # BD + Seguridad + Backend y Frontend
 .\AsistenciasUCO-Infra\infra.ps1 stack status
 ```
 
 Use `stack up completo` solo si la demo necesita mensajes (correos) y Catálogo de Parámetros; `soportes` agrega ClamAV
-para adjuntos. No agregue más secciones a `completo` (memoria). El frontend queda en `http://localhost:4200`; el resto de
+para adjuntos. No agregue más secciones a `completo` (memoria). Todos los escenarios con app incluyen `ext-notificaciones` (Servicio de Notificaciones UCO, `http://localhost:18090`): `stack up` genera sus secretos y crea su base; ver [stack/README](../../stack/README.md#ext-notificaciones-servicio-de-notificaciones-uco). El frontend queda en `http://localhost:4200`; el resto de
 direcciones se imprimen al terminar `stack up`.
 
 ## 5. Datos de prueba y PDP

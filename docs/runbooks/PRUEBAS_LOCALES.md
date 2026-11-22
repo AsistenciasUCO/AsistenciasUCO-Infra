@@ -14,6 +14,20 @@ Use `mensajes`, `parametros`, `soportes` u `observabilidad` según lo que vaya a
 La Seguridad del equipo debe estar aprovisionada una vez (`provision_asistencias.py keycloak` y `pdp`, ver
 `GestioAsistenciaBackend/infra/security-baseline`).
 
+### Servicio de Notificaciones (`ext-notificaciones`)
+
+Todo escenario con la app levanta también el Servicio de Notificaciones UCO (componente propio). Primera vez:
+`.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones`. Luego `stack up` genera sus secretos (en `stack/.env`), crea
+`notificacionesdb` y deja el servicio en `http://localhost:18090` (`GET /actuator/health` abierto; el resto exige la cabecera
+`X-Api-Key`, cuyo valor es `NOTIFICACIONES_API_KEY` de `stack/.env`; no la pegue en chats ni en commits). Canal `smtp` con el
+mismo modo de pruebas del Backend (todo se redirige al buzón de prueba). Hasta la fase F4 el Backend sigue enviando con su
+SMTP propio; el servicio ya recibe las variables `NOTIFICACIONES_SERVICE_URL` y `NOTIFICACIONES_API_KEY`.
+
+```powershell
+$k = @{ 'X-Api-Key' = ((Get-Content .\AsistenciasUCO-Infra\stack\.env | Where-Object { $_ -like 'NOTIFICACIONES_API_KEY=*' }) -split '=', 2)[1] }
+Invoke-RestMethod http://localhost:18090/api/v1/plantillas -Headers $k | Select-Object tipo, versionActiva   # 22 tipos
+```
+
 ## 2. Cargar los datos de prueba variados
 
 ```powershell
