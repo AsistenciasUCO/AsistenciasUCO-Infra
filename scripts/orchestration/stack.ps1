@@ -37,7 +37,9 @@ param(
     # up: no espera la salud de los contenedores.
     [switch]$SinEsperar,
     # down: tambien detiene asis-datos.
-    [switch]$IncluirDatos
+    [switch]$IncluirDatos,
+    # up: no verifica ni aprovisiona el PDP (concesiones de endpoints nuevos) al terminar.
+    [switch]$SinPdp
 )
 
 Set-StrictMode -Version Latest
@@ -52,11 +54,13 @@ foreach ($o in $Objetivo) {
         '^-(?i:Conservar)$' { $Conservar = [switch]::Present; continue }
         '^-(?i:SinEsperar)$' { $SinEsperar = [switch]::Present; continue }
         '^-(?i:IncluirDatos)$' { $IncluirDatos = [switch]::Present; continue }
+        '^-(?i:SinPdp)$' { $SinPdp = [switch]::Present; continue }
         default { $restantes += $o }
     }
 }
 $Objetivo = $restantes
 
+. (Join-Path $PSScriptRoot 'pdp-lib.ps1')
 $infraRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $workspace = (Resolve-Path (Join-Path $infraRoot '..')).Path
 $stackDir = Join-Path $infraRoot 'stack'
@@ -402,6 +406,14 @@ switch ($Accion) {
                 try { & (Join-Path $infraRoot 'scripts\security\Disable-KeycloakSelfRegistration.ps1') }
                 catch { Write-Host "    !!  no se pudo desactivar el auto-registro de Keycloak: $($_.Exception.Message)" -ForegroundColor Red }
             }
+        }
+        if ($secciones -contains 'asis-app' -and ($seccionesConfiguracion -contains 'ext-seguridad') -and -not $SinPdp -and -not $SinEsperar) {
+            # Un endpoint nuevo del backend responde 403 hasta que el PDP tenga su concesion (aditivo, nunca --prune).
+            try {
+                $okPdp = Invoke-PdpProvision -BackendRepo (Join-Path $workspace 'GestioAsistenciaBackend') -PythonExe (Resolve-PythonWindows)
+                if (-not $okPdp) { Write-Host '    !!  PDP con diferencias; revise: python -X utf8 -I GestioAsistenciaBackend/infra/security-baseline/scripts/provision_asistencias.py verify' -ForegroundColor Yellow }
+            }
+            catch { Write-Host "    !!  PDP no verificado: $($_.Exception.Message) (use -SinPdp para omitir)" -ForegroundColor Yellow }
         }
         Write-Host "`nListo. Direcciones:" -ForegroundColor Cyan
         foreach ($n in $secciones) { foreach ($u in (Get-Seccion $n).urls) { Write-Host "  [$n] $u" } }

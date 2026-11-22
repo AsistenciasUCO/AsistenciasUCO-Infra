@@ -22,7 +22,15 @@ La Seguridad del equipo debe estar aprovisionada una vez (`provision_asistencias
 
 Respalda la base actual en `/var/opt/mssql/backup`, la recrea desde el esquema de `develop`, carga el conjunto de
 `GestioAsistenciaDB/scripts/datos-prueba`, da de alta los 73 usuarios en Keycloak y el PDP y verifica cada rol (unos 10
-minutos). Requiere Python 3 de Windows (`-Python <ruta>` si no está el lanzador `py`).
+minutos). Requiere Python 3 de Windows, que se resuelve en este orden: `-Python <ruta>`, la variable de entorno
+`ASISTENCIAS_PYTHON` (ruta a `python.exe`), el lanzador `py`, `python`/`python3` y `%LOCALAPPDATA%\Programs\Python`. Cada
+candidato se prueba con `python -c "import sys"` (15 s máximo); el alias de la Microsoft Store (`WindowsApps`) y el Python
+de MSYS se descartan. Si no hay ninguno, falla de inmediato, antes de tocar la base, pidiendo definir `ASISTENCIAS_PYTHON`
+(`$env:ASISTENCIAS_PYTHON = 'C:\Users\<usuario>\AppData\Local\Programs\Python\Python312\python.exe'`).
+
+Concesiones del PDP: `stack up` (con Seguridad y la app) y `datos-prueba cargar|seguridad` ejecutan
+`provision_asistencias.py verify` y, si hay líneas `FALTA`, `pdp` (aditivo, nunca `--prune`), de modo que un endpoint
+nuevo ya no responde 403. Se omite con `-SinPdp`. Guía de la demo final: [DEMO_DOCKER](DEMO_DOCKER.md).
 
 | Paso suelto | Comando |
 | :--- | :--- |

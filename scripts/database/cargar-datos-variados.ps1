@@ -29,6 +29,7 @@ param(
     [switch]$StopBackend,
     [switch]$SinSeguridad,
     [switch]$SinVerificar,
+    [switch]$SinPdp,
     [string]$Python,
     [string]$Password,
     [string]$ContainerName = 'sql_server_asistencias',
@@ -39,6 +40,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Database = 'gestionasistenciadb'
+. (Join-Path $PSScriptRoot '..\orchestration\pdp-lib.ps1')
 $infraRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $workspace = (Resolve-Path (Join-Path $infraRoot '..')).Path
 if (-not $DbRepo) { $DbRepo = Join-Path $workspace 'GestioAsistenciaDB' }
@@ -91,22 +93,7 @@ function Assert-Ok($Result, [string]$What) {
     }
 }
 
-function Resolve-Python {
-    if ($Python) { return $Python }
-    if ($env:ASISTENCIAS_PYTHON) { return $env:ASISTENCIAS_PYTHON }
-    $py = Get-Command py -ErrorAction SilentlyContinue
-    if ($py) {
-        $exe = (Invoke-Native -Exe $py.Source -Arguments @('-3', '-c', 'import sys; print(sys.executable)')).Text.Trim()
-        if ($exe -and (Test-Path $exe)) { return $exe }
-    }
-    foreach ($cmd in @('python', 'python3')) {
-        $c = Get-Command $cmd -ErrorAction SilentlyContinue
-        if ($c -and $c.Source -notmatch 'msys|cygwin|WindowsApps') { return $c.Source }
-    }
-    $local = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs\Python') -Filter python.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($local) { return $local.FullName }
-    throw 'No se encontro Python 3 de Windows: instale Python 3 o indique -Python <ruta a python.exe> (o ASISTENCIAS_PYTHON).'
-}
+function Resolve-Python { return Resolve-PythonWindows $Python }
 
 function Set-DatasetPassword {
     if ($env:ASISTENCIAS_DATASET_PASSWORD) { return }
@@ -126,6 +113,11 @@ function Invoke-Seguridad {
     Push-Location $BackendRepo
     try { & $py -X utf8 $provision dataset-users $usuariosJson; $code = $LASTEXITCODE } finally { Pop-Location }
     if ($code -ne 0) { throw "El aprovisionamiento de Seguridad termino con codigo $code." }
+    if (-not $SinPdp) {
+        if (-not (Invoke-PdpProvision -BackendRepo $BackendRepo -PythonExe $py)) {
+            Write-Host '    !!  PDP con diferencias (use -SinPdp para omitir este paso).' -ForegroundColor Yellow
+        }
+    }
 }
 
 function Invoke-Verificar {
@@ -224,6 +216,8 @@ function Invoke-Cargar {
 
 switch ($Accion) {
     'Cargar' {
+        # Falla rapido (antes de tocar la base) si no hay Python utilizable para Seguridad.
+        if (-not $SinSeguridad) { [void](Resolve-Python) }
         Invoke-Cargar
         if (-not $SinSeguridad) { Invoke-Seguridad }
         if (-not $SinSeguridad -and -not $SinVerificar) { Invoke-Verificar }
