@@ -40,6 +40,7 @@ TYPE_MAP = {  # tipoMensaje del seed -> (Tipo, Categoria) de la plantilla
     "SECURITY_ERROR": ("Funcional", "Error"),
     "TECHNICAL_ERROR": ("Técnico", "Error"),
     "INFO": ("Funcional", "Información"),
+    "INFORMATIVO": ("Funcional", "Información"),  # SES-GEN-01 (HOR_*) y DEC-081 (REC_011): avisos informativos
 }
 PREFIX_FOR_LONG = {"ERR_": "ERR", "SUC_": "SUC"}
 
