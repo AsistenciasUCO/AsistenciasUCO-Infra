@@ -98,3 +98,8 @@ NEXT AUTHORIZED PHASE:                 LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANA
 
 - La copia `docs/contracts/db/DB_DEVELOP_FREEZE_MANIFEST.sha256` de Infra refleja, por precedente (`usp_crear_sesion`, `usp_actualizar_sesion`), el hash vigente de los objetos congelados supersedidos por trabajo autorizado. Se alinean del mismo modo `usp_generar_sesiones_grupo.sql` (`ef9de7e9…`) y `usp_registrar_asistencias_sesion.sql` (`7217604b…`, excepcion SES-01 autorizada por el responsable, `d2d951f` del repo de BD), cuyas supersesiones constan en `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` del repo de BD (`freeze-manifest.ps1 -Mode Verify` OK).
 - El manifiesto base WORM del repo de BD (`DB_DEVELOP_FREEZE_MANIFEST.sha256`) no se modifica: la trazabilidad del cambio vive en las lineas `SUPERSEDES` del manifiesto post-freeze. Sustituye a las PR #105 (BD) y #29 (Infra) del equipo, que editaban el manifiesto base (TD-074).
+
+## Auditoría 2026-11-22: alineación por `SET XACT_ABORT ON` en `usp_registrar_asistencias_sesion`
+
+- Hallazgo M-6 de la auditoría de BD: el SP de escritura no declaraba `SET XACT_ABORT ON`, que exige AGENTS.md 3.3 regla 1. El commit `a89d1b5` de GestioAsistenciaDB lo agrega sin cambiar parámetros ni el resultado. El gate completo de BD pasa con 1100 casos y 0 fallos.
+- El nuevo hash `e6db7b77…e751` ya figura en `DB_CULM001_D_POST_FREEZE_MANIFEST.sha256` y `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` del repositorio de BD. La copia de Infra toma el hash vigente, como en la alineación del 2026-11-09, y el manifiesto base WORM del repositorio de BD no se toca.
