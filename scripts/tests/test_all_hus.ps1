@@ -698,8 +698,9 @@ Run-Test "HU043" "Crear nuevo grupo academico validando cupos y aforo (usp_crear
     # DEC-065 (4): el coordinador crea el grupo de una asignatura de su programa y asigna al docente titular; se retiro la
     # oferta de creacion del docente. El titular es el docente de prueba (vinculado al programa) para que HU050/HU051 operen.
     $yo = Invoke-Api GET "/auth/me" $hDoc
-    $docentes = Invoke-Api GET "/coordinador/docentes" $hCoord
-    $script:docenteId = [string]@($docentes.datos | Where-Object { $_.idUsuario -ieq [string]$yo.datos.idUsuario })[0].idDocente
+    # El listado es paginado (10 por defecto) y cada corrida agrega un docente E2E (HU091): se pide una pagina amplia.
+    $docentes = Invoke-Api GET "/coordinador/docentes?pagina=1&tamano=100" $hCoord
+    $script:docenteId =[string]@($docentes.datos | Where-Object { $_.idUsuario -ieq [string]$yo.datos.idUsuario })[0].idDocente
     if (-not $script:docenteId) { throw "El docente de prueba no esta vinculado a un programa del coordinador" }
     # Ojo: no llamar a una variable $base aqui; PowerShell no distingue mayusculas y taparia la URL $BASE de Invoke-Api.
     $grupoDelDocente = @((Invoke-Api GET "/docente/asignaturas" $hDoc).datos | Where-Object { $_.idGrupo -ieq $script:grupoBaseId })[0]
