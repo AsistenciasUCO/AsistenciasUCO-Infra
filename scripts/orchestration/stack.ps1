@@ -11,10 +11,12 @@
                                 Con asis-app genera stack/generado/{backend,frontend}.env segun las secciones activas.
       down   [secciones...]     Detiene secciones (sin argumentos: todo menos asis-datos). Nunca borra volumenes.
       status                    Estado y memoria por seccion.
-      build  [backend|frontend] Construye las imagenes asistencias-backend:develop / asistencias-frontend:develop.
+      build  [backend|frontend|notificaciones]
+                                Construye las imagenes asistencias-backend:develop / asistencias-frontend:develop /
+                                notificaciones-uco:0.1.0 (componente propio, Complementos/Notificaciones).
 
-    Un objetivo es una seccion (asis-datos, ext-seguridad, ext-mensajes, ext-parametros, asis-antivirus, asis-obs,
-    asis-contingencia, asis-app) o un escenario (minimo, basico, mensajes, parametros, completo, soportes, observabilidad,
+    Un objetivo es una seccion (asis-datos, ext-seguridad, ext-mensajes, ext-parametros, ext-notificaciones, asis-antivirus,
+    asis-obs, asis-contingencia, asis-app) o un escenario (minimo, basico, mensajes, parametros, completo, soportes, observabilidad,
     contingencia). asis-datos se incluye siempre.
 
 .EXAMPLE
@@ -272,6 +274,13 @@ function New-ConfiguracionApp([string[]]$secciones) {
     } else {
         $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'] = 'sqlserver'
     }
+    # Servicio de Notificaciones (componente propio). El Backend lo consume desde la fase F4; hasta entonces estas variables
+    # son inertes y el Backend sigue con su SMTP propio.
+    if ($secciones -contains 'ext-notificaciones') {
+        $sn = Get-SecretosNotificaciones
+        $b['NOTIFICACIONES_SERVICE_URL'] = 'http://ext-notificaciones-servicio:8080'
+        $b['NOTIFICACIONES_API_KEY'] = $sn['NOTIFICACIONES_API_KEY']
+    }
     Write-EnvGenerado (Join-Path $gen 'backend.env') $b 'Backend de Asistencias UCO en contenedor (asis-app)'
 
     # ---- Frontend: ids del laboratorio (no secretos) desde los env.js locales; direcciones vistas por el navegador ----
@@ -301,6 +310,79 @@ function New-ConfiguracionApp([string[]]$secciones) {
     $eventosAsignacion = $(if ($b['APP_ADAPTERS_ASSIGNMENT_EVENTS_ENABLED'] -eq 'true') { 'rabbitmq' } else { 'apagados' })
     Write-Host ("  * Configuracion de asis-app: seguridad={0}, mensajes={1}, parametros={2}, eventos-asignacion={3}" -f `
         $b['APP_ADAPTERS_SECURITY_PROVIDER'], $b['APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER'], $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'], $eventosAsignacion) -ForegroundColor Gray
+}
+
+# ---- ext-notificaciones: secretos generados, .env del servicio y BD propia (idempotente) ----
+# Los secretos viven en stack/.env (fuera de Git, junto a MSSQL_SA_PASSWORD) y se generan una sola vez.
+function New-ClaveAleatoria([int]$longitud, [switch]$ConComplejidadSql) {
+    $alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+    $bytes = New-Object byte[] $longitud
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($x in $bytes) { [void]$sb.Append($alfabeto[$x % $alfabeto.Length]) }
+    # SQL Server exige mayuscula, minuscula y digito: se garantizan al final (solo alfanumerico: viaja bien por .env/JDBC/sqlcmd).
+    if ($ConComplejidadSql) { [void]$sb.Append('Aa7') }
+    return $sb.ToString()
+}
+
+function Set-ValorEnvStack([string]$clave, [string]$valor) {
+    $ruta = Join-Path $stackDir '.env'
+    $lineas = @(); if (Test-Path $ruta) { $lineas = @(Get-Content -LiteralPath $ruta -Encoding UTF8) }
+    $lineas += "$clave=$valor"
+    [System.IO.File]::WriteAllText($ruta, (($lineas -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+}
+
+function Get-SecretosNotificaciones {
+    $envStack = Read-EnvFile (Join-Path $stackDir '.env')
+    if (-not $envStack['NOTIFICACIONES_API_KEY']) { Set-ValorEnvStack 'NOTIFICACIONES_API_KEY' (New-ClaveAleatoria 48); Write-Host '    + NOTIFICACIONES_API_KEY generada en stack/.env' -ForegroundColor Gray }
+    if (-not $envStack['NOTIFICACIONES_DB_PASSWORD']) { Set-ValorEnvStack 'NOTIFICACIONES_DB_PASSWORD' (New-ClaveAleatoria 24 -ConComplejidadSql); Write-Host '    + NOTIFICACIONES_DB_PASSWORD generada en stack/.env' -ForegroundColor Gray }
+    return (Read-EnvFile (Join-Path $stackDir '.env'))
+}
+
+function Initialize-Notificaciones {
+    $dir = Join-Path $workspace (Get-Seccion 'ext-notificaciones').directorio
+    $ejemplo = Join-Path $dir '.env.example'
+    if (-not (Test-Path $ejemplo)) { throw "Falta $ejemplo (componente Complementos/Notificaciones)." }
+    $envStack = Get-SecretosNotificaciones
+    if (-not $envStack['MSSQL_SA_PASSWORD']) { throw 'stack/.env no define MSSQL_SA_PASSWORD (necesaria para crear notificacionesdb).' }
+    # .env del servicio = .env.example + secretos de stack/.env + SMTP_NOTIFICATION_* del .env del Backend (mismos nombres,
+    # incluido el modo de pruebas con redireccion). Nada se imprime. Se regenera en cada up.
+    $backendEnv = Read-EnvFile (Join-Path $workspace 'GestioAsistenciaBackend\.env')
+    $salida = New-Object System.Collections.Generic.List[string]
+    foreach ($linea in Get-Content -LiteralPath $ejemplo -Encoding UTF8) {
+        $t = $linea.Trim()
+        $i = $t.IndexOf('=')
+        if ($t.Length -eq 0 -or $t.StartsWith('#') -or $i -lt 1) { $salida.Add($linea); continue }
+        $k = $t.Substring(0, $i).Trim()
+        if ($k -in 'NOTIFICACIONES_API_KEY', 'NOTIFICACIONES_DB_PASSWORD') { $salida.Add("$k=$($envStack[$k])") }
+        elseif ($k.StartsWith('SMTP_NOTIFICATION_') -and $backendEnv.Contains($k) -and $backendEnv[$k] -ne '') { $salida.Add("$k=$($backendEnv[$k])") }
+        else { $salida.Add($linea) }
+    }
+    $destino = Join-Path $dir '.env'
+    [System.IO.File]::WriteAllText($destino, (($salida -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $pendientes = @($salida | Where-Object { $_ -match '^[A-Z0-9_]+=<.*>\s*$' } | ForEach-Object { ($_ -split '=', 2)[0] })
+    if ($pendientes.Count -gt 0) {
+        Write-Host "    !!  .env de Notificaciones con valores sin definir: $($pendientes -join ', ') (el canal SMTP puede fallar; use NOTIFICACIONES_CANAL=log)" -ForegroundColor Yellow
+    }
+    # BD y login propios (idempotente: reasigna la clave). Las claves viajan por el entorno del proceso hijo, no por argumentos.
+    $env:MSSQL_SA_PASSWORD = $envStack['MSSQL_SA_PASSWORD']
+    $env:NOTIFICACIONES_DB_PASSWORD = $envStack['NOTIFICACIONES_DB_PASSWORD']
+    try {
+        $script = Join-Path $dir 'scripts\crear-bd.ps1'
+        $ps = (Get-Process -Id $PID).Path
+        $ok = $false
+        for ($intento = 1; $intento -le 6 -and -not $ok; $intento++) {
+            & $ps -NoProfile -ExecutionPolicy Bypass -File $script | Out-Null
+            if ($LASTEXITCODE -eq 0) { $ok = $true } else { Start-Sleep -Seconds 5 }
+        }
+        if (-not $ok) { throw 'No se pudo crear/verificar notificacionesdb (scripts/crear-bd.ps1; SQL Server arriba?).' }
+        Write-Host '    + notificacionesdb y su login listos (idempotente)' -ForegroundColor Gray
+    }
+    finally {
+        Remove-Item Env:\MSSQL_SA_PASSWORD -ErrorAction SilentlyContinue
+        Remove-Item Env:\NOTIFICACIONES_DB_PASSWORD -ErrorAction SilentlyContinue
+    }
 }
 
 function Invoke-Compose([string]$nombre, [string[]]$argumentos) {
@@ -378,10 +460,16 @@ switch ($Accion) {
         Write-Host "`n==> stack up $($Objetivo -join ' ')" -ForegroundColor Cyan
         $total = Show-Plan $secciones
         if ($total -gt $manifiesto.limiteMemoriaMb) { throw "La memoria estimada ($total MB) supera el limite ($($manifiesto.limiteMemoriaMb) MB). Levante menos secciones." }
-        if ($secciones -contains 'asis-app') {
-            foreach ($img in (Get-Seccion 'asis-app').requiereImagenes) {
-                docker image inspect $img 2>$null | Out-Null
-                if ($LASTEXITCODE -ne 0) { throw "Falta la imagen $img. Construyala con: .\infra.ps1 stack build" }
+        foreach ($n in $secciones) {
+            $imgs = Get-Prop (Get-Seccion $n) 'requiereImagenes'
+            if ($imgs) {
+                foreach ($img in $imgs) {
+                    docker image inspect $img 2>$null | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        $cual = $(if ($img -like 'notificaciones-uco:*') { 'notificaciones' } else { '' })
+                        throw "Falta la imagen $img (seccion $n). Construyala con: .\infra.ps1 stack build $cual"
+                    }
+                }
             }
         }
         $seccionesConfiguracion = Get-SeccionesConfiguracion $secciones
@@ -399,6 +487,7 @@ switch ($Accion) {
                 if ($extra.Count -gt 0) { Write-Host "  * Configuracion con las secciones que ya estan arriba: $($extra -join ', ')" -ForegroundColor Gray }
                 New-ConfiguracionApp $seccionesConfiguracion
             }
+            if ($n -eq 'ext-notificaciones') { Initialize-Notificaciones }
             Invoke-Compose $n (@('up', '-d', '--no-build', '--remove-orphans') + @($s.servicios))
             if (-not $SinEsperar) { Wait-Salud $n }
             if ($n -eq 'ext-seguridad' -and -not $SinEsperar) {
@@ -464,7 +553,15 @@ switch ($Accion) {
                     & docker build --label "org.opencontainers.image.revision=$sha" -t asistencias-frontend:develop -t "asistencias-frontend:$sha" $repo
                     if ($LASTEXITCODE -ne 0) { throw 'Fallo el build del Frontend.' }
                 }
-                default { throw "build acepta backend o frontend, no '$c'." }
+                'notificaciones' {
+                    # El Dockerfile compila con -DskipTests (las pruebas del componente las corre su equipo); ver Complementos/Notificaciones/README.md.
+                    $repo = Join-Path $workspace 'Complementos\Notificaciones\notificaciones-uco'
+                    if (-not (Test-Path (Join-Path $repo 'Dockerfile'))) { throw "Falta $repo\Dockerfile (componente Complementos/Notificaciones)." }
+                    Write-Host '==> notificaciones-uco:0.1.0 desde Complementos/Notificaciones/notificaciones-uco' -ForegroundColor Cyan
+                    & docker build -t notificaciones-uco:0.1.0 $repo
+                    if ($LASTEXITCODE -ne 0) { throw 'Fallo el build de Notificaciones.' }
+                }
+                default { throw "build acepta backend, frontend o notificaciones, no '$c'." }
             }
         }
     }
