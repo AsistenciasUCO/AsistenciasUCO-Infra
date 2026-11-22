@@ -712,7 +712,8 @@ Run-Test "HU043" "Crear nuevo grupo academico validando cupos y aforo (usp_crear
     $ultimo = ""
     for ($i = 0; $i -lt 12; $i++) {
         $codigo = Get-Random -Minimum 1000 -Maximum 9999
-        $hora = Get-Random -Minimum 5 -Maximum 20
+        # HOR_008: la franja debe quedar dentro del horario permitido 06:00-22:00 (inicio 06..19, fin = inicio + 2).
+        $hora = Get-Random -Minimum 6 -Maximum 20
         $body = @{
             idAsignatura = $script:asignaturaOfertaId
             idPeriodoAcademico = $script:periodoVigenteId
