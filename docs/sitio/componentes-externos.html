@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seguridad, Mensajes y Parámetros · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>Componentes externos: Seguridad, Mensajes y Parámetros</h1>
+      <p>Tres servicios de otros equipos se conectan al sistema por puertos y adaptadores. Esta página explica qué hace cada uno, cómo se integra, qué eventos emite y la receta de ocho pasos para integrar cualquier componente nuevo.</p>
+      <div class="etiquetas">
+        <span class="etiqueta">Security Baseline 0.1.14</span>
+        <span class="etiqueta">MessageUcoLab 0.3.0</span>
+        <span class="etiqueta">Catálogo de Parámetros 0.1.7</span>
+        <span class="etiqueta">Un componente de otro equipo no se modifica</span>
+      </div>
+    </header>
+
+    <div class="nota"><strong>Regla de propiedad</strong> Las carpetas de <code>Complementos/</code> pertenecen a otros equipos y no se modifican. Los problemas se documentan y se resuelven en el adaptador de Asistencias o con el equipo dueño. El cuarto componente, <a href="notificaciones.html">Notificaciones</a>, es propio y tiene su propia página.</div>
+
+    <h2 id="resumen">Resumen</h2>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Componente</th><th>Versión</th><th>Qué hace</th><th>Puerto o adaptador en el backend</th><th>Sección del stack</th><th>Eventos</th></tr></thead>
+        <tbody>
+          <tr><td>Security Baseline</td><td>0.1.14</td><td>Identidad, sesión, roles y permisos por política</td><td>Adaptadores <code>securitybaseline</code> (PEP y PDP) y selector <code>APP_ADAPTERS_SECURITY_PROVIDER</code></td><td><code>ext-seguridad</code></td><td><code>assignment.changed</code> por RabbitMQ</td></tr>
+          <tr><td>MessageUcoLab</td><td>0.3.0</td><td>Catálogo de textos de usuario</td><td><code>MessageCatalogPort</code> con <code>MessageUcoLabMessageCatalogAdapter</code></td><td><code>ext-mensajes</code></td><td>Cambios de mensajes por Pulsar</td></tr>
+          <tr><td>Catálogo de Parámetros</td><td>0.1.7 (microfrontend 0.1.6)</td><td>Valores de negocio ajustables</td><td><code>ParameterCatalogPort</code> con <code>CatalogoParametrosHttpParameterCatalogAdapter</code></td><td><code>ext-parametros</code></td><td>Ninguno (caché con refresco)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  subgraph app["Backend de Asistencias"]
+    PEPF["Filtro PEP y validacion JWT"]
+    MCP["MessageCatalogPort"]
+    PCP["ParameterCatalogPort"]
+    EVT["Listeners de eventos"]
+  end
+  subgraph seg["ext-seguridad"]
+    KC["Keycloak"]
+    PEP["PEP"]
+    PDP["PDP y OPA"]
+    RMQ["RabbitMQ"]
+  end
+  subgraph msg["ext-mensajes"]
+    KONG["Kong"]
+    MUL["MessageUcoLab"]
+    PUL["Pulsar"]
+  end
+  subgraph par["ext-parametros"]
+    CAT["Catalogo de Parametros"]
+  end
+  PEPF -->|"decision"| PEP --> PDP
+  PEPF -->|"JWT del emisor"| KC
+  MCP -->|"lectura publica"| KONG --> MUL
+  PUL -.->|"cambio de mensaje"| EVT
+  RMQ -.->|"assignment.changed"| EVT
+  PCP -->|"token y secreto"| CAT
+      </pre>
+      <figcaption>Las líneas punteadas son eventos. El catálogo de parámetros no emite eventos: el backend lo consulta con caché.</figcaption>
+    </figure>
+
+    <h2 id="seguridad">Security Baseline 0.1.14</h2>
+    <h3>Qué hace</h3>
+    <p>Reúne cinco piezas: <strong>Keycloak</strong> (inicio de sesión, realm <code>security-baseline</code>), <strong>PDP</strong> (administra aplicaciones, recursos, roles y perfiles, y decide), <strong>PEP</strong> (punto al que consulta el backend), <strong>OPA</strong> (motor de políticas interno del PDP) y <strong>RabbitMQ</strong> (eventos de asignación). Además trae una consola de administración (microfrontend) que la SPA carga en «Seguridad UCO» para asignar roles.</p>
+    <h3>Cómo está integrado</h3>
+    <ul>
+      <li><strong>Autenticación:</strong> la SPA usa Authorization Code + PKCE contra Keycloak. El backend valida el JWT (emisor, audiencia <code>asistencias-api</code> y el claim <code>idUsuario</code>).</li>
+      <li><strong>Autorización:</strong> <code>SecurityPepEnforcementFilter</code> (<code>infrastructure/config/security/</code>) consulta al PEP por cada ruta. Falla cerrada: sin respuesta del PEP, deniega.</li>
+      <li><strong>Selector único:</strong> <code>APP_ADAPTERS_SECURITY_PROVIDER</code> valor <code>baseline</code> (por defecto) o <code>legacy</code> (el Keycloak propio de contingencia). Gobierna seguridad e identidad a la vez.</li>
+      <li><strong>Catálogo de acceso:</strong> <code>GestioAsistenciaBackend/infra/security-baseline/access-catalog.json</code> es la única definición de qué roles llaman a cada endpoint. Se verifica contra el código y contra el PDP (ver <a href="operacion.html#pdp">Operación</a>).</li>
+      <li><strong>Stack:</strong> sección <code>ext-seguridad</code> (1600 MB). Puertos solo en loopback: Keycloak 19090, PDP 18080, PEP 18081, RabbitMQ 25672 y 25673, consola 5175.</li>
+    </ul>
+    <h3>Eventos</h3>
+    <p>El PDP publica <code>assignment.changed</code> en RabbitMQ (host virtual <code>/security</code>). El backend lo consume con <code>AssignmentEventsRabbitListener</code> y lo <strong>audita de forma idempotente</strong> (SEC-BASELINE-020). No cambia ninguna decisión de autorización. Se activa con <code>APP_ADAPTERS_ASSIGNMENT_EVENTS_ENABLED</code>.</p>
+    <h3>Variables (solo nombres)</h3>
+    <p><code>SECURITY_BASELINE_ISSUER_URI</code>, <code>SECURITY_BASELINE_API_CLIENT_ID</code>, <code>SECURITY_BASELINE_EXPECTED_AUDIENCE</code>, <code>SECURITY_BASELINE_USER_ID_CLAIM</code>, <code>SECURITY_BASELINE_PDP_URL</code>, <code>SECURITY_BASELINE_IDENTITY_SERVER_URL</code>, <code>SECURITY_BASELINE_IDENTITY_REALM</code>, <code>SECURITY_BASELINE_PDP_PROFILE_SYNC_ENABLED</code>, <code>RABBITMQ_HOST</code>, <code>RABBITMQ_PORT</code>, <code>RABBITMQ_VIRTUAL_HOST</code>, <code>RABBITMQ_USERNAME</code>, <code>RABBITMQ_PASSWORD</code>. Los secretos llegan del archivo local <code>lab.env</code> fuera de Git.</p>
+    <div class="nota alerta"><strong>Límites conocidos</strong> Una cuenta de estudiante recién creada por el QR recibe 403 del PDP hasta que Seguridad le asigne el rol en su primer inicio de sesión (HU176B abierta). La sesión de 5 minutos del laboratorio espera una versión nueva de Seguridad. El PDP compartido (SEG-07, SEG-08) lo aprovisiona un tercero.</div>
+
+    <h2 id="mensajes">MessageUcoLab 0.3.0</h2>
+    <h3>Qué hace</h3>
+    <p>Es el catálogo institucional de textos: cada mensaje tiene código, título y contenido por aplicación y ambiente. El backend lo lee para devolver <code>mensajeUsuario</code> y, con la bandera del frontend, para los textos de pantalla (<code>UI###</code>). La lectura es pública por Kong; la administración exige sesión en Seguridad.</p>
+    <h3>Cómo está integrado</h3>
+    <ul>
+      <li><strong>Puerto:</strong> <code>MessageCatalogPort</code>. Adaptador <code>MessageUcoLabMessageCatalogAdapter</code> en <code>infrastructure/adapter/secondary/catalog/messageucolab/</code>.</li>
+      <li><strong>Mapeo de códigos:</strong> <code>MessageUcoLabCodeMapper</code> quita los caracteres no alfanuméricos y antepone <code>MSG_</code> (por ejemplo <code>VAL_001</code> pasa a <code>MSG_VAL001</code>). Los códigos de más de 10 caracteres sin alias no se consultan.</li>
+      <li><strong>Resiliencia:</strong> caché de 5 minutos, tiempo máximo de 3 segundos y respaldo configurable (<code>azure</code> o ninguno).</li>
+      <li><strong>Identidad de servicio:</strong> <code>MessageUcoLabServiceIdentityTokenProvider</code> obtiene un token de cliente de Keycloak para las operaciones que lo exigen.</li>
+      <li><strong>Selector:</strong> <code>APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER</code>: <code>azure</code> (por defecto), <code>messageucolab</code> o <code>sqlserver</code>. Con <code>infra.ps1 stack up</code>, el backend usa <code>messageucolab</code> solo si <code>ext-mensajes</code> está arriba.</li>
+      <li><strong>Stack:</strong> sección <code>ext-mensajes</code> (3300 MB): Redis, SurrealDB, Kong, Pulsar y la aplicación; requiere <code>ext-seguridad</code>. Los secretos del kit salen de Doppler (proyecto <code>messageucolab-local</code>), por eso necesita <code>doppler login</code> de la cuenta del responsable.</li>
+    </ul>
+    <h3>Eventos</h3>
+    <p>Un cambio de mensaje en MessageUcoLab llega por Pulsar (prefijo <code>persistent://public/default/message-events</code>). <code>MessageUcoLabEventListener</code> sincroniza el catálogo de la BD y, al arrancar, reconcilia todo (<code>MESSAGEUCOLAB_RECONCILE_ON_STARTUP</code>). La validación del 2026-11-15 reconcilió 482 mensajes sin fallos y reflejó un cambio en la BD en 2,8 segundos. El backend reintenta la suscripción si Pulsar no está listo.</p>
+    <h3>Variables (solo nombres)</h3>
+    <p><code>MESSAGEUCOLAB_URL</code>, <code>MESSAGEUCOLAB_TIMEOUT</code>, <code>MESSAGEUCOLAB_CACHE_TTL</code>, <code>MESSAGEUCOLAB_FALLBACK</code>, <code>MESSAGEUCOLAB_CODE_PREFIX</code>, <code>MESSAGEUCOLAB_TOKEN_URI</code>, <code>MESSAGEUCOLAB_CLIENT_ID</code>, <code>MESSAGEUCOLAB_CLIENT_SECRET</code>, <code>MESSAGEUCOLAB_EVENTS_ENABLED</code>, <code>MESSAGEUCOLAB_PULSAR_URL</code>, <code>MESSAGEUCOLAB_EVENTS_TOPIC_PREFIX</code>, <code>MESSAGEUCOLAB_EVENTS_SUBSCRIPTION</code>. En el frontend, <code>MENSAJES_UI_DESDE_CATALOGO</code>.</p>
+    <div class="nota alerta"><strong>En curso (2026-11-22)</strong> Los nueve textos de pantalla nuevos (UI136 a UI144) ya están importados en MessageUcoLab (ambiente Develop). Faltan la prueba viva contra el servicio real, que necesita <code>doppler login</code>, y decidir si <code>MENSAJES_UI_DESDE_CATALOGO</code> se enciende por defecto (ítems MSG-03 y MSG-06 de la lista de chequeo).</div>
+
+    <h2 id="parametros">Catálogo de Parámetros 0.1.7</h2>
+    <h3>Qué hace</h3>
+    <p>Guarda los valores de negocio que cambian sin recompilar: días límite para reclamar, umbrales de alerta, segmentos de red del campus, entre otros. Trae un microfrontend (0.1.6) para administrarlos y se protege con Seguridad.</p>
+    <h3>Cómo está integrado</h3>
+    <ul>
+      <li><strong>Puerto:</strong> <code>ParameterCatalogPort</code>. Adaptador <code>CatalogoParametrosHttpParameterCatalogAdapter</code> en <code>infrastructure/adapter/secondary/catalog/catalogoparametros/</code>.</li>
+      <li><strong>Valor por defecto:</strong> <code>ParametroConValorPorDefectoCatalogAdapter</code> devuelve el valor sembrado si el catálogo no responde o no tiene el parámetro, de modo que el sistema no cae.</li>
+      <li><strong>Caché:</strong> 5 minutos; vencida, se sirve y se refresca en segundo plano. El tiempo máximo de lectura es de 10 segundos porque la lectura en frío del componente tarda varios.</li>
+      <li><strong>Selector:</strong> <code>APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER</code>: <code>azure_appconfig</code> (por defecto en el código), <code>sqlserver</code> o <code>catalogoparametros</code>. El stack elige <code>catalogoparametros</code> si <code>ext-parametros</code> está arriba.</li>
+      <li><strong>Stack:</strong> sección <code>ext-parametros</code> (600 MB): Redis, SurrealDB, la aplicación y el microfrontend (puerto 4201). Su API usa el puerto 8081, por eso no puede convivir con <code>asis-contingencia</code>.</li>
+      <li><strong>Edición en la app:</strong> mientras llega el componente, la pantalla de parámetros del administrador es un puente (DEC-067) con una lista blanca de parámetros editables.</li>
+    </ul>
+    <h3>Eventos</h3>
+    <p>No emite eventos. Un valor distinto solo en <code>dbo.CatalogoParametro</code> no se usa cuando el escenario <code>parametros</code> está activo: el backend lee del Catálogo. El cambio de un parámetro desde la app publica <code>PARAMETER_UPDATED</code> solo para el administrador.</p>
+    <h3>Variables (solo nombres)</h3>
+    <p><code>CATALOGO_PARAMETROS_BASE_URL</code>, <code>CATALOGO_PARAMETROS_TOKEN_ID</code>, <code>CATALOGO_PARAMETROS_SECRETO</code>, <code>CATALOGO_PARAMETROS_APPLICATION_ID</code>, <code>CATALOGO_PARAMETROS_ENVIRONMENT_ID</code>, <code>CATALOGO_PARAMETROS_TIMEOUT</code>, <code>CATALOGO_PARAMETROS_CACHE_TTL</code>, <code>CATALOGO_PARAMETROS_SEPARADOR</code>. El secreto del token se muestra una sola vez al crearlo y se guarda solo en el backend o en el almacén de secretos, nunca en el frontend.</p>
+
+    <h2 id="versiones">Versiones y escenarios</h2>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Escenario</th><th>Seguridad</th><th>Mensajes</th><th>Parámetros</th><th>Notificaciones</th></tr></thead>
+        <tbody>
+          <tr><td><code>basico</code></td><td>Sí</td><td>Desde la BD</td><td>Desde la BD</td><td>Sí</td></tr>
+          <tr><td><code>mensajes</code></td><td>Sí</td><td>MessageUcoLab</td><td>Desde la BD</td><td>Sí</td></tr>
+          <tr><td><code>parametros</code></td><td>Sí</td><td>Desde la BD</td><td>Catálogo</td><td>Sí</td></tr>
+          <tr><td><code>completo</code></td><td>Sí</td><td>MessageUcoLab</td><td>Catálogo</td><td>Sí</td></tr>
+          <tr><td><code>contingencia</code></td><td>Keycloak propio (<code>legacy</code>)</td><td>Desde la BD</td><td>Desde la BD</td><td>Sí</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Fuente: <code>AsistenciasUCO-Infra/stack/secciones.json</code> y <code>stack/README.md</code>. Las versiones de los componentes de otros equipos se fijan en sus kits de <code>Complementos/</code> y no se usa <code>latest</code>.</p>
+
+    <h2 id="receta">Receta de ocho pasos para integrar un componente externo</h2>
+    <p>Es el patrón que siguieron los tres componentes anteriores. Mantiene el negocio libre de proveedores y permite reemplazar el componente sin tocar los casos de uso.</p>
+    <ol>
+      <li><strong>Leer su guía y fijar la versión.</strong> Registra el contrato (rutas, autenticación, límites) y la versión exacta. Nada de <code>latest</code>.</li>
+      <li><strong>Definir el puerto.</strong> Una interfaz en <code>application/secondaryports/&lt;tema&gt;</code> con el vocabulario del negocio, sin tipos del proveedor.</li>
+      <li><strong>Escribir el adaptador.</strong> En <code>infrastructure/adapter/secondary/&lt;tema&gt;/&lt;proveedor&gt;</code>, con tiempo máximo, caché y manejo de errores propios. Nunca se llama al componente desde un controlador ni desde un caso de uso.</li>
+      <li><strong>Cablearlo en el Composition Root.</strong> Una clase de configuración con <code>@ConditionalOnProperty</code> sobre un selector <code>app.adapters.&lt;tema&gt;.provider</code>, con un valor por defecto y un respaldo (por ejemplo BD o un adaptador anterior) para contingencia.</li>
+      <li><strong>Configurar sin secretos en el repositorio.</strong> Variables de entorno con valor por defecto seguro; los secretos por <code>SecretVaultPort</code> o por <code>.env</code> local fuera de Git.</li>
+      <li><strong>Agregar la sección al stack.</strong> Una entrada en <code>stack/secciones.json</code> (directorio, compose, salud, memoria, requisitos y conflictos) con un overlay propio, y que <code>stack.ps1</code> genere la configuración del backend según lo que esté arriba. Se añade a los escenarios que lo usan sin pasar el límite de memoria.</li>
+      <li><strong>Aprovisionar permisos y eventos.</strong> Si el componente es administrable, registra sus rutas en Seguridad y el catálogo de acceso; si emite eventos, un listener idempotente y con reintento de suscripción.</li>
+      <li><strong>Probar y documentar.</strong> Pruebas unitarias del adaptador, de cableado y de ArchUnit (aislamiento del proveedor), una prueba viva en el laboratorio, una guía en <code>AsistenciasUCO-Infra/docs/governance</code> o <code>hardening</code> y <code>infra.ps1 verify</code> en verde.</li>
+    </ol>
+    <div class="nota exito"><strong>Cuándo se cumple</strong> Si cambiar de proveedor solo exige cambiar una propiedad y la sección del stack, la integración está bien hecha. Si exige tocar un caso de uso, el puerto filtró detalles del proveedor.</div>
+  </main>
+</div>
+</body>
+</html>

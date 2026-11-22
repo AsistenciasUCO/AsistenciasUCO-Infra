@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laboratorio y despliegue · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>Laboratorio y despliegue</h1>
+      <p>Cómo levantar el sistema en tu equipo, cargar datos de prueba, verificar contratos, resolver los problemas más comunes y entender las compuertas de calidad de la integración continua.</p>
+      <div class="etiquetas">
+        <span class="etiqueta">infra.ps1</span>
+        <span class="etiqueta">Docker por secciones</span>
+        <span class="etiqueta">Escenarios</span>
+        <span class="etiqueta">CI y compuertas</span>
+        <span class="etiqueta">Conventional Commits</span>
+      </div>
+    </header>
+
+    <p>Todo se ejecuta desde la raíz del workspace con el ayudante maestro <code>.\AsistenciasUCO-Infra\infra.ps1</code>. Guías de origen: <code>AsistenciasUCO-Infra/docs/runbooks/PRUEBAS_LOCALES.md</code>, <code>DEMO_DOCKER.md</code> y <code>AsistenciasUCO-Infra/stack/README.md</code>.</p>
+
+    <h2 id="comandos">Comandos de infra.ps1</h2>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Grupo</th><th>Comando</th><th>Qué hace</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="6">Contenedores</td><td><code>stack list</code></td><td>Muestra secciones y escenarios.</td></tr>
+          <tr><td><code>stack plan &lt;escenario&gt;</code></td><td>Calcula qué levantaría y cuánta memoria usa, sin cambiar nada.</td></tr>
+          <tr><td><code>stack up &lt;escenario o sección&gt;</code></td><td>Levanta lo necesario y apaga lo que no se use. Con <code>-Conservar</code> agrega sin apagar el resto.</td></tr>
+          <tr><td><code>stack status</code></td><td>Estado y memoria por sección.</td></tr>
+          <tr><td><code>stack down</code></td><td>Apaga todo menos <code>asis-datos</code>. Nunca borra volúmenes. Con <code>-IncluirDatos</code> apaga también SQL Server y MinIO.</td></tr>
+          <tr><td><code>stack build [backend|frontend|notificaciones]</code></td><td>Construye las imágenes <code>asistencias-backend:develop</code>, <code>asistencias-frontend:develop</code> y <code>notificaciones-uco:0.1.0</code>.</td></tr>
+          <tr><td rowspan="5">Datos y BD</td><td><code>datos-prueba cargar -Yes</code></td><td>Respalda y recrea la BD desde el esquema de <code>develop</code>, carga 73 usuarios de todos los roles, los da de alta en Keycloak y el PDP y verifica cada rol (unos 10 minutos).</td></tr>
+          <tr><td><code>datos-prueba seguridad</code> y <code>datos-prueba verificar</code></td><td>Solo cuentas y perfiles, o solo la verificación por rol (lectura).</td></tr>
+          <tr><td><code>db-deploy</code> · <code>db-seed</code> · <code>db-test</code></td><td>Despliega el esquema, siembra y ejecuta las pruebas T-SQL.</td></tr>
+          <tr><td><code>db-reset-qa -Mode Snapshot</code> o <code>Restore</code></td><td>Guarda o restaura el estado de la BD (detén antes el backend).</td></tr>
+          <tr><td><code>db-cupos</code></td><td>Amplía en 40 la capacidad de cupos de todos los grupos, para pruebas.</td></tr>
+          <tr><td rowspan="5">Calidad</td><td><code>verify</code></td><td>Pre-flight: secretos, contratos WORM con paridad entre repos y rutas por rol.</td></tr>
+          <tr><td><code>check-secrets</code> · <code>verify-contracts</code></td><td>Cada parte de <code>verify</code> por separado.</td></tr>
+          <tr><td><code>sync-hus</code></td><td>Sincroniza los work items hacia <code>docs/work-items/INDEX.md</code>.</td></tr>
+          <tr><td><code>test-backend</code> · <code>test-e2e</code></td><td>Gate del backend (ArchUnit y unitarias) y suite E2E de las HU.</td></tr>
+          <tr><td><code>kc-token -Role &lt;rol&gt;</code></td><td>Obtiene un token de prueba para un rol.</td></tr>
+          <tr><td rowspan="2">Componentes</td><td><code>messages-up</code>, <code>messages-down</code>, <code>messages-status</code>, <code>messages-switch</code></td><td>Atajos de MessageUcoLab (el camino vigente es <code>stack up mensajes</code>).</td></tr>
+          <tr><td><code>security-up</code>, <code>security-status</code>, <code>security-switch</code></td><td>Atajos de Seguridad y del selector entre Keycloak propio y Security Baseline.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota alerta"><strong>Antes de cerrar una tarea</strong> Ejecuta siempre <code>.\AsistenciasUCO-Infra\infra.ps1 verify</code>. Falla si hay secretos expuestos, contratos con firma que no coincide o rutas por rol desactualizadas.</div>
+
+    <h2 id="escenarios">Escenarios y memoria</h2>
+    <p>El laboratorio completo no cabe en la máquina virtual de Docker (límite de 9700 MB, <code>%USERPROFILE%\.wslconfig</code> con 10 GB). Por eso se levanta por <strong>secciones</strong> o por <strong>escenarios</strong>. <code>asis-datos</code> es la única sección con reinicio automático.</p>
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Memoria estimada en megabytes de cada sección del laboratorio" role="img" data-grafica='{"type":"bar","data":{"labels":["ext-mensajes","asis-datos","ext-seguridad","asis-antivirus","asis-app","asis-obs","asis-contingencia","ext-parametros","ext-notificaciones"],"datasets":[{"label":"Memoria (MB)","data":[3300,2500,1600,1300,1200,900,900,600,450]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}},"scales":{"x":{"title":{"display":true,"text":"MB estimados"}}}}}'></canvas></div>
+      <figcaption>Memoria por sección según <code>memoriaMb</code> de <code>stack/secciones.json</code>. El límite global es 9700 MB.</figcaption>
+    </figure>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Escenario</th><th>Secciones</th><th>Memoria</th><th>Pruebas que cubre</th></tr></thead>
+        <tbody>
+          <tr><td><code>minimo</code></td><td>asis-datos</td><td>2,5 GB</td><td>Gate de BD y scripts SQL</td></tr>
+          <tr><td><code>basico</code></td><td>datos, seguridad, notificaciones, app</td><td>5,75 GB</td><td>HU de los 5 roles</td></tr>
+          <tr><td><code>mensajes</code></td><td>básico + mensajes</td><td>9,05 GB</td><td>Catálogo de mensajes y textos UI</td></tr>
+          <tr><td><code>parametros</code></td><td>básico + parámetros</td><td>6,35 GB</td><td>Catálogo de Parámetros y su microfrontend</td></tr>
+          <tr><td><code>completo</code></td><td>básico + mensajes + parámetros</td><td>9,65 GB de 9,7 GB</td><td>Flujos con los tres componentes (no agregar más secciones)</td></tr>
+          <tr><td><code>soportes</code></td><td>básico + antivirus</td><td>7,05 GB</td><td>Adjuntos de reclamos con MinIO y ClamAV</td></tr>
+          <tr><td><code>observabilidad</code></td><td>básico + obs</td><td>6,65 GB</td><td>Trazas, métricas y logs por <code>correlationId</code></td></tr>
+          <tr><td><code>contingencia</code></td><td>datos, contingencia, notificaciones, app</td><td>5,05 GB</td><td>Arranque con el Keycloak propio</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li><code>ext-mensajes</code> y <code>ext-parametros</code> requieren <code>ext-seguridad</code>; <code>ext-notificaciones</code> requiere <code>asis-datos</code>. Se agregan solas.</li>
+      <li><code>asis-contingencia</code> y <code>ext-parametros</code> no pueden convivir: ambos usan el puerto 8081 del PC.</li>
+      <li>Con <code>asis-app</code>, <code>stack up</code> genera la configuración del backend y del frontend (<code>stack/generado/*.env</code>, fuera de Git) según lo que esté arriba. Por ejemplo usa el proveedor <code>baseline</code> con <code>ext-seguridad</code> y el <code>legacy</code> con la contingencia.</li>
+    </ul>
+
+    <h2 id="levantar">Levantar el laboratorio después de un apagado</h2>
+    <div class="flujo" data-flujo data-titulo="Del PC apagado a la demo lista">
+      <div class="paso" data-actor="Docker" data-detalle="Abre Docker Desktop y comprueba con docker ps que responde. Si falla con engine.sock o se cuelga, reinicia Docker (wsl --shutdown y vuelve a abrirlo).">Docker arriba</div>
+      <div class="paso" data-actor="infra.ps1" data-detalle="Una sola vez tras cambios de código: stack build construye las imágenes de backend y frontend, y stack build notificaciones la del servicio de correo.">Construye imágenes</div>
+      <div class="paso" data-actor="infra.ps1" data-detalle="stack up basico levanta BD, Seguridad, Notificaciones y la app. Imprime las direcciones al terminar: SPA en 4200 y API en 8080.">Levanta el escenario</div>
+      <div class="paso" data-actor="infra.ps1" data-detalle="stack up ejecuta provision_asistencias.py verify y, si falta alguna concesión, pdp (aditivo). Evita los 403 en rutas nuevas.">Sincroniza el PDP</div>
+      <div class="paso" data-actor="infra.ps1" data-detalle="datos-prueba cargar -Yes recrea la BD con 73 usuarios y casos preparados. Define ASISTENCIAS_PYTHON si no hay el lanzador py.">Carga datos</div>
+      <div class="paso" data-actor="Tú" data-detalle="Abre http://localhost:4200 e inicia sesión con un usuario de prueba del rol que quieras probar. La lista por rol está en GestioAsistenciaDB/scripts/datos-prueba/USUARIOS.md.">Entra a la SPA</div>
+      <div class="paso" data-actor="infra.ps1" data-tipo="error" data-detalle="Si algo no arranca, consulta la tabla de problemas frecuentes: memoria de Docker, puerto ocupado o imagen faltante.">Si falla</div>
+    </div>
+    <pre><code>.\AsistenciasUCO-Infra\infra.ps1 stack build
+.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones
+.\AsistenciasUCO-Infra\infra.ps1 stack up basico
+.\AsistenciasUCO-Infra\infra.ps1 datos-prueba cargar -Yes</code></pre>
+    <p class="nota"><strong>Fuente</strong> Secuencia de <code>AsistenciasUCO-Infra/docs/runbooks/DEMO_DOCKER.md</code>, secciones 4 y 5.</p>
+    <p>Para apagar: <code>stack down</code> (todo menos la BD y MinIO) o <code>stack down -IncluirDatos</code>. Ninguno borra volúmenes.</p>
+
+    <h2 id="pdp">Aprovisionar el PDP (permisos de rutas)</h2>
+    <p>Cada endpoint del backend debe estar concedido a sus roles en el PDP. Una ruta nueva sin concesión responde <strong>403</strong> aunque el código esté bien.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Paso</th><th>Comando</th><th>Efecto</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>python -X utf8 -I GestioAsistenciaBackend/infra/security-baseline/scripts/provision_asistencias.py verify</code></td><td>Compara el PDP con <code>access-catalog.json</code>. Las líneas <code>FALTA</code> indican concesiones ausentes.</td></tr>
+          <tr><td>2</td><td><code>... provision_asistencias.py pdp</code></td><td>Agrega lo que falta. Es aditivo.</td></tr>
+          <tr><td>3</td><td><code>... provision_asistencias.py verify-decisions</code></td><td>Prueba la decisión real PEP a PDP por endpoint y rol.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota peligro"><strong>Nunca <code>--prune</code> en la demo</strong> Revoca lo que el catálogo no declara. Su ejecución en el PDP compartido la hace el dueño del componente (decisión DEC-071). <code>stack up</code> y <code>datos-prueba</code> ya aprovisionan de forma aditiva; se omite con <code>-SinPdp</code>.</div>
+
+    <h2 id="problemas">Solución de problemas</h2>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Síntoma</th><th>Causa y solución</th></tr></thead>
+        <tbody>
+          <tr><td>403 en una ruta o endpoint nuevo</td><td>El PDP no tiene la concesión. <code>stack up</code> y <code>datos-prueba</code> ya la corrigen; manual: <code>provision_asistencias.py pdp</code> y luego <code>verify</code>. Nunca <code>--prune</code>.</td></tr>
+          <tr><td>Contenedores que mueren o <code>stack up</code> rechaza por memoria</td><td>Docker sin memoria. Sube <code>.wslconfig</code> a 10 GB o detén secciones que no uses con <code>stack down &lt;sección&gt;</code>. Antes del gate de BD detén MessageUcoLab, Kong, el Catálogo y ClamAV.</td></tr>
+          <tr><td>Error <code>engine.sock</code> o <code>docker</code> colgado</td><td>Reinicia Docker Desktop (<code>wsl --shutdown</code> y ábrelo de nuevo) y verifica con <code>docker ps</code>.</td></tr>
+          <tr><td><code>datos-prueba cargar</code> pide definir Python</td><td>Define <code>ASISTENCIAS_PYTHON</code> con la ruta de <code>python.exe</code>. El alias de la Microsoft Store y el Python de MSYS se descartan.</td></tr>
+          <tr><td>Falta la imagen <code>asistencias-backend:develop</code></td><td>Ejecuta <code>infra.ps1 stack build</code>.</td></tr>
+          <tr><td>Error de collation al desplegar el esquema</td><td>La base debe crearse con la collation del esquema. Usa <code>datos-prueba cargar -Yes</code> (recrea desde cero) en vez de restaurar una base de otro servidor.</td></tr>
+          <tr><td>Hay un backend local en el puerto 8080</td><td>Deténlo o usa <code>datos-prueba cargar -Yes -StopBackend</code>.</td></tr>
+          <tr><td>La sesión «se cae» durante la demo</td><td>Es esperado: el token de acceso dura 5 minutos (se renueva por PKCE) y la sesión SSO 30 minutos.</td></tr>
+          <tr><td>Frontend sin estilos o en blanco</td><td>Tras un <code>stack build</code>, recrea la app con <code>stack up asis-app -Conservar</code>.</td></tr>
+          <tr><td><code>migrar.ps1 -Modo Aplicar</code> re-ejecuta todo</td><td>Con <code>dbo.MigracionAplicada</code> vacía, las migraciones desde la 05 figuran pendientes. Corre siempre antes <code>migrar.ps1 -Modo Estado</code> (solo lee).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota alerta"><strong>Orden de migraciones</strong> Aplica las migraciones antes que <code>deploy_schema.ps1</code> (TD-081): algunas recrean procedimientos con el texto de su época y, con otro orden, pisan objetos más nuevos.</div>
+
+    <h2 id="ci">Integración continua y compuertas</h2>
+    <p>Cada repositorio tiene su flujo de GitHub Actions. Un PR a <code>develop</code> debe pasar todas las compuertas.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Repositorio</th><th>Flujo</th><th>Qué comprueba</th></tr></thead>
+        <tbody>
+          <tr><td>Base de datos</td><td><code>ci.yml</code> (DB Quality Gate)</td><td>Firma del manifiesto de congelación, despliegue del esquema desde cero (<code>deploy_schema.ps1</code>), suite <code>test_summary.ps1</code>, inventario Trivy y Gitleaks.</td></tr>
+          <tr><td rowspan="5">Backend</td><td><code>backend-ci.yml</code></td><td><code>mvn clean verify</code>: pruebas unitarias, ArchUnit, empaquetado y reporte JaCoCo; análisis de calidad.</td></tr>
+          <tr><td><code>integration.yml</code></td><td><code>mvn verify -Pintegration</code> contra una BD desplegada con el mismo script del CI de BD.</td></tr>
+          <tr><td><code>security.yml</code></td><td>Revisión de dependencias, Gitleaks y CodeQL de Java.</td></tr>
+          <tr><td><code>security-deep-scan.yml</code></td><td>ArchUnit, Trivy sobre el repositorio y sobre la imagen de producción.</td></tr>
+          <tr><td><code>load-test.yml</code></td><td>Prueba de carga de lectura con k6 (manual).</td></tr>
+          <tr><td>Frontend</td><td><code>frontend-ci.yml</code></td><td>Lint, verificaciones de textos de pantalla, matriz de HU y contrato OpenAPI, pruebas con cobertura, compuerta de cobertura de realtime, compilación, E2E con Playwright (backend simulado), CodeQL, revisión de dependencias y Gitleaks.</td></tr>
+          <tr><td>Infra</td><td><code>infra-validation.yml</code></td><td>Contenido oficial de Infra y contratos, Trivy que bloquea HIGH y CRITICAL (con excepciones fechadas en <code>.trivyignore</code>) y Gitleaks.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Umbrales mínimos</h3>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Capa</th><th>Umbral de la compuerta</th><th>Medido el 2026-11-22</th></tr></thead>
+        <tbody>
+          <tr><td>Backend (JaCoCo)</td><td>Líneas 80 % y ramas 70 %</td><td>95,9 % y 87,5 %</td></tr>
+          <tr><td>Frontend, realtime (<code>src/app/core/realtime/**</code>)</td><td>Líneas 90 % y ramas 80 %</td><td>95,24 % y 86,81 %</td></tr>
+          <tr><td>Servicio de Notificaciones (JaCoCo)</td><td>Líneas 80 % y ramas 70 %</td><td>98,5 % y 92,6 %</td></tr>
+          <tr><td>Base de datos</td><td>Todos los casos del gate aprobados</td><td>1100 casos, 0 fallos</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Comandos locales equivalentes:</p>
+    <pre><code># Backend (en Windows, evita el error de loopback de Java)
+cd GestioAsistenciaBackend
+$env:JAVA_TOOL_OPTIONS='-Djdk.net.unixdomain.tmpdir=C:\jtmp'
+.\mvnw.cmd clean verify
+
+# Frontend
+cd GestioAsistenciaFrontend
+npm run verify
+
+# Base de datos: desplegar desde cero y correr el gate como la CI
+cd GestioAsistenciaDB
+.\deploy_schema.ps1
+.\test_summary.ps1</code></pre>
+    <div class="nota"><strong>Gate de BD como la CI</strong> El gate local debe desplegar desde cero y correr <code>test_summary.ps1</code>. Ejecutar <code>test_suite.sql</code> sobre un respaldo no equivale al de la CI.</div>
+
+    <h2 id="commits">Convenciones de commits y ramas</h2>
+    <p>Los commits siguen Conventional Commits 1.0.0, <strong>en español</strong> y en modo imperativo. Cada capa tiene su commit atómico: no se mezclan BD, backend y frontend en un solo paquete.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Elemento</th><th>Regla</th><th>Ejemplo</th></tr></thead>
+        <tbody>
+          <tr><td>Estructura</td><td><code>&lt;tipo&gt;(&lt;alcance&gt;): &lt;descripción&gt;</code>, primera línea de 72 caracteres como máximo, sin punto final</td><td><code>fix(db/sp): corregir evaluacion de inasistencia en usp_calcular_perdidas</code></td></tr>
+          <tr><td>Tipos</td><td><code>feat</code>, <code>fix</code>, <code>refactor</code>, <code>test</code>, <code>perf</code>, <code>docs</code>, <code>ci</code>, <code>chore</code></td><td><code>refactor(backend/adapter): retirar plantillas, renderizado y SMTP del backend</code></td></tr>
+          <tr><td>Alcances</td><td><code>db/sp</code>, <code>db/tables</code>, <code>db/views</code>, <code>backend/controller</code>, <code>backend/usecase</code>, <code>backend/adapter</code>, <code>frontend/realtime</code>, <code>frontend/docente</code>, <code>scripts</code>, <code>docs</code>, entre otros</td><td><code>test(frontend): agregar cobertura realtime</code></td></tr>
+          <tr><td>Cuerpo y pie</td><td>Obligatorios en cambios de arquitectura o de HU: qué cambió, por qué y cómo. El pie referencia la HU (<code>Refs: HU043</code>) y los cambios incompatibles (<code>BREAKING CHANGE:</code>)</td><td><code>Refs: HU043</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li>Nunca se relajan ni se desactivan pruebas para que pasen: se corrige el código de producción, salvo que la prueba tenga un error técnico real o un cambio formal de contrato.</li>
+      <li>Antes de empujar una rama, comprueba que el PR no esté ya mezclado.</li>
+      <li>Un cambio de contrato exige addendum, hash nuevo y <code>infra.ps1 verify</code> en verde.</li>
+    </ul>
+  </main>
+</div>
+</body>
+</html>

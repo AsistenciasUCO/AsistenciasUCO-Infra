@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inicio y mapa del sistema · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>Sistema de Gestión de Asistencia UCO</h1>
+      <p>Documentación técnica de la plataforma con la que la Universidad Católica de Oriente registra, controla y audita la asistencia académica en tiempo real. Estado medido el 2026-11-22.</p>
+      <div class="etiquetas">
+        <span class="etiqueta">SQL Server 2022</span>
+        <span class="etiqueta">Spring Boot 4 · Java 25</span>
+        <span class="etiqueta">Angular 22 · Signals</span>
+        <span class="etiqueta">Tiempo real (SSE)</span>
+        <span class="etiqueta">5 roles</span>
+      </div>
+    </header>
+
+    <h2 id="que-es">Qué es y qué problema resuelve</h2>
+    <p>El sistema digitaliza el ciclo completo de la asistencia universitaria: se crean los grupos de un período, el sistema genera las sesiones de clase (descontando festivos y recesos), el docente toma la asistencia en el aula (a mano, por QR o por PIN), el estudiante ve sus faltas y puede reclamarlas, y el sistema calcula solo el porcentaje de inasistencia para avisar del riesgo y de la pérdida de la asignatura por inasistencia (regla institucional del 20 %).</p>
+    <p>El porqué: antes de la plataforma el control de ausentismo dependía de listas en papel o de hojas de cálculo, sin trazabilidad para la acreditación institucional y sin una regla única para calcular la pérdida. Hoy la regla vive en un solo lugar (la base de datos), cada decisión queda auditada y cada rol ve solo lo que le corresponde.</p>
+
+    <div class="tarjetas">
+      <div class="tarjeta"><div class="icono">🧠</div><h4>La base de datos es la fuente de verdad</h4><p>Reglas de negocio, folios y catálogos viven en SQL Server mediante procedimientos almacenados transaccionales.</p></div>
+      <div class="tarjeta"><div class="icono">🔌</div><h4>Backend delgado y desacoplado</h4><p>Spring Boot orquesta casos de uso por puertos y adaptadores. No tiene SQL inline ni lógica de negocio duplicada.</p></div>
+      <div class="tarjeta"><div class="icono">⚡</div><h4>Interfaz reactiva</h4><p>Angular con Signals y eventos del servidor (SSE). El sondeo periódico (polling) está prohibido.</p></div>
+      <div class="tarjeta"><div class="icono">🧩</div><h4>Componentes externos</h4><p>Seguridad, mensajes, parámetros y notificaciones son servicios independientes que se conectan por contrato.</p></div>
+    </div>
+
+    <h2 id="roles">Los cinco roles</h2>
+    <p>Ningún rol puede hacerlo todo. La jerarquía es de custodia: cada nivel crea y administra al de abajo dentro de su propio ámbito. El ámbito se valida <strong>dentro de los procedimientos almacenados</strong>, no solo en la pantalla.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Rol</th><th>Ámbito</th><th>Qué hace</th><th>Qué no puede hacer</th></tr></thead>
+        <tbody>
+          <tr><td>Administrador institucional</td><td>Toda la institución</td><td>Facultades, decanos, períodos académicos, recesos, cierre masivo, parámetros, plantillas de correo y catálogos.</td><td>Tomar ni editar asistencia.</td></tr>
+          <tr><td>Decano</td><td>Su facultad</td><td>Programas, coordinadores, consolidados e indicadores de su facultad.</td><td>Editar asistencia; resolver la cancelación por inasistencia (solo consulta y auditoría).</td></tr>
+          <tr><td>Coordinador de programa</td><td>Programas que coordina</td><td>Planes, asignaturas, docentes, grupos, sesiones extraordinarias y la decisión final de la cancelación por inasistencia.</td><td>Editar asistencia.</td></tr>
+          <tr><td>Docente</td><td>Grupos donde es titular</td><td>Toma de asistencia, matrícula por QR o manual, resolución definitiva de reclamos, cancelación de sus sesiones.</td><td>Ver grupos ajenos.</td></tr>
+          <tr><td>Estudiante</td><td>Sus matrículas</td><td>Marcar asistencia por QR o PIN, consultar faltas, reclamar y justificar con soportes.</td><td>Ver datos de otros.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>El detalle de los flujos por rol está en <a href="negocio.html">Reglas y flujos de negocio</a>.</p>
+
+    <h2 id="stack">Stack tecnológico</h2>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Capa</th><th>Tecnología</th><th>Responsabilidad</th></tr></thead>
+        <tbody>
+          <tr><td>Base de datos</td><td>SQL Server 2022 (nivel de compatibilidad 160) en Docker</td><td>Reglas ACID, procedimientos <code>usp_*</code>, vistas <code>uv_*</code>, funciones <code>ufn_*</code>, catálogos.</td></tr>
+          <tr><td>Backend</td><td>Java 25 · Spring Boot 4.0.8 · Spring Data JPA</td><td>API REST delgada, casos de uso, seguridad OAuth2/JWT, auditoría, SSE.</td></tr>
+          <tr><td>Frontend</td><td>Angular 22 · TypeScript 6 · Tailwind CSS v4</td><td>SPA con componentes standalone, Signals y detección de cambios OnPush.</td></tr>
+          <tr><td>Identidad y permisos</td><td>Security Baseline 0.1.14 (Keycloak, PDP, PEP, OPA)</td><td>Inicio de sesión con Authorization Code + PKCE y autorización por política.</td></tr>
+          <tr><td>Mensajes</td><td>MessageUcoLab 0.3.0 (Kong, Pulsar)</td><td>Catálogo de textos de usuario.</td></tr>
+          <tr><td>Parámetros</td><td>Catálogo de Parámetros 0.1.7</td><td>Valores de negocio ajustables.</td></tr>
+          <tr><td>Correo</td><td>Servicio de Notificaciones UCO 0.1.0 (propio)</td><td>Plantillas, cola, reintentos y entrega SMTP.</td></tr>
+          <tr><td>Soportes</td><td>MinIO + ClamAV 1.5.4</td><td>Almacenamiento de objetos y escaneo antivirus de adjuntos.</td></tr>
+          <tr><td>Observabilidad</td><td>OpenTelemetry, Actuator, Grafana, Prometheus, Loki, Tempo</td><td>Trazas, métricas y logs correlacionados.</td></tr>
+          <tr><td>Automatización</td><td>PowerShell (<code>infra.ps1</code>), Docker Compose</td><td>Laboratorio por secciones, datos de prueba y verificación.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="mapa">Mapa del sistema</h2>
+    <p>El navegador solo habla con el backend. El backend nunca consulta tablas: ejecuta procedimientos y lee vistas. Los componentes externos se consumen por puertos, de modo que se pueden reemplazar sin tocar el negocio. Las líneas en movimiento muestran el sentido de los datos.</p>
+    <figure class="diagrama">
+      <svg viewBox="0 0 900 470" width="100%" role="img" aria-labelledby="mapa-titulo mapa-desc" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto">
+        <title id="mapa-titulo">Mapa del sistema de asistencia</title>
+        <desc id="mapa-desc">La SPA Angular se comunica con la API Spring Boot, que usa SQL Server. La API se conecta con Security Baseline, MessageUcoLab, Catálogo de Parámetros, Notificaciones, MinIO con ClamAV y la pila de observabilidad.</desc>
+        <g style="font-family:Inter,Segoe UI,system-ui,sans-serif;font-size:14px">
+          <!-- conexiones -->
+          <path class="animar-trazo" d="M200 75 L370 75" style="fill:none;stroke:var(--acento);stroke-width:2.5"/>
+          <path class="animar-trazo" d="M540 75 L710 75" style="fill:none;stroke:var(--acento);stroke-width:2.5"/>
+          <path class="animar-trazo" d="M60 110 L60 250" style="fill:none;stroke:var(--violeta);stroke-width:2"/>
+          <path class="animar-trazo" d="M130 170 L130 250 M130 170 L455 170 M455 110 L455 170" style="fill:none;stroke:var(--violeta);stroke-width:2"/>
+          <path class="animar-trazo" d="M455 170 L290 170 L290 250" style="fill:none;stroke:var(--acento-2);stroke-width:2"/>
+          <path class="animar-trazo" d="M455 170 L455 250" style="fill:none;stroke:var(--acento-2);stroke-width:2"/>
+          <path class="animar-trazo" d="M455 170 L620 170 L620 250" style="fill:none;stroke:var(--alerta);stroke-width:2"/>
+          <path class="animar-trazo" d="M455 170 L790 170 L790 250" style="fill:none;stroke:var(--acento);stroke-width:2"/>
+          <path class="animar-trazo" d="M860 170 L860 380 L540 380" style="fill:none;stroke:var(--texto-suave);stroke-width:1.5"/>
+          <path d="M455 170 L860 170" style="fill:none;stroke:var(--texto-suave);stroke-width:1.5" stroke-dasharray="2 4"/>
+          <!-- etiquetas de enlaces -->
+          <text x="285" y="64" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">HTTPS · JWT · SSE</text>
+          <text x="625" y="64" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">usp_* · uv_*</text>
+          <text x="66" y="190" style="fill:var(--texto-suave);font-size:12px">OIDC + PKCE</text>
+          <text x="140" y="212" style="fill:var(--texto-suave);font-size:12px">PEP / PDP</text>
+          <!-- nodos principales -->
+          <rect x="30" y="40" width="170" height="70" rx="12" style="fill:var(--acento-suave);stroke:var(--acento);stroke-width:1.5"/>
+          <text x="115" y="70" text-anchor="middle" style="fill:var(--texto);font-weight:700">SPA Angular</text>
+          <text x="115" y="90" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Signals · OnPush</text>
+          <rect x="370" y="40" width="170" height="70" rx="12" style="fill:var(--acento-suave);stroke:var(--acento);stroke-width:1.5"/>
+          <text x="455" y="70" text-anchor="middle" style="fill:var(--texto);font-weight:700">API Spring Boot</text>
+          <text x="455" y="90" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Puertos y adaptadores</text>
+          <rect x="710" y="40" width="170" height="70" rx="12" style="fill:var(--acento-2-suave);stroke:var(--acento-2);stroke-width:1.5"/>
+          <text x="795" y="70" text-anchor="middle" style="fill:var(--texto);font-weight:700">SQL Server</text>
+          <text x="795" y="90" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">SP · vistas · catálogos</text>
+          <!-- satélites -->
+          <rect x="20" y="250" width="160" height="70" rx="12" style="fill:var(--violeta-suave);stroke:var(--violeta);stroke-width:1.5"/>
+          <text x="100" y="278" text-anchor="middle" style="fill:var(--texto);font-weight:700">Security Baseline</text>
+          <text x="100" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Keycloak · PDP · PEP</text>
+          <rect x="210" y="250" width="160" height="70" rx="12" style="fill:var(--acento-2-suave);stroke:var(--acento-2);stroke-width:1.5"/>
+          <text x="290" y="278" text-anchor="middle" style="fill:var(--texto);font-weight:700">MessageUcoLab</text>
+          <text x="290" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Textos de usuario</text>
+          <rect x="375" y="250" width="160" height="70" rx="12" style="fill:var(--acento-2-suave);stroke:var(--acento-2);stroke-width:1.5"/>
+          <text x="455" y="278" text-anchor="middle" style="fill:var(--texto);font-weight:700">Catálogo de Parámetros</text>
+          <text x="455" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Valores de negocio</text>
+          <rect x="540" y="250" width="160" height="70" rx="12" style="fill:var(--alerta-suave);stroke:var(--alerta);stroke-width:1.5"/>
+          <text x="620" y="278" text-anchor="middle" style="fill:var(--texto);font-weight:700">Notificaciones</text>
+          <text x="620" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Correo con plantillas</text>
+          <rect x="710" y="250" width="160" height="70" rx="12" style="fill:var(--acento-suave);stroke:var(--acento);stroke-width:1.5"/>
+          <text x="790" y="278" text-anchor="middle" style="fill:var(--texto);font-weight:700">MinIO + ClamAV</text>
+          <text x="790" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Soportes con antivirus</text>
+          <rect x="380" y="345" width="160" height="70" rx="12" style="fill:var(--superficie-2);stroke:var(--texto-suave);stroke-width:1.5"/>
+          <text x="460" y="373" text-anchor="middle" style="fill:var(--texto);font-weight:700">Observabilidad</text>
+          <text x="460" y="393" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">OTLP · Grafana · Loki</text>
+          <text x="450" y="450" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Violeta: identidad · Verde: catálogos · Naranja: correo · Azul: datos y soportes · Gris: telemetría</text>
+        </g>
+      </svg>
+      <figcaption>Mapa del sistema. El backend es el único punto de entrada del navegador; los demás elementos son sus adaptadores secundarios. Detalle por capa en <a href="arquitectura.html">Arquitectura</a>.</figcaption>
+    </figure>
+
+    <h2 id="cifras">Cifras clave (2026-11-22)</h2>
+    <p>Medidas sobre las ramas <code>feat/p3-revision-final</code> (BD, Backend y Frontend) y <code>feat/p2-revision-final</code> (Infra).</p>
+    <div class="kpis">
+      <div class="kpi"><div class="valor">5177</div><div class="rotulo">pruebas de backend</div></div>
+      <div class="kpi"><div class="valor">3862</div><div class="rotulo">pruebas de frontend</div></div>
+      <div class="kpi"><div class="valor">1100</div><div class="rotulo">casos del gate de BD, 0 fallos</div></div>
+      <div class="kpi"><div class="valor">145</div><div class="rotulo">pruebas de Notificaciones</div></div>
+      <div class="kpi"><div class="valor">95,9 %</div><div class="rotulo">líneas en backend (JaCoCo)</div></div>
+      <div class="kpi"><div class="valor">21/21</div><div class="rotulo">E2E del frontend</div></div>
+      <div class="kpi"><div class="valor">140</div><div class="rotulo">HU certificadas de 175 registradas</div></div>
+      <div class="kpi"><div class="valor">113</div><div class="rotulo">ítems de checklist en CUMPLE de 140</div></div>
+    </div>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Medida</th><th>Valor</th><th>Cómo se obtuvo</th></tr></thead>
+        <tbody>
+          <tr><td>Procedimientos almacenados</td><td>315</td><td>Archivos en <code>GestioAsistenciaDB/schema/stored-procedures</code></td></tr>
+          <tr><td>Tablas · vistas · funciones</td><td>76 · 107 · 28</td><td>Archivos en <code>GestioAsistenciaDB/schema/tables</code>, <code>views</code>, <code>functions</code></td></tr>
+          <tr><td>Migraciones</td><td>01 a 70</td><td><code>GestioAsistenciaDB/migrations</code> (cada una con <code>up</code> y <code>down</code>)</td></tr>
+          <tr><td>Controladores · mapeos HTTP</td><td>79 · 208</td><td><code>@RestController</code> y anotaciones <code>@Get/Post/Put/Patch/DeleteMapping</code> en <code>GestioAsistenciaBackend/src/main</code></td></tr>
+          <tr><td>Casos de uso (<code>*UseCaseImpl</code>)</td><td>160</td><td>Archivos en <code>GestioAsistenciaBackend/src/main</code></td></tr>
+          <tr><td>Componentes · servicios Angular</td><td>172 · 54</td><td>Clases con <code>@Component</code> y <code>@Injectable</code> en <code>GestioAsistenciaFrontend/src/app</code></td></tr>
+          <tr><td>Rutas del contrato Golden Path</td><td>13</td><td><code>AsistenciasUCO-Infra/docs/contracts/openapi/openapi-golden-path.yaml</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Las cifras de cobertura, historias de usuario y deuda técnica se explican en <a href="calidad.html">Pruebas, cobertura y HU</a>.</p>
+
+    <h2 id="paginas">Todas las páginas</h2>
+    <div class="tarjetas">
+      <div class="tarjeta"><div class="icono">🏛️</div><h4><a href="arquitectura.html">Arquitectura y patrones</a></h4><p>Principios, diagramas de contexto y contenedores, seguridad, flujo de una petición y decisiones.</p></div>
+      <div class="tarjeta"><div class="icono">📋</div><h4><a href="negocio.html">Reglas y flujos de negocio</a></h4><p>Grupos, sesiones, tomas, regla del 20 %, reclamos, recesos y cierre masivo.</p></div>
+      <div class="tarjeta"><div class="icono">🗄️</div><h4><a href="base-datos.html">Base de datos</a></h4><p>Esquema, procedimientos, vistas, migraciones y pruebas T-SQL.</p></div>
+      <div class="tarjeta"><div class="icono">⚙️</div><h4><a href="backend.html">Backend</a></h4><p>Capas, puertos, adaptadores, controladores y pruebas.</p></div>
+      <div class="tarjeta"><div class="icono">🖥️</div><h4><a href="frontend.html">Frontend</a></h4><p>Rutas por rol, Signals, tiempo real y diseño.</p></div>
+      <div class="tarjeta"><div class="icono">✉️</div><h4><a href="notificaciones.html">Notificaciones por correo</a></h4><p>Servicio independiente, contrato, plantillas, reemplazo y fases de migración.</p></div>
+      <div class="tarjeta"><div class="icono">🔗</div><h4><a href="componentes-externos.html">Seguridad, Mensajes y Parámetros</a></h4><p>Qué hace cada componente externo y cómo se integra.</p></div>
+      <div class="tarjeta"><div class="icono">🧰</div><h4><a href="operacion.html">Laboratorio y despliegue</a></h4><p>Comandos de <code>infra.ps1</code>, escenarios, solución de problemas y CI.</p></div>
+      <div class="tarjeta"><div class="icono">✅</div><h4><a href="calidad.html">Pruebas, cobertura y HU</a></h4><p>Pirámide de pruebas, métricas, deuda técnica y validación por rol.</p></div>
+    </div>
+
+    <h2 id="como-leer">Cómo leer esta documentación</h2>
+    <ul>
+      <li><strong>Si eres nuevo:</strong> lee esta página, luego <a href="arquitectura.html">Arquitectura</a> y <a href="negocio.html">Negocio</a>. Con eso entiendes el porqué de cada decisión.</li>
+      <li><strong>Si vas a programar:</strong> pasa a la capa que te toca (<a href="base-datos.html">BD</a>, <a href="backend.html">backend</a> o <a href="frontend.html">frontend</a>) y mantén abierta <a href="operacion.html">Operación</a> para levantar el laboratorio.</li>
+      <li><strong>Si vas a revisar o auditar:</strong> empieza por <a href="calidad.html">Calidad</a>, que remite a la evidencia.</li>
+      <li>Cada afirmación cita su ruta relativa al workspace (por ejemplo <code>GestioAsistenciaBackend/src/main/java/...</code>). Si algo cambia, el código manda sobre esta página.</li>
+      <li>Las fuentes normativas son la <code>CONSTITUTION.md</code> y los contratos congelados de <code>AsistenciasUCO-Infra/docs/</code>. Esta documentación las explica, no las reemplaza.</li>
+    </ul>
+    <div class="nota"><strong>Fecha de corte</strong> Todo lo medido corresponde al 2026-11-22. Las cifras de pruebas son las de la última corrida completa de cada capa en ese día.</div>
+  </main>
+</div>
+</body>
+</html>

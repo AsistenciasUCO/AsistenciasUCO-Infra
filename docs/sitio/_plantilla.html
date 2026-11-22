@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TÍTULO · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>TÍTULO</h1>
+      <p>Resumen de una o dos líneas de qué cubre la página.</p>
+      <div class="etiquetas"><span class="etiqueta">Etiqueta</span></div>
+    </header>
+
+    <h2 id="seccion-1">Sección</h2>
+    <p>Texto.</p>
+
+    <!-- Diagrama Mermaid -->
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  A[Frontend] --> B[Backend] --> C[(SQL Server)]
+      </pre>
+      <figcaption>Pie del diagrama.</figcaption>
+    </figure>
+
+    <!-- Gráfica Chart.js declarativa (JSON válido, sin funciones) -->
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Descripción de la gráfica" role="img" data-grafica='{"type":"bar","data":{"labels":["BD","Backend","Frontend"],"datasets":[{"label":"Pruebas","data":[1100,5177,3862]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Pie de la gráfica.</figcaption>
+    </figure>
+
+    <!-- Flujo animado paso a paso -->
+    <div class="flujo" data-flujo data-titulo="Nombre del flujo">
+      <div class="paso" data-actor="Docente" data-detalle="Explicación larga de lo que pasa en este paso.">Acción corta</div>
+      <div class="paso" data-actor="Backend" data-detalle="...">Otra acción</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Camino de error.">Rechazo</div>
+    </div>
+
+    <!-- Pestañas -->
+    <div class="pestanas">
+      <div role="tablist" aria-label="Variantes">
+        <button role="tab" type="button">Uno</button>
+        <button role="tab" type="button">Dos</button>
+      </div>
+      <div role="tabpanel"><p>Contenido uno.</p></div>
+      <div role="tabpanel"><p>Contenido dos.</p></div>
+    </div>
+
+    <div class="nota alerta"><strong>Importante</strong> Texto del aviso.</div>
+  </main>
+</div>
+</body>
+</html>
