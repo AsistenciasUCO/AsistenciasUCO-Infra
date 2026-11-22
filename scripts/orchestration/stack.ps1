@@ -217,6 +217,19 @@ function New-ConfiguracionApp([string[]]$secciones) {
     }
     if ($b.Contains('APP_ADAPTERS_IDENTITY_PROVIDER')) { $b.Remove('APP_ADAPTERS_IDENTITY_PROVIDER') }
 
+    # Notificaciones: el Backend ya no envia correo (no lee SMTP_NOTIFICATION_*); las credenciales SMTP viajan solo al .env del
+    # servicio (Initialize-Notificaciones las toma del .env del checkout). Se renombran las variables propias del Backend.
+    foreach ($k in @($b.Keys)) { if ($k.StartsWith('SMTP_NOTIFICATION_')) { $b.Remove($k) } }
+    $urlPlataforma = $null
+    $envFuente = Read-EnvFile (Join-Path $workspace 'GestioAsistenciaBackend\.env')
+    if ($envFuente['SMTP_NOTIFICATION_PLATFORM_URL']) { $urlPlataforma = $envFuente['SMTP_NOTIFICATION_PLATFORM_URL'] }
+    if ($envFuente['NOTIFICACIONES_PLATFORM_URL']) { $urlPlataforma = $envFuente['NOTIFICACIONES_PLATFORM_URL'] }
+    if ($urlPlataforma) { $b['NOTIFICACIONES_PLATFORM_URL'] = $urlPlataforma }
+    if ($envFuente['SMTP_NOTIFICATION_REQUIRE_CONFIRMED_EMAIL'] -and -not $envFuente['NOTIFICACIONES_REQUIRE_CONFIRMED_EMAIL']) {
+        $b['NOTIFICACIONES_REQUIRE_CONFIRMED_EMAIL'] = $envFuente['SMTP_NOTIFICATION_REQUIRE_CONFIRMED_EMAIL']
+    }
+    $b['OUTBOX_NOTIFICATION_SENDER'] = 'servicio'
+
     # Emisor publico de los tokens (el que ve el navegador; en asis-red keycloak.localhost es alias del Keycloak de Seguridad).
     $kc = 'http://keycloak.localhost:19090'
     # Lo que el Backend exige en loopback lo reenvia el contenedor asis-app-enlaces (ver asis-app.compose.yml).
@@ -274,8 +287,7 @@ function New-ConfiguracionApp([string[]]$secciones) {
     } else {
         $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'] = 'sqlserver'
     }
-    # Servicio de Notificaciones (componente propio). El Backend lo consume desde la fase F4; hasta entonces estas variables
-    # son inertes y el Backend sigue con su SMTP propio.
+    # Servicio de Notificaciones (componente propio): el Backend envia por el (OUTBOX_NOTIFICATION_SENDER=servicio).
     if ($secciones -contains 'ext-notificaciones') {
         $sn = Get-SecretosNotificaciones
         $b['NOTIFICACIONES_SERVICE_URL'] = 'http://ext-notificaciones-servicio:8080'
@@ -346,7 +358,7 @@ function Initialize-Notificaciones {
     if (-not (Test-Path $ejemplo)) { throw "Falta $ejemplo (componente Complementos/Notificaciones)." }
     $envStack = Get-SecretosNotificaciones
     if (-not $envStack['MSSQL_SA_PASSWORD']) { throw 'stack/.env no define MSSQL_SA_PASSWORD (necesaria para crear notificacionesdb).' }
-    # .env del servicio = .env.example + secretos de stack/.env + SMTP_NOTIFICATION_* del .env del Backend (mismos nombres,
+    # .env del servicio = .env.example + secretos de stack/.env + SMTP_NOTIFICATION_* del .env del checkout del Backend (solo fuente; al contenedor del Backend no llegan; mismos nombres,
     # incluido el modo de pruebas con redireccion). Nada se imprime. Se regenera en cada up.
     $backendEnv = Read-EnvFile (Join-Path $workspace 'GestioAsistenciaBackend\.env')
     $salida = New-Object System.Collections.Generic.List[string]

@@ -115,7 +115,7 @@ Casos preparados y detalle: [PRUEBAS_LOCALES §3](PRUEBAS_LOCALES.md) y
    pérdida; Mateo, Laura, Camila y Valeria en riesgo), radicar un reclamo.
 6. **Tiempo real.** Docente y estudiante en dos ventanas: el cambio se refleja sin recargar (SSE).
 
-Los correos van al buzón de prueba (`SMTP_NOTIFICATION_TEST_MODE_ENABLED=true`).
+Los correos van al buzón de prueba (`SMTP_NOTIFICATION_TEST_MODE_ENABLED=true` en el servicio de Notificaciones, no en el Backend).
 
 ## 8. Apagar
 

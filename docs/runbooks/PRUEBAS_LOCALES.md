@@ -73,7 +73,7 @@ laboratorio (`AGENTS.md`, sección 7) y entran por correo en `http://localhost:4
 | Visibilidad por rol | Cualquiera | Grupos compartidos entre programas y facultades (Cátedra, Ética, Cálculo, Costos) |
 | Doble rol | Diana Londoño | Coordinadora de Tec. Software y docente de Pruebas de Software |
 
-Los correos que genere la aplicación van al buzón de prueba (`SMTP_NOTIFICATION_TEST_MODE_ENABLED=true`).
+Los correos que genere la aplicación van al buzón de prueba (`SMTP_NOTIFICATION_TEST_MODE_ENABLED=true` en el servicio de Notificaciones, no en el Backend).
 
 ## 4. Suites automáticas
 

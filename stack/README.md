@@ -120,8 +120,11 @@ Antes de levantar el contenedor, `stack up` (función `Initialize-Notificaciones
 
 1. Genera `NOTIFICACIONES_API_KEY` y `NOTIFICACIONES_DB_PASSWORD` en `stack/.env` si no existen.
 2. Escribe `Complementos/Notificaciones/notificaciones-local/.env` (fuera de Git: la carpeta no es un repositorio y
-   `.env` no se versiona) desde su `.env.example`, con esos secretos y los `SMTP_NOTIFICATION_*` del `.env` del Backend
-   (mismos nombres, incluido el modo de pruebas que redirige todo al buzón de prueba). Canal `smtp`.
+   `.env` no se versiona) desde su `.env.example`, con esos secretos y los `SMTP_NOTIFICATION_*` del `.env` del checkout del Backend
+   (mismos nombres, incluido el modo de pruebas que redirige todo al buzón de prueba). Canal `smtp`. Esas variables SMTP
+   llegan **solo** a este `.env`: el Backend ya no las lee y `stack/generado/backend.env` las omite (recibe
+   `OUTBOX_NOTIFICATION_SENDER=servicio`, `NOTIFICACIONES_PLATFORM_URL` y `NOTIFICACIONES_REQUIRE_CONFIRMED_EMAIL`, tomadas de
+   `SMTP_NOTIFICATION_PLATFORM_URL`/`SMTP_NOTIFICATION_REQUIRE_CONFIRMED_EMAIL` del `.env` fuente si aún usa los nombres viejos).
 3. Crea de forma idempotente la base `notificacionesdb` y su login en `sql_server_asistencias` (`scripts/crear-bd.ps1` del
    componente; las claves viajan por el entorno del proceso, no por argumentos).
 
