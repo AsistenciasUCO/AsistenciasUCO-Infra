@@ -99,12 +99,12 @@ $canonicalContracts = @(
         PeerFile     = "GestioAsistenciaBackend/docs/contracts/REALTIME_EVENT_STANDARD.md"
     },
     @{
-        # Componente propio Complementos/Notificaciones: la copia de gobierno de Infra debe ser identica a la fuente del componente.
+        # Componente propio (GestioAsistenciaBackend/servicios/notificaciones): la copia de gobierno de Infra debe ser identica a la fuente del componente.
         Name = "Notificaciones OpenAPI (Infra)"
         ContractFile = "AsistenciasUCO-Infra/docs/contracts/notificaciones/openapi-notificaciones.yaml"
         ShaFile      = "AsistenciasUCO-Infra/docs/contracts/notificaciones/openapi-notificaciones.sha256"
         RelativeRef  = "openapi-notificaciones.yaml"
-        PeerFile     = "Complementos/Notificaciones/contrato/openapi-notificaciones.yaml"
+        PeerFile     = "GestioAsistenciaBackend/servicios/notificaciones/contrato/openapi-notificaciones.yaml"
     },
     @{
         Name = "Notificaciones Addendum (Infra)"
