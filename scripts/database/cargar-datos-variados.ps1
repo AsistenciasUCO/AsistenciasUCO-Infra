@@ -11,6 +11,10 @@
                  Seguridad y Verificar salvo -SinSeguridad / -SinVerificar.
       Seguridad  Cuentas de Keycloak, contraseña común, roles, identidad y perfiles del PDP para los 73 usuarios (idempotente).
       Verificar  Solo lectura: inicia sesión con un usuario de cada caso y comprueba lo que cada rol puede ver.
+      Catalogo   Con el Catálogo de Parámetros arriba (escenario parametros), empuja al Catálogo los valores que los datos de
+                 prueba fijan solo en la BD (hoy RED.CIDRS_CAMPUS con los rangos de Docker); si no, el Backend, que toma el
+                 Catálogo como fuente de verdad, los revertiría al arrancar. Cargar lo hace solo al final (se omite si el
+                 Catálogo no está arriba).
     La contraseña común de laboratorio se toma de ASISTENCIAS_DATASET_PASSWORD o de AGENTS.md (sección 7); nunca se imprime.
     La clave de SQL Server sale de -Password, GestioAsistenciaDB/.env, MSSQL_SA_PASSWORD o AsistenciasUCO-Infra/stack/.env.
     Requiere el laboratorio de Seguridad aprovisionado (%USERPROFILE%\.asistencias-security-lab\lab.env) y Python 3 de
@@ -20,10 +24,11 @@
     .\infra.ps1 datos-prueba cargar -Yes
     .\infra.ps1 datos-prueba seguridad
     .\infra.ps1 datos-prueba verificar
+    .\infra.ps1 datos-prueba catalogo
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Cargar', 'Seguridad', 'Verificar')]
+    [ValidateSet('Cargar', 'Seguridad', 'Verificar', 'Catalogo')]
     [string]$Accion = 'Verificar',
     [switch]$Yes,
     [switch]$StopBackend,
@@ -128,6 +133,20 @@ function Invoke-Verificar {
     if ($LASTEXITCODE -ne 0) { throw 'La verificacion por rol encontro diferencias (ver las lineas XX).' }
 }
 
+function Invoke-Catalogo {
+    # Alinea el Catalogo con los datos de prueba (solo si ext-parametros-app corre). Nunca imprime claves ni tokens.
+    $corre = (Invoke-Native -Exe 'docker' -Arguments @('inspect', '-f', '{{.State.Running}}', 'ext-parametros-app')).Text.Trim() -eq 'true'
+    if (-not $corre) {
+        Write-Step 'Catalogo de Parametros no esta arriba (escenario parametros): se omite el empuje de valores de prueba.'
+        return
+    }
+    $script = Join-Path $PSScriptRoot 'sincronizar_catalogo_parametros.py'
+    $py = Resolve-Python
+    Write-Step 'Catalogo de Parametros: empujando los valores de los datos de prueba (evento -> el Backend los aplica a la BD).'
+    & $py -X utf8 -I $script --backend-repo $BackendRepo --db-repo $DbRepo
+    if ($LASTEXITCODE -eq 1) { Write-Host '    !!  El empuje al Catalogo fallo; el Backend podria revertir RED.CIDRS_CAMPUS.' -ForegroundColor Yellow }
+}
+
 function Wait-Healthy([string]$Name, [int]$Seconds = 240) {
     $deadline = (Get-Date).AddSeconds($Seconds)
     do {
@@ -220,9 +239,11 @@ switch ($Accion) {
         if (-not $SinSeguridad) { [void](Resolve-Python) }
         Invoke-Cargar
         if (-not $SinSeguridad) { Invoke-Seguridad }
+        Invoke-Catalogo
         if (-not $SinSeguridad -and -not $SinVerificar) { Invoke-Verificar }
     }
     'Seguridad' { Invoke-Seguridad }
     'Verificar' { Invoke-Verificar }
+    'Catalogo' { Invoke-Catalogo }
 }
 Write-Step 'Listo. Usuarios por rol: GestioAsistenciaDB/scripts/datos-prueba/USUARIOS.md'
