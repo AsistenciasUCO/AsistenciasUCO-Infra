@@ -63,7 +63,7 @@
           <tr><td>Frontend</td><td>Angular 22 · TypeScript 6 · Tailwind CSS v4</td><td>SPA con componentes standalone, Signals y detección de cambios OnPush.</td></tr>
           <tr><td>Identidad y permisos</td><td>Security Baseline 0.1.14 (Keycloak, PDP, PEP, OPA)</td><td>Inicio de sesión con Authorization Code + PKCE y autorización por política.</td></tr>
           <tr><td>Mensajes</td><td>MessageUcoLab 0.3.0 (Kong, Pulsar)</td><td>Catálogo de textos de usuario.</td></tr>
-          <tr><td>Parámetros</td><td>Catálogo de Parámetros 0.1.7</td><td>Valores de negocio ajustables.</td></tr>
+          <tr><td>Parámetros</td><td>Catálogo de Parámetros 0.1.17</td><td>Valores de negocio ajustables, con consulta M2M y eventos por su propio Pulsar.</td></tr>
           <tr><td>Correo</td><td>Servicio de Notificaciones UCO 0.1.1 (propio)</td><td>Plantillas, cola, reintentos y entrega SMTP.</td></tr>
           <tr><td>Soportes</td><td>MinIO + ClamAV 1.5.4</td><td>Almacenamiento de objetos y escaneo antivirus de adjuntos.</td></tr>
           <tr><td>Observabilidad</td><td>OpenTelemetry, Actuator, Grafana, Prometheus, Loki, Tempo</td><td>Trazas, métricas y logs correlacionados.</td></tr>
@@ -77,7 +77,7 @@
     <figure class="diagrama">
       <svg viewBox="0 0 900 470" width="100%" role="img" aria-labelledby="mapa-titulo mapa-desc" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto">
         <title id="mapa-titulo">Mapa del sistema de asistencia</title>
-        <desc id="mapa-desc">La SPA Angular se comunica con la API Spring Boot, que usa SQL Server. La API se conecta con Security Baseline, MessageUcoLab, Catálogo de Parámetros, Notificaciones, MinIO con ClamAV y la pila de observabilidad.</desc>
+        <desc id="mapa-desc">La SPA Angular se comunica con la API Spring Boot, que usa SQL Server. La API se conecta con Security Baseline, MessageUcoLab, Catálogo de Parámetros, Notificaciones, MinIO con ClamAV y la pila de observabilidad. El Catálogo de Parámetros se consulta por M2M y avisa de sus cambios por su propio Pulsar.</desc>
         <g style="font-family:Inter,Segoe UI,system-ui,sans-serif;font-size:14px">
           <!-- conexiones -->
           <path class="animar-trazo" d="M200 75 L370 75" style="fill:none;stroke:var(--acento);stroke-width:2.5"/>
@@ -95,6 +95,7 @@
           <text x="625" y="64" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">usp_* · uv_*</text>
           <text x="66" y="190" style="fill:var(--texto-suave);font-size:12px">OIDC + PKCE</text>
           <text x="140" y="212" style="fill:var(--texto-suave);font-size:12px">PEP / PDP</text>
+          <text x="462" y="212" style="fill:var(--texto-suave);font-size:12px">M2M · Pulsar</text>
           <!-- nodos principales -->
           <rect x="30" y="40" width="170" height="70" rx="12" style="fill:var(--acento-suave);stroke:var(--acento);stroke-width:1.5"/>
           <text x="115" y="70" text-anchor="middle" style="fill:var(--texto);font-weight:700">SPA Angular</text>
@@ -114,7 +115,7 @@
           <text x="290" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Textos de usuario</text>
           <rect x="375" y="250" width="160" height="70" rx="12" style="fill:var(--acento-2-suave);stroke:var(--acento-2);stroke-width:1.5"/>
           <text x="455" y="278" text-anchor="middle" style="fill:var(--texto);font-weight:700">Catálogo de Parámetros</text>
-          <text x="455" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Valores de negocio</text>
+          <text x="455" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">M2M + eventos Pulsar</text>
           <rect x="540" y="250" width="160" height="70" rx="12" style="fill:var(--alerta-suave);stroke:var(--alerta);stroke-width:1.5"/>
           <text x="620" y="278" text-anchor="middle" style="fill:var(--texto);font-weight:700">Notificaciones</text>
           <text x="620" y="298" text-anchor="middle" style="fill:var(--texto-suave);font-size:12px">Correo con plantillas</text>
@@ -133,9 +134,9 @@
     <h2 id="cifras">Cifras clave (2026-11-22)</h2>
     <p>Corrida final tras la auditoría de las cuatro capas, sobre las ramas <code>feat/p3-revision-final</code> (BD, Backend y Frontend) y <code>feat/p2-revision-final</code> (Infra).</p>
     <div class="kpis">
-      <div class="kpi"><div class="valor">5162</div><div class="rotulo">pruebas de backend</div></div>
+      <div class="kpi"><div class="valor">5215</div><div class="rotulo">pruebas de backend</div></div>
       <div class="kpi"><div class="valor">3903</div><div class="rotulo">pruebas de frontend</div></div>
-      <div class="kpi"><div class="valor">1107</div><div class="rotulo">casos del gate de BD, 0 fallos</div></div>
+      <div class="kpi"><div class="valor">1118</div><div class="rotulo">casos del gate de BD, 0 fallos</div></div>
       <div class="kpi"><div class="valor">146</div><div class="rotulo">pruebas de Notificaciones</div></div>
       <div class="kpi"><div class="valor">95,9 %</div><div class="rotulo">líneas en backend (JaCoCo)</div></div>
       <div class="kpi"><div class="valor">21/21</div><div class="rotulo">E2E del frontend</div></div>
@@ -148,7 +149,7 @@
         <tbody>
           <tr><td>Procedimientos almacenados</td><td>303</td><td>Archivos en <code>GestioAsistenciaDB/schema/stored-procedures</code></td></tr>
           <tr><td>Tablas · vistas · funciones</td><td>74 · 106 · 28</td><td>Archivos en <code>GestioAsistenciaDB/schema/tables</code>, <code>views</code>, <code>functions</code></td></tr>
-          <tr><td>Migraciones</td><td>01 a 72</td><td><code>GestioAsistenciaDB/migrations</code> (cada una con <code>up</code> y <code>down</code>)</td></tr>
+          <tr><td>Migraciones</td><td>01 a 73</td><td><code>GestioAsistenciaDB/migrations</code> (cada una con <code>up</code> y <code>down</code>)</td></tr>
           <tr><td>Controladores · mapeos HTTP</td><td>79 · 208</td><td><code>@RestController</code> y anotaciones <code>@Get/Post/Put/Patch/DeleteMapping</code> en <code>GestioAsistenciaBackend/src/main</code></td></tr>
           <tr><td>Casos de uso (<code>*UseCaseImpl</code>)</td><td>160</td><td>Archivos en <code>GestioAsistenciaBackend/src/main</code></td></tr>
           <tr><td>Componentes · servicios Angular</td><td>172 · 54</td><td>Clases con <code>@Component</code> y <code>@Injectable</code> en <code>GestioAsistenciaFrontend/src/app</code></td></tr>

@@ -18,9 +18,9 @@
       <h1>Pruebas, cobertura y estado de las HU</h1>
       <p>La evidencia de calidad al cierre del 2026-11-22: pirámide de pruebas, métricas por capa, historias de usuario, lista de chequeo, deuda técnica, verificación de contratos, la validación funcional por rol con cinco agentes y la auditoría final de las cuatro capas.</p>
       <div class="etiquetas">
-        <span class="etiqueta">5162 pruebas de backend</span>
+        <span class="etiqueta">5215 pruebas de backend</span>
         <span class="etiqueta">3903 de frontend</span>
-        <span class="etiqueta">1107 casos de BD</span>
+        <span class="etiqueta">1118 casos de BD</span>
         <span class="etiqueta">22 defectos corregidos</span>
         <span class="etiqueta">Auditoría de 4 capas</span>
         <span class="etiqueta">Contratos WORM</span>
@@ -46,8 +46,8 @@ flowchart TB
       <table>
         <thead><tr><th>Capa</th><th>Qué valida</th><th>Cómo se ejecuta</th><th>Resultado (2026-11-22)</th></tr></thead>
         <tbody>
-          <tr><td>1. Base de datos</td><td>Integridad, transacciones con rollback, tupla de salida estándar, aislamiento por rol, concurrencia</td><td><code>GestioAsistenciaDB/test_summary.ps1</code> tras <code>deploy_schema.ps1</code> desde cero</td><td>1107 casos, 0 fallos, migraciones 01 a 72</td></tr>
-          <tr><td>2. Backend</td><td>Casos de uso, adaptadores, ArchUnit (Clean Architecture, aislamiento de JPA y de mensajería), integración con SQL Server</td><td><code>.\mvnw.cmd verify</code> y <code>-Pintegration</code></td><td>5162 pruebas; 95,9 % de líneas y 87,1 % de ramas</td></tr>
+          <tr><td>1. Base de datos</td><td>Integridad, transacciones con rollback, tupla de salida estándar, aislamiento por rol, concurrencia</td><td><code>GestioAsistenciaDB/test_summary.ps1</code> tras <code>deploy_schema.ps1</code> desde cero</td><td>1118 casos, 0 fallos, migraciones 01 a 73</td></tr>
+          <tr><td>2. Backend</td><td>Casos de uso, adaptadores, ArchUnit (Clean Architecture, aislamiento de JPA y de mensajería), integración con SQL Server</td><td><code>.\mvnw.cmd verify</code> y <code>-Pintegration</code></td><td>5215 pruebas; 95,9 % de líneas y 87,1 % de ramas</td></tr>
           <tr><td>3. Frontend</td><td>Componentes, servicios, interceptores, tiempo real y E2E de autenticación, guardas y flujos por rol</td><td><code>npm run verify</code> (pruebas, cobertura, compilación)</td><td>3903 pruebas; realtime ≈95 % de líneas y ≈87 % de ramas; E2E 21/21</td></tr>
           <tr><td>4. HU de extremo a extremo</td><td>Los endpoints de las HU con cinco roles y datos reales</td><td><code>AsistenciasUCO-Infra/scripts/tests/test_all_hus.ps1</code></td><td>81 PASS, 0 FAIL y 1 SKIP (regresión corregida y en verde con ClamAV)</td></tr>
           <tr><td>Servicio de Notificaciones</td><td>Contrato, despachador, plantillas y SMTP</td><td><code>mvnw verify</code> en <code>Complementos/Notificaciones/notificaciones-uco</code></td><td>146 pruebas; 98,5 % de líneas y 92,4 % de ramas</td></tr>
@@ -57,14 +57,14 @@ flowchart TB
 
     <h2 id="metricas">Métricas</h2>
     <div class="kpis">
-      <div class="kpi"><div class="valor">10 318</div><div class="rotulo">pruebas automáticas sumadas (BD, backend, frontend y servicio)</div></div>
+      <div class="kpi"><div class="valor">10 382</div><div class="rotulo">pruebas automáticas sumadas (BD, backend, frontend y servicio)</div></div>
       <div class="kpi"><div class="valor">0</div><div class="rotulo">fallos en el gate de BD</div></div>
       <div class="kpi"><div class="valor">21/21</div><div class="rotulo">E2E de Playwright</div></div>
       <div class="kpi"><div class="valor">95,9 %</div><div class="rotulo">líneas del backend</div></div>
     </div>
     <div class="dos-columnas">
       <figure class="grafica">
-        <div class="lienzo"><canvas aria-label="Cantidad de pruebas por capa: 1107 de base de datos, 5162 de backend, 3903 de frontend y 146 del servicio de notificaciones" role="img" data-grafica='{"type":"bar","data":{"labels":["BD","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1107,5162,3903,146]}]},"options":{"plugins":{"legend":{"display":false}},"scales":{"y":{"title":{"display":true,"text":"Pruebas"}}}}}'></canvas></div>
+        <div class="lienzo"><canvas aria-label="Cantidad de pruebas por capa: 1118 de base de datos, 5215 de backend, 3903 de frontend y 146 del servicio de notificaciones" role="img" data-grafica='{"type":"bar","data":{"labels":["BD","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1118,5215,3903,146]}]},"options":{"plugins":{"legend":{"display":false}},"scales":{"y":{"title":{"display":true,"text":"Pruebas"}}}}}'></canvas></div>
         <figcaption>Pruebas por capa. La BD cuenta casos del gate, no archivos.</figcaption>
       </figure>
       <figure class="grafica">
@@ -73,9 +73,10 @@ flowchart TB
       </figure>
     </div>
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Evolución de las pruebas en cinco mediciones: la base de datos pasa de 1058 a 1107, el backend de 5076 a 5162 (con un máximo de 5177 antes de la auditoría) y el frontend de 3785 a 3903" role="img" data-grafica='{"type":"line","data":{"labels":["Informe P1-P3","Lista de chequeo","Validación por rol","Medición del 22 (previa)","Cierre del 22"],"datasets":[{"label":"BD","data":[1058,1074,1089,1100,1107]},{"label":"Backend","data":[5076,5113,5130,5177,5162]},{"label":"Frontend","data":[3785,3808,3841,3862,3903]}]},"options":{"scales":{"y":{"title":{"display":true,"text":"Pruebas"}}}}}'></canvas></div>
-      <figcaption>Las pruebas crecieron con cada ronda: cada defecto corregido dejó su caso. La medición final del backend (5162) es la de la última corrida de <code>mvnw verify</code>, 15 menos que la medición previa (5162); la BD y el frontend siguen creciendo. Fuentes: informe P1-P3 (secciones 3, 7 y 8), lista de chequeo y cierre del 2026-11-22.</figcaption>
+      <div class="lienzo"><canvas aria-label="Evolución de las pruebas en seis mediciones: la base de datos pasa de 1058 a 1118, el backend de 5076 a 5215 y el frontend de 3785 a 3903" role="img" data-grafica='{"type":"line","data":{"labels":["Informe P1-P3","Lista de chequeo","Validación por rol","Medición del 22 (previa)","Cierre del 22","Tras INT-004"],"datasets":[{"label":"BD","data":[1058,1074,1089,1100,1118,1118]},{"label":"Backend","data":[5076,5113,5130,5177,5215,5215]},{"label":"Frontend","data":[3785,3808,3841,3862,3903,3903]}]},"options":{"scales":{"y":{"title":{"display":true,"text":"Pruebas"}}}}}'></canvas></div>
+      <figcaption>Las pruebas crecieron con cada ronda: cada defecto corregido dejó su caso. La última medición es la de INT-004 (2026-11-22): el gate de BD pasa a 1118 casos con 0 fallos (migraciones 01 a 73) y el backend a 5215 pruebas con <code>BUILD SUCCESS</code>; el frontend no cambió (3903). Fuentes: informe P1-P3 (secciones 3, 7 y 8), lista de chequeo y cierre del 2026-11-22.</figcaption>
     </figure>
+    <div class="nota exito"><strong>INT-004 (Catálogo de Parámetros 0.1.17)</strong> Gate de BD: 1118 casos y 0 fallos con la migración 73 (<code>usp_sincronizar_parametro_catalogo_externo</code> y su bitácora). Backend: 5215 pruebas, <code>BUILD SUCCESS</code>, con las del adaptador M2M, el listener de eventos y el caso de uso de sincronización. Ver <a href="componentes-externos.html#parametros">Componentes externos</a>.</div>
     <p>Medidas del código en el mismo corte: 848 archivos de prueba Java en <code>GestioAsistenciaBackend/src/test</code> y 319 archivos <code>.spec.ts</code> en <code>GestioAsistenciaFrontend/src/app</code>, además de 242 archivos de primer nivel en <code>GestioAsistenciaDB/test</code> (202 <code>.sql</code> y 40 <code>.ps1</code>).</p>
 
     <h2 id="hu">Historias de usuario</h2>
@@ -221,7 +222,7 @@ flowchart TB
         </tbody>
       </table>
     </div>
-    <div class="nota exito"><strong>Validaciones finales</strong> Gate de BD con 1107 casos y 0 fallos (migraciones 01 a 72), <code>mvnw verify</code> con 5162 pruebas, frontend con 3903 pruebas y E2E 21/21, y la suite <code>test_all_hus.ps1</code> con 81 PASS, 0 FAIL y 1 SKIP. Todo en verde.</div>
+    <div class="nota exito"><strong>Validaciones finales</strong> Gate de BD con 1118 casos y 0 fallos (migraciones 01 a 73), <code>mvnw verify</code> con 5215 pruebas, frontend con 3903 pruebas y E2E 21/21, y la suite <code>test_all_hus.ps1</code> con 81 PASS, 0 FAIL y 1 SKIP. Todo en verde.</div>
   </main>
 </div>
 </body>

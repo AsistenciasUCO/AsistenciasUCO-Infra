@@ -37,7 +37,7 @@
       <div class="kpi"><div class="valor">206</div><div class="rotulo">endpoints en el catálogo de acceso</div></div>
       <div class="kpi"><div class="valor">184</div><div class="rotulo">SP distintos invocados con EXEC</div></div>
       <div class="kpi"><div class="valor">59</div><div class="rotulo">vistas uv_* leídas</div></div>
-      <div class="kpi"><div class="valor">5162</div><div class="rotulo">pruebas</div></div>
+      <div class="kpi"><div class="valor">5215</div><div class="rotulo">pruebas</div></div>
       <div class="kpi"><div class="valor">95,9 %</div><div class="rotulo">líneas JaCoCo</div></div>
     </div>
     <p>Conteos: <code>find src/<wbr>main -<wbr>name "*.<wbr>java"</code> (2081), <code>*Controller.java</code> (78), <code>*UseCaseImpl.java</code> (160), <code>*InputPort.java</code> (164), puertos secundarios en <code>application/<wbr>secondaryports</code> (108), repositorios <code>*JpaRepository.java</code> (80), clases <code>*WiringConfiguration</code> (41). Cero usos de <code>JdbcTemplate</code> en <code>src/main</code>.</p>
@@ -529,10 +529,11 @@ flowchart LR
   MP --> M2["messageucolab: MessageUcoLab 0.3.0"]
   MP --> M3["sqlserver: tablas de la BD"]
   PP --> P1["azure_appconfig (predeterminado)"]
-  PP --> P2["catalogoparametros: Catálogo de Parámetros por HTTP"]
+  PP --> P2["catalogoparametros: Catálogo de Parámetros por M2M"]
   PP --> P3["sqlserver: tablas de la BD"]
   M2 -. "fallback azure o none" .-> M1
   M2 --- EV["Avisos de cambio por Pulsar"]
+  P2 --- EV2["Eventos de cambio por Pulsar del Catálogo"]
   M1 --> FB["Texto de respaldo en el enum de errores"]
   M2 --> FB
   M3 --> FB
@@ -547,13 +548,83 @@ flowchart LR
           <tr><td>Mensajes</td><td>MessageUcoLab</td><td><code>Message<wbr>Uco<wbr>Lab<wbr>Message<wbr>Catalog<wbr>Adapter</code> (<code>MESSAGEUCOLAB_URL</code>, caché <code>MESSAGEUCOLAB_<wbr>CACHE_<wbr>TTL</code>, <code>MESSAGEUCOLAB_<wbr>FALLBACK=azure|none</code>); <code>MessageUcoLabEventListener</code> invalida la caché con los avisos de Pulsar y <code>Message<wbr>Uco<wbr>Lab<wbr>Sincronizacion<wbr>Configuration</code> concilia al arrancar.</td></tr>
           <tr><td>Mensajes y parámetros</td><td>SQL Server</td><td>Repositorios <code>MessageCatalogJpaRepository</code> y <code>ParameterCatalogJpaRepository</code>; caché con vencimiento <code>ASISTENCIAS_<wbr>CATALOGO_<wbr>SQL_<wbr>CACHE_<wbr>TTL</code> (60 s). Es el valor por defecto de los perfiles <code>local</code> y <code>dev</code>.</td></tr>
           <tr><td>Parámetros</td><td>Azure App Configuration (por defecto)</td><td><code>Azure<wbr>App<wbr>Config<wbr>Parameter<wbr>Catalog<wbr>Adapter</code>; claves <code>asistencias:&lt;modulo&gt;:&lt;parametro&gt;</code>.</td></tr>
-          <tr><td>Parámetros</td><td>Catálogo de Parámetros (componente del equipo de parámetros)</td><td><code>Catalogo<wbr>Parametros<wbr>Http<wbr>Parameter<wbr>Catalog<wbr>Adapter</code> (<code>CATALOGO_PARAMETROS_*</code>); la edición local queda deshabilitada (PRM_010). <code>Parametro<wbr>Con<wbr>Valor<wbr>Por<wbr>Defecto<wbr>Catalog<wbr>Adapter</code> aporta valores por defecto.</td></tr>
+          <tr><td>Parámetros</td><td>Catálogo de Parámetros (componente del equipo de parámetros)</td><td><code>Catalogo<wbr>Parametros<wbr>Http<wbr>Parameter<wbr>Catalog<wbr>Adapter</code> (<code>CATALOGO_PARAMETROS_*</code>), lectura M2M con eventos por Pulsar (<a href="#proveedor-parametros">detalle</a>); la edición local queda deshabilitada (PRM_010). <code>Parametro<wbr>Con<wbr>Valor<wbr>Por<wbr>Defecto<wbr>Catalog<wbr>Adapter</code> aporta valores por defecto.</td></tr>
         </tbody>
       </table>
     </div>
     <h3>Respaldo y pruebas de paridad</h3>
     <p>Cada código de error tiene un texto de respaldo en su enum (<code>Error<wbr>Definition.<wbr>default<wbr>Message()</code>) para cuando el catálogo no responde. <code>Mensaje<wbr>Respaldo<wbr>Paridad<wbr>Catalogo<wbr>Test</code> compara ese texto con el del catálogo de la BD (archivo <code>/<wbr>messageucolab/<wbr>catalogo-<wbr>mensajes-<wbr>usuario.<wbr>psv</code>) y solo admite una lista corta y justificada de excepciones. <code>Mensaje<wbr>Usuario<wbr>Error<wbr>Code<wbr>Catalogo<wbr>Test</code>, <code>Global<wbr>Exception<wbr>Handler<wbr>Mensaje<wbr>Catalogo<wbr>Test</code> y <code>Sincronizar<wbr>Mensajes<wbr>Catalogo<wbr>Use<wbr>Case<wbr>Impl<wbr>Test</code> completan la cobertura.</p>
     <div class="nota"><strong>Interfaz.</strong> La SPA recupera textos de pantalla (códigos <code>UI###</code>) por <code>GET /<wbr>api/<wbr>v1/<wbr>public/<wbr>mensajes-<wbr>interfaz/<wbr>{codigo}</code>, una ruta pública con límite de peticiones por IP (<code>Mensajes<wbr>Interfaz<wbr>Rate<wbr>Limit<wbr>Filter</code>).</div>
+
+    <h3 id="proveedor-parametros">Proveedor del Catálogo de Parámetros (INT-004)</h3>
+    <p><strong>Por qué.</strong> Con <code>app.adapters.parameter-catalog.provider=catalogoparametros</code> el Catálogo de Parámetros externo es la fuente de verdad de los valores. El backend lo lee por M2M (sin sesión de usuario), se entera de los cambios por eventos y deja una copia vigente en <code>dbo.CatalogoParametro</code> para los procedimientos almacenados. Todo se cablea en <code>CatalogoParametrosAdapterConfiguration</code> y <code>CatalogoParametrosSincronizacionConfiguration</code> (<code>infrastructure/config/adapters/catalog/catalogoparametros/</code>), solo si el selector tiene ese valor.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  subgraph lectura["Lectura con cache"]
+    UC["Casos de uso"] --> PCP["ParameterCatalogPort"]
+    PCP --> AD["CatalogoParametrosHttpParameterCatalogAdapter"]
+    AD --> CL["CatalogoParametrosM2mClient"]
+    CL --> TK["CatalogoParametrosM2mTokenProvider"]
+  end
+  TK -->|"client_credentials"| KC["Keycloak de Security"]
+  CL -->|"GET parametros consulta m2m"| CAT["Catalogo de Parametros"]
+  subgraph eventos["Eventos"]
+    PUL["Pulsar del Catalogo"] --> LI["CatalogoParametrosEventListener"]
+    LI --> SYNC["SincronizarParametrosCatalogoUseCaseImpl"]
+  end
+  SYNC -->|"invalida cache"| AD
+  SYNC -->|"relee por nombre"| CL
+  SYNC --> REPO["ParametroCatalogoJpaRepository"]
+  REPO -->|"EXEC usp_sincronizar_parametro_catalogo_externo"| BD[("SQL Server")]
+      </pre>
+      <figcaption>Lectura y sincronización del proveedor <code>catalogoparametros</code>. El listener es un adaptador primario; el caso de uso solo conoce puertos.</figcaption>
+    </figure>
+    <h4>Lectura M2M y caché</h4>
+    <ul>
+      <li><strong>Token:</strong> <code>CatalogoParametrosM2mTokenProvider</code> pide <code>client_credentials</code> a Keycloak con <code>CATALOGO_PARAMETROS_M2M_CLIENT_ID</code> y el secreto. Lo guarda en memoria hasta <strong>30 segundos antes</strong> de que venza (<code>MARGEN_SEGUNDOS</code>) y hay una sola petición de token en vuelo. Ni el secreto ni el token se escriben en logs ni en mensajes de error.</li>
+      <li><strong>Consulta:</strong> <code>CatalogoParametrosM2mClient</code> hace <code>GET {base-url}/parametros/consulta/m2m</code> (con <code>?nombre=</code> para un parámetro). Un <strong>401</strong> descarta el token y la lectura síncrona reintenta una sola vez con uno nuevo.</li>
+      <li><strong>Caché:</strong> una sola respuesta trae todos los parámetros del alcance y se guarda <code>CATALOGO_PARAMETROS_CACHE_TTL</code> (5 minutos). Vencida, se sirve y se refresca en segundo plano. Tras un fallo de refresco hay una gracia máxima de 30 segundos sin reintentar, de modo que un Catálogo caído no llena el log ni degrada cada lectura.</li>
+      <li><strong>Invalidación:</strong> el adaptador implementa <code>InvalidableParameterCatalog</code>; invalidar un parámetro vacía toda la caché porque la respuesta es un solo bloque.</li>
+    </ul>
+    <h4>Listener de eventos</h4>
+    <p><code>CatalogoParametrosEventListener</code> (<code>infrastructure/adapter/primary/messaging/catalogoparametros/</code>) es un <code>SmartLifecycle</code> que se suscribe al topic <code>&lt;prefijo&gt;-&lt;client_id&gt;</code> con una suscripción <strong>durable de tipo <code>Shared</code></strong> (<code>asistencias-uco-backend-parametros</code> por defecto, posición inicial <code>Earliest</code>).</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Situación</th><th>Qué hace el listener</th></tr></thead>
+        <tbody>
+          <tr><td>Evento procesado</td><td>Confirma (<code>acknowledge</code>) <strong>después</strong> de procesar. Resultado <code>procesado</code>.</td></tr>
+          <tr><td>Evento ilegible, de otra fuente (<code>source</code> distinto de <code>catalogo-parametros</code>) o sin <code>eventType</code></td><td>Lo confirma y lo descarta: reintentarlo no lo arregla. Resultado <code>descartado</code>.</td></tr>
+          <tr><td>Falla el Catálogo o la BD</td><td><code>negativeAcknowledge</code> con espera creciente de <strong>1 a 60 segundos</strong> (multiplicador 2). Resultado <code>fallido</code>.</td></tr>
+          <tr><td>Pulsar no responde al arrancar</td><td>El backend arranca igual y reintenta la suscripción cada 15 s, duplicando hasta 5 minutos; mientras tanto lee con la caché.</td></tr>
+          <tr><td><code>schemaVersion</code> distinto de 3</td><td>Advierte en el log y procesa igual, porque el valor se relee por M2M.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>El caso de uso <code>SincronizarParametrosCatalogoUseCaseImpl</code> (<code>application/features/catalogo/sincronizarparametros/</code>) decide qué hacer con cada aviso:</p>
+    <ul>
+      <li><strong>Filtro:</strong> ignora los eventos de otra aplicación o ambiente (<code>applicationId</code> y <code>environmentId</code>) y los de un tipo que no sea <code>Parameter*</code>, <code>Metadata*</code> o <code>MetadataEnvironment*</code> con sufijo <code>Created</code>, <code>Updated</code> o <code>Deleted</code>.</li>
+      <li><strong>Idempotencia:</strong> recuerda los últimos 1000 <code>eventId</code> procesados <strong>sin error</strong>; un repetido se ignora. La BD también es idempotente por <code>eventId</code>.</li>
+      <li><strong>Relectura por nombre:</strong> en 0.1.17 el valor vive en el metadato, así que un cambio llega como <code>MetadataUpdated</code>. Estos eventos traen el valor (<code>resourceValue</code>), pero el backend <strong>no lo usa</strong>: invalida la caché, relee el parámetro por M2M con <code>?nombre=</code> y hace <code>UPSERT</code> con el valor del Catálogo. Un metadato sin nombre usable reconcilia el catálogo completo.</li>
+      <li><strong>Borrado:</strong> solo <code>ParameterDeleted</code> con el parámetro ausente del Catálogo hace <code>DELETE</code> (la fila vuelve a su valor por defecto). Si el Catálogo ya no devuelve un valor por otra causa (metadato borrado, valor vacío), la BD conserva el suyo.</li>
+    </ul>
+    <h4>Reconciliación de arranque</h4>
+    <p>Al iniciar, si <code>CATALOGO_PARAMETROS_RECONCILE_ON_STARTUP</code> es verdadero, un hilo virtual hace <strong>una sola lectura M2M</strong> y hace <code>UPSERT</code> de todos los parámetros (sin <code>eventId</code>). No es sondeo: cubre eventos emitidos con el backend apagado. <strong>Nunca borra</strong>: un parámetro ausente en el Catálogo no se toca. Si falla, el backend sigue con la caché y la BD. El resumen (<code>ResumenSincronizacion</code>) cuenta aplicados, sin cambios, desconocidos, obsoletos, rechazados y fallidos; ver el SP en <a href="base-datos.html#sincronizacion-parametros">Base de datos</a>.</p>
+    <h4>Métricas y salud</h4>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Señal</th><th>Etiquetas o estados</th><th>Qué mide</th></tr></thead>
+        <tbody>
+          <tr><td><code>catalogo_parametros_eventos_total</code></td><td><code>resultado</code>: <code>recibido</code>, <code>procesado</code>, <code>descartado</code>, <code>fallido</code></td><td>Eventos por su destino.</td></tr>
+          <tr><td><code>catalogo_parametros_valores_total</code></td><td><code>resultado</code>: <code>aplicado</code>, <code>sin_cambios</code>, <code>desconocido</code>, <code>obsoleto</code>, <code>rechazado</code>, <code>fallido</code></td><td>Lo que ocurrió en la BD por valor.</td></tr>
+          <tr><td><code>catalogo_parametros_ultima_sincronizacion_segundos</code></td><td>Gauge</td><td>Época del último evento o reconciliación exitosos (0 si aún no hubo).</td></tr>
+          <tr><td>Componente de salud <code>catalogoParametrosEventos</code></td><td><code>UP</code> si está suscrito; <code>UNKNOWN</code> si no</td><td>Detalles <code>suscrito</code> y <code>ultimaSincronizacionEpochSegundos</code>. Nunca es <code>DOWN</code>: sin Pulsar el backend sigue sirviendo con caché y BD, así que no debe salir del balanceador.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4>Propiedades (<code>app.providers.catalogo-parametros.events</code>)</h4>
+    <p><code>CATALOGO_PARAMETROS_EVENTS_ENABLED</code> (una sola bandera para suscripción y reconciliación), <code>CATALOGO_PARAMETROS_PULSAR_URL</code> (<code>pulsar://localhost:6652</code> desde el PC; <code>pulsar://pulsar-parametros:6650</code> desde <code>asis-red</code>), <code>CATALOGO_PARAMETROS_EVENTS_TOPIC</code> (vacío: prefijo más <code>client_id</code>), <code>CATALOGO_PARAMETROS_EVENTS_TOPIC_PREFIX</code>, <code>CATALOGO_PARAMETROS_EVENTS_SUBSCRIPTION</code> y <code>CATALOGO_PARAMETROS_RECONCILE_ON_STARTUP</code>. Fuente: <code>GestioAsistenciaBackend/src/main/resources/application.yml</code> y <code>CatalogoParametrosEventsProperties</code>.</p>
+    <div class="nota alerta"><strong>Límite conocido</strong> Una lectura M2M fría del Catálogo puede tardar varios segundos, por eso el tiempo máximo es de 10 s (<code>CATALOGO_PARAMETROS_TIMEOUT</code>). El esquema del evento es del equipo de Parámetros: una falla del esquema se reporta a ellos, no se parcha aquí.</div>
 
     <h2 id="realtime">Tiempo real con SSE</h2>
     <p><strong>Por qué.</strong> La interfaz debe enterarse de los cambios sin preguntar cada pocos segundos. Está <strong>prohibido el polling</strong>: el servidor empuja eventos por Server-Sent Events y el cliente los convierte en señales de Angular.</p>
@@ -785,7 +856,7 @@ flowchart LR
     </div>
     <div class="dos-columnas">
       <figure class="grafica">
-        <div class="lienzo"><canvas aria-label="Pruebas por capa medidas el 2026-11-22: base de datos 1107, backend 5162, frontend 3903, servicio de notificaciones 146" role="img" data-grafica='{"type":"bar","data":{"labels":["BD (casos)","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1107,5162,3903,146]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+        <div class="lienzo"><canvas aria-label="Pruebas por capa medidas el 2026-11-22: base de datos 1118, backend 5215, frontend 3903, servicio de notificaciones 146" role="img" data-grafica='{"type":"bar","data":{"labels":["BD (casos)","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1118,5215,3903,146]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
         <figcaption>Pruebas por capa, medidas el 2026-11-22. El backend cuenta casos parametrizados; hay 4936 métodos anotados con <code>@Test</code> o <code>@ParameterizedTest</code>.</figcaption>
       </figure>
       <figure class="grafica">

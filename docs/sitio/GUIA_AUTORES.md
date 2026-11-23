@@ -26,13 +26,13 @@ No se agregan otras librerías, CSS en línea con colores fijos ni scripts propi
 1. Todo en español, claro para un desarrollador nuevo. Primero el porqué y luego el cómo.
 2. **Verdad desde el código:** cada afirmación se comprueba leyendo los repos y se cita la ruta relativa al workspace, por ejemplo `GestioAsistenciaBackend/src/main/java/...`. No se inventan clases, SP ni endpoints. Si algo no se encuentra, no se menciona.
 3. **Cifras reales:** los conteos (tablas, SP, endpoints, componentes, pruebas) se calculan con `grep` o `find` sobre los repos actuales (ramas `feat/p3-revision-final` en BD, Backend y Frontend, y `feat/p2-revision-final` en Infra) y se pone la fecha. Métricas ya medidas el 2026-11-22:
-   - Gate de BD: 1100 casos y 0 fallos, migraciones 01–70.
-   - Backend: 5177 pruebas; JaCoCo 95,9 % en líneas y 87,5 % en ramas.
-   - Frontend: 3862 pruebas; realtime 95,24 % en líneas y 86,81 % en ramas; E2E 21/21.
-   - Servicio de Notificaciones: 145 pruebas; 98,5 % en líneas y 92,6 % en ramas.
-   - HU: 140 certificadas, 29 descartadas y 4 abiertas en develop, más HU179/180 (receso) por registrar; 175 en total.
+   - Gate de BD: 1118 casos y 0 fallos, migraciones 01–73 (2026-11-23, tras INT-004).
+   - Backend: 5215 pruebas (`mvnw verify` BUILD SUCCESS); JaCoCo ≈95,9 % en líneas y ≈87,1 % en ramas.
+   - Frontend: 3903 pruebas; realtime ≈95 % en líneas y ≈87 % en ramas; E2E 21/21.
+   - Servicio de Notificaciones 0.1.1: 146 pruebas; 98,5 % en líneas y 92,4 % en ramas.
+   - HU: 144 certificadas, 29 descartadas, HU176B en Fase 3 y HU177 pendiente (dependen de Seguridad); 175 en total.
    - Checklist: 113 CUMPLE, 22 PARCIAL y 5 PENDIENTE EXTERNO.
-4. **Notificaciones:** está en plena separación. El estado destino es el servicio propio en `Complementos/Notificaciones`. El backend conserva la outbox y entrega por HTTP con una `idempotencyKey`; las plantillas, el SMTP y el tope de envíos viven en el servicio. Ver `docs/PLAN_COMPONENTE_NOTIFICACIONES.md` en la raíz del workspace y `Complementos/Notificaciones/README.md`. Describe el estado destino y marca con `.nota.alerta` lo que siga en curso.
+4. **Notificaciones:** separación terminada (F1–F7, 2026-11-22): servicio propio en `Complementos/Notificaciones`. El backend conserva la outbox y entrega por HTTP con una `idempotencyKey`; las plantillas, el SMTP y el tope de envíos viven en el servicio. Ver `docs/PLAN_COMPONENTE_NOTIFICACIONES.md` en la raíz del workspace y `Complementos/Notificaciones/README.md`. El aviso entra a la outbox con un SP propio, no en la transacción del negocio.
 5. **Nunca** incluyas secretos, contraseñas (ni siquiera las de prueba), tokens ni correos reales de personas. Los usuarios de prueba se nombran solo por rol.
 6. **Accesibilidad:** encabezados en orden, `aria-label` en las gráficas, texto alternativo en los diagramas complejos (resumen en `figcaption`) y tablas con `th`.
 7. **Verificación:** el sitio se sirve en `http://localhost:8765/` (servidor ya levantado). Antes de terminar, abre cada página tuya con Playwright y el Chrome del sistema:

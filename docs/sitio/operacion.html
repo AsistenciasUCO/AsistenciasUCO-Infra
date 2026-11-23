@@ -59,7 +59,7 @@
     <h2 id="escenarios">Escenarios y memoria</h2>
     <p>El laboratorio completo no cabe en la máquina virtual de Docker (límite de 9700 MB, <code>%USERPROFILE%\.wslconfig</code> con 10 GB). Por eso se levanta por <strong>secciones</strong> o por <strong>escenarios</strong>. <code>asis-datos</code> es la única sección con reinicio automático.</p>
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Memoria estimada en megabytes de cada sección del laboratorio" role="img" data-grafica='{"type":"bar","data":{"labels":["ext-mensajes","asis-datos","ext-seguridad","asis-antivirus","asis-app","asis-obs","asis-contingencia","ext-parametros","ext-notificaciones"],"datasets":[{"label":"Memoria (MB)","data":[3300,2500,1600,1300,1200,900,900,600,450]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}},"scales":{"x":{"title":{"display":true,"text":"MB estimados"}}}}}'></canvas></div>
+      <div class="lienzo"><canvas aria-label="Memoria estimada en megabytes de cada sección del laboratorio" role="img" data-grafica='{"type":"bar","data":{"labels":["ext-mensajes","asis-datos","ext-seguridad","ext-parametros","asis-antivirus","asis-app","asis-obs","asis-contingencia","ext-notificaciones"],"datasets":[{"label":"Memoria (MB)","data":[3300,2500,1600,1500,1300,1200,900,900,450]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}},"scales":{"x":{"title":{"display":true,"text":"MB estimados"}}}}}'></canvas></div>
       <figcaption>Memoria por sección según <code>memoriaMb</code> de <code>stack/secciones.json</code>. El límite global es 9700 MB.</figcaption>
     </figure>
     <div class="tabla-contenedor">
@@ -69,8 +69,8 @@
           <tr><td><code>minimo</code></td><td>asis-datos</td><td>2,5 GB</td><td>Gate de BD y scripts SQL</td></tr>
           <tr><td><code>basico</code></td><td>datos, seguridad, notificaciones, app</td><td>5,75 GB</td><td>HU de los 5 roles</td></tr>
           <tr><td><code>mensajes</code></td><td>básico + mensajes</td><td>9,05 GB</td><td>Catálogo de mensajes y textos UI</td></tr>
-          <tr><td><code>parametros</code></td><td>básico + parámetros</td><td>6,35 GB</td><td>Catálogo de Parámetros y su microfrontend</td></tr>
-          <tr><td><code>completo</code></td><td>básico + mensajes + parámetros</td><td>9,65 GB de 9,7 GB</td><td>Flujos con los tres componentes (no agregar más secciones)</td></tr>
+          <tr><td><code>parametros</code></td><td>básico + parámetros</td><td>7,25 GB</td><td>Catálogo de Parámetros 0.1.17: microfrontend, consulta M2M y eventos Pulsar (INT-004)</td></tr>
+          <tr><td><code>completo</code></td><td>básico + mensajes + parámetros</td><td>10,55 GB, sobre el límite de 9,7 GB</td><td>Flujos con los tres componentes: <code>stack up</code> lo rechaza por memoria desde INT-004; use <code>mensajes</code> o <code>parametros</code></td></tr>
           <tr><td><code>soportes</code></td><td>básico + antivirus</td><td>7,05 GB</td><td>Adjuntos de reclamos con MinIO y ClamAV</td></tr>
           <tr><td><code>observabilidad</code></td><td>básico + obs</td><td>6,65 GB</td><td>Trazas, métricas y logs por <code>correlationId</code></td></tr>
           <tr><td><code>contingencia</code></td><td>datos, contingencia, notificaciones, app</td><td>5,05 GB</td><td>Arranque con el Keycloak propio</td></tr>
@@ -82,6 +82,20 @@
       <li><code>asis-contingencia</code> y <code>ext-parametros</code> no pueden convivir: ambos usan el puerto 8081 del PC.</li>
       <li>Con <code>asis-app</code>, <code>stack up</code> genera la configuración del backend y del frontend (<code>stack/generado/*.env</code>, fuera de Git) según lo que esté arriba. Por ejemplo usa el proveedor <code>baseline</code> con <code>ext-seguridad</code> y el <code>legacy</code> con la contingencia.</li>
     </ul>
+
+    <h3 id="escenario-parametros">El escenario parametros (INT-004)</h3>
+    <p>Levanta datos, seguridad, <code>ext-parametros</code>, notificaciones y la app, sin ClamAV ni observabilidad. La sección <code>ext-parametros</code> declara <strong>1500 MB</strong> y se mide cerca de 1,45 GB: Pulsar 845 MB, la aplicación 456 MB y SurrealDB 104 MB (la hoja <code>stack/secciones.json</code> es la fuente).</p>
+    <ul>
+      <li><strong>Broker propio:</strong> el Catálogo trae su Pulsar (contenedor <code>ext-parametros-pulsar</code>). Se une a <code>asis-red</code> con el alias <code>pulsar-parametros</code>, así que desde el contenedor del backend la dirección es <code>pulsar://pulsar-parametros:6650</code>. El puerto 6652 del PC es el listener externo, que se anuncia como <code>localhost:6652</code> y no sirve desde un contenedor. Un backend fuera de Docker usa <code>pulsar://localhost:6652</code>; la administración del broker está en <code>http://localhost:8082</code>.</li>
+      <li><strong>Salud de la sección:</strong> <code>actuator/health</code> de 8081 y <code>brokers/health</code> de 8082; el microfrontend, en el 4201.</li>
+      <li><strong>Sin observabilidad del Catálogo:</strong> su compose la exige (TD-128); el overlay <code>stack/secciones/ext-parametros.yml</code> la omite y el app registra un <code>UnknownHostException</code> de <code>otel-collector</code> inofensivo.</li>
+      <li><strong>MessageUcoLab apagado para el Catálogo:</strong> el consumo de los mensajes de MessageUcoLab por el Catálogo queda desactivado (<code>PULSAR_ENABLED=false</code>) porque ese escenario necesita <code>doppler login</code>; la publicación de eventos sigue activa.</li>
+    </ul>
+    <h4>Variables que <code>stack up</code> pasa al backend (solo nombres)</h4>
+    <p>Con <code>ext-parametros</code> arriba, <code>stack.ps1</code> escribe en <code>stack/generado/backend.env</code> (fuera de Git): <code>CATALOGO_PARAMETROS_BASE_URL</code>, <code>CATALOGO_PARAMETROS_M2M_TOKEN_URI</code>, <code>CATALOGO_PARAMETROS_PULSAR_URL</code>, <code>CATALOGO_PARAMETROS_EVENTS_SUBSCRIPTION</code> y <code>CATALOGO_PARAMETROS_EVENTS_TOPIC</code>. <code>CATALOGO_PARAMETROS_M2M_CLIENT_ID</code> y <code>CATALOGO_PARAMETROS_M2M_CLIENT_SECRET</code> pasan del <code>.env</code> del backend (el secreto no está en Git ni en el script); sin el <code>client_id</code> el script avisa y no hay consulta M2M ni topic de eventos. <code>CATALOGO_PARAMETROS_APPLICATION_ID</code> y <code>CATALOGO_PARAMETROS_ENVIRONMENT_ID</code> identifican la aplicación y el ambiente (ver <a href="componentes-externos.html#parametros">Componentes externos</a>).</p>
+    <h4>Cómo repetir INT-004</h4>
+    <p>El procedimiento completo está en <code>AsistenciasUCO-Infra/docs/work-items/INT-004-parametros-m2m-eventos/ESTADO.md</code> (sección 7): preparar el kit del Catálogo, <code>infra.ps1 stack up parametros</code>, aprovisionar Seguridad (recursos, rol técnico <code>PARAMETROS_CONSUMER</code>, identidad de servicio y su aprobación), asociar la identidad a la aplicación y al ambiente <code>Desarrollo</code>, probar el contrato M2M y un evento, y volver a levantar <code>stack up parametros</code> para regenerar <code>backend.env</code>. Los scripts de esa sesión no están versionados porque llevan rutas locales y leen secretos del laboratorio.</p>
+    <div class="nota alerta"><strong>Antes de editar valores del laboratorio</strong> Con el Catálogo activo, un valor cambiado solo en la BD se sobrescribe en la siguiente reconciliación o evento: los datos de prueba que difieren de lo sembrado (por ejemplo <code>RED.CIDRS_CAMPUS</code>) deben cambiarse en el Catálogo. <code>provision_asistencias.py verify</code> informa <code>SOBRA=141</code> con <code>FALTA=0</code>: concesiones del PDP que el catálogo de endpoints ya no declara; no bloquea.</div>
 
     <h2 id="levantar">Levantar el laboratorio después de un apagado</h2>
     <div class="flujo" data-flujo data-titulo="Del PC apagado a la demo lista">
@@ -126,6 +140,7 @@
           <tr><td>Falta la imagen <code>asistencias-backend:develop</code></td><td>Ejecuta <code>infra.ps1 stack build</code>.</td></tr>
           <tr><td>Error de collation al desplegar el esquema</td><td>La base debe crearse con la collation del esquema. Usa <code>datos-prueba cargar -Yes</code> (recrea desde cero) en vez de restaurar una base de otro servidor.</td></tr>
           <tr><td>Hay un backend local en el puerto 8080</td><td>Deténlo o usa <code>datos-prueba cargar -Yes -StopBackend</code>.</td></tr>
+          <tr><td>El backend no recibe cambios del Catálogo o lee <code>HTTP 401</code> del Catálogo</td><td>Revisa que el <code>.env</code> del backend tenga la identidad M2M y que <code>stack up parametros</code> se haya vuelto a ejecutar tras crearla (genera el topic con el <code>client_id</code>). El componente de salud <code>catalogoParametrosEventos</code> en <code>UNKNOWN</code> indica que no hay suscripción; el backend sigue sirviendo con caché y BD.</td></tr>
           <tr><td>La sesión «se cae» durante la demo</td><td>Es esperado: el token de acceso dura 5 minutos (se renueva por PKCE) y la sesión SSO 30 minutos.</td></tr>
           <tr><td>Frontend sin estilos o en blanco</td><td>Tras un <code>stack build</code>, recrea la app con <code>stack up asis-app -Conservar</code>.</td></tr>
           <tr><td><code>migrar.ps1 -Modo Aplicar</code> re-ejecuta todo</td><td>Con <code>dbo.MigracionAplicada</code> vacía, las migraciones desde la 05 figuran pendientes. Corre siempre antes <code>migrar.ps1 -Modo Estado</code> (solo lee).</td></tr>

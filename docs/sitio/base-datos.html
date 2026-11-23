@@ -21,18 +21,18 @@
         <span class="etiqueta">SQL Server 2022</span>
         <span class="etiqueta">Smart / Thick database</span>
         <span class="etiqueta">315 procedimientos</span>
-        <span class="etiqueta">1107 casos de prueba</span>
-        <span class="etiqueta">Migraciones 01–72</span>
+        <span class="etiqueta">1118 casos de prueba</span>
+        <span class="etiqueta">Migraciones 01–73</span>
       </div>
     </header>
 
     <div class="kpis">
-      <div class="kpi"><div class="valor">75</div><div class="rotulo">tablas físicas</div></div>
+      <div class="kpi"><div class="valor">76</div><div class="rotulo">tablas físicas</div></div>
       <div class="kpi"><div class="valor">107</div><div class="rotulo">vistas <code>uv_*</code></div></div>
-      <div class="kpi"><div class="valor">315</div><div class="rotulo">procedimientos <code>usp_*</code></div></div>
+      <div class="kpi"><div class="valor">317</div><div class="rotulo">procedimientos <code>usp_*</code></div></div>
       <div class="kpi"><div class="valor">28</div><div class="rotulo">funciones <code>ufn_*</code></div></div>
       <div class="kpi"><div class="valor">524</div><div class="rotulo">códigos de mensaje</div></div>
-      <div class="kpi"><div class="valor">1107</div><div class="rotulo">casos del gate, 0 fallos</div></div>
+      <div class="kpi"><div class="valor">1118</div><div class="rotulo">casos del gate, 0 fallos</div></div>
     </div>
 
     <h2 id="rol-de-la-bd">El rol de la base de datos: Smart / Thick database</h2>
@@ -143,21 +143,21 @@ sequenceDiagram
     <p>El esquema se guarda <strong>un objeto por archivo</strong> y se despliega con <code>deploy_schema.ps1</code> en un orden fijo (tablas, triggers, funciones, vistas, procedimientos, seguridad y semillas). Raíz: <code>GestioAsistenciaDB/</code>.</p>
 
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Cantidad de archivos por carpeta del esquema de la base de datos" role="img" data-grafica='{"type":"bar","data":{"labels":["stored-procedures","views","seed","tables","security","migrations (versiones)","functions","triggers"],"datasets":[{"label":"Archivos","data":[303,106,80,74,53,71,28,1]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
-      <figcaption>Archivos por carpeta (cierre del 2026-11-22). Las tablas son 74 archivos porque uno es <code>zz_foreign_keys.sql</code>, que agrupa 94 llaves foráneas: quedan 73 tablas. Migraciones: 71 versiones distintas (la 35 no existe).</figcaption>
+      <div class="lienzo"><canvas aria-label="Cantidad de archivos por carpeta del esquema de la base de datos" role="img" data-grafica='{"type":"bar","data":{"labels":["stored-procedures","views","seed","tables","security","migrations (versiones)","functions","triggers"],"datasets":[{"label":"Archivos","data":[305,106,81,75,54,72,28,1]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Archivos por carpeta (cierre del 2026-11-22). Las tablas son 75 archivos porque uno es <code>zz_foreign_keys.sql</code>, que agrupa las llaves foráneas: quedan 74 tablas, una de ellas <code>SincronizacionParametroExterno</code> (migración 73). Migraciones: 72 versiones distintas (la 35 no existe).</figcaption>
     </figure>
 
     <div class="tabla-contenedor">
       <table>
         <thead><tr><th>Carpeta</th><th>Contenido</th><th>Archivos</th></tr></thead>
         <tbody>
-          <tr><td><code>schema/tables</code></td><td>DDL idempotente (<code>IF OBJECT_ID(...) IS NULL</code>), índices y restricciones. <code>zz_foreign_keys.sql</code> va al final del orden alfabético.</td><td>74</td></tr>
+          <tr><td><code>schema/tables</code></td><td>DDL idempotente (<code>IF OBJECT_ID(...) IS NULL</code>), índices y restricciones. <code>zz_foreign_keys.sql</code> va al final del orden alfabético.</td><td>75</td></tr>
           <tr><td><code>schema/views</code></td><td>Vistas de lectura <code>uv_*</code> (106), de las cuales 13 son <code>uv_auth_*</code> filtradas por rol.</td><td>106</td></tr>
           <tr><td><code>schema/functions</code></td><td>Funciones <code>ufn_*</code>: parámetros, validaciones puras, cálculo de horas y porcentajes, ámbito de programas.</td><td>28</td></tr>
-          <tr><td><code>schema/stored-procedures</code></td><td>207 fachadas públicas y 96 núcleos internos (16 <code>usp_internal_*</code> y 80 <code>*_interno</code>).</td><td>303</td></tr>
+          <tr><td><code>schema/stored-procedures</code></td><td>208 fachadas públicas y 97 núcleos internos (16 <code>usp_internal_*</code> y 81 <code>*_interno</code>).</td><td>305</td></tr>
           <tr><td><code>schema/triggers</code></td><td><code>tr_<wbr>Sesion_<wbr>procedencia_<wbr>temporal</code>: defensa contra DML directo sobre <code>Sesion</code>.</td><td>1</td></tr>
-          <tr><td><code>schema/security</code></td><td>Roles y permisos del backend (<code>rol_asistencias_runtime*</code>), uno por paquete de trabajo.</td><td>53</td></tr>
-          <tr><td><code>schema/seed</code></td><td>Catálogos, mensajes y parámetros (<code>MERGE</code> idempotentes).</td><td>80</td></tr>
+          <tr><td><code>schema/security</code></td><td>Roles y permisos del backend (<code>rol_asistencias_runtime*</code>), uno por paquete de trabajo.</td><td>54</td></tr>
+          <tr><td><code>schema/seed</code></td><td>Catálogos, mensajes y parámetros (<code>MERGE</code> idempotentes).</td><td>81</td></tr>
           <tr><td><code>migrations</code></td><td>Cambios incrementales para bases existentes: <code>NN_nombre_up.sql</code> y <code>_down.sql</code>.</td><td>143</td></tr>
           <tr><td><code>test</code> y <code>test_suite.sql</code></td><td>202 pruebas T-SQL y 40 scripts PowerShell; la suite incluye 174 archivos con <code>:r</code>.</td><td>242</td></tr>
           <tr><td><code>scripts</code></td><td><code>migrar.ps1</code>, <code>freeze-manifest.ps1</code>, <code>check-test-summary-parity.ps1</code>, <code>generar-catalogo-mensajes.ps1</code>, datos de prueba.</td><td>—</td></tr>
@@ -169,8 +169,8 @@ sequenceDiagram
     <div class="nota"><strong>Sin tipos de tabla (TVP).</strong> <code>AGENTS.md</code> menciona una carpeta <code>types</code>, pero hoy no existe en el esquema: los lotes (asistencia, horarios, carga masiva) viajan como JSON en un <code>NVARCHAR(MAX)</code> y se leen con <code>OPENJSON</code>, validando primero con <code>ISJSON</code>.</div>
 
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Distribución de los 303 procedimientos almacenados por familia" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Consultas públicas (usp_consultar_*)","Comandos públicos (crear, actualizar, registrar, etc.)","Núcleos internos (usp_internal_* y *_interno)"],"datasets":[{"label":"Procedimientos","data":[101,106,96]}]}}'></canvas></div>
-      <figcaption>303 procedimientos: 101 consultas públicas, 106 comandos y utilidades públicas, y 96 núcleos internos sin permiso de ejecución para el backend.</figcaption>
+      <div class="lienzo"><canvas aria-label="Distribución de los 305 procedimientos almacenados por familia" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Consultas públicas (usp_consultar_*)","Comandos públicos (crear, actualizar, registrar, etc.)","Núcleos internos (usp_internal_* y *_interno)"],"datasets":[{"label":"Procedimientos","data":[102,106,97]}]}}'></canvas></div>
+      <figcaption>305 procedimientos: 102 consultas públicas, 106 comandos y utilidades públicas, y 97 núcleos internos sin permiso de ejecución para el backend.</figcaption>
     </figure>
 
     <h2 id="modelo-de-datos">Modelo de datos por dominio</h2>
@@ -495,6 +495,7 @@ erDiagram
 erDiagram
   CatalogoParametro ||--o| CatalogoParametroEdicion : "reglas de edicion"
   CatalogoParametro ||--o{ CambioParametro : "historial"
+  CatalogoParametro ||--o{ SincronizacionParametroExterno : "sincroniza"
   Usuario ||--o{ CambioParametro : "cambia"
   EstadoNotificacion ||--o{ NotificacionSaliente : "estado"
   AuditoriaEvento {
@@ -518,6 +519,19 @@ erDiagram
     guid id PK
     varchar codigo
     nvarchar contenido
+  }
+  SincronizacionParametroExterno {
+    guid id PK
+    varchar idEvento UK
+    guid parametro FK
+    varchar grupo
+    varchar clave
+    varchar operacion
+    varchar resultado
+    nvarchar valorAnterior
+    nvarchar valorNuevo
+    datetime2 ocurridoEnUtc
+    guid idCorrelacion
   }
   CatalogoParametro {
     guid id PK
@@ -785,6 +799,33 @@ flowchart TD
       </table>
     </div>
 
+    <h3 id="sincronizacion-parametros">Sincronización con el Catálogo de Parámetros externo (INT-004)</h3>
+    <p><strong>Por qué.</strong> Cuando el backend usa el proveedor <code>catalogoparametros</code> (<a href="componentes-externos.html#parametros">componentes externos</a>), la fuente de verdad de los valores es el Catálogo de Parámetros. Pero los procedimientos almacenados leen <code>dbo.CatalogoParametro</code> con <code>ufn_obtener_parametro</code> y no pueden llamar a un servicio externo. La migración 73 deja un único camino de escritura para copiar en la BD los valores vigentes del Catálogo: <code>usp_sincronizar_parametro_catalogo_externo</code>.</p>
+    <h4>Entradas y reglas</h4>
+    <p>Recibe <code>@grupo</code> y <code>@clave</code> (el backend parte el nombre <code>GRUPO.CLAVE</code> con el separador configurado), <code>@valor</code>, <code>@operacion</code> (<code>UPSERT</code> o <code>DELETE</code>), <code>@idEvento</code> (el <code>eventId</code> del evento; <code>NULL</code> en la reconciliación de arranque), <code>@ocurridoEnUtc</code> (el <code>occurredAt</code> del evento) y <code>@idCorrelacion</code>. No hay usuario ejecutor, porque es un proceso del sistema, así que no valida RBAC. No crea filas: solo actualiza parámetros que ya existen y están activos.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Resultado</th><th>Mensaje</th><th>Cuándo ocurre</th><th>Escribe el valor</th></tr></thead>
+        <tbody>
+          <tr><td><code>APLICADO</code></td><td><code>PRM_013</code></td><td>El valor es distinto del actual y pasa la validación; se actualiza <code>valor</code> y <code>fechaModificacion</code>.</td><td>Sí</td></tr>
+          <tr><td><code>SIN_CAMBIOS</code></td><td><code>PRM_011</code></td><td>El valor ya es igual, en comparación binaria (<code>Latin1_General_BIN2</code>).</td><td>No</td></tr>
+          <tr><td><code>DUPLICADO</code></td><td><code>PRM_014</code></td><td>El <code>idEvento</code> ya está en <code>SincronizacionParametroExterno</code>: idempotencia.</td><td>No</td></tr>
+          <tr><td><code>OBSOLETO</code></td><td><code>PRM_015</code></td><td>El <code>ocurridoEnUtc</code> es menor que el del último valor aplicado: «el último evento gana»; un empate lo gana el que llega después.</td><td>No</td></tr>
+          <tr><td><code>DESCONOCIDO</code></td><td><code>PRM_016</code></td><td>No hay un parámetro activo con ese grupo y clave en esta BD.</td><td>No</td></tr>
+          <tr><td><code>RECHAZADO</code></td><td><code>PRM_004</code>, <code>PRM_005</code> o <code>PRM_006</code></td><td>El valor no cumple tipo, rango o lista permitida; <code>estadoResultado</code> es 0.</td><td>No</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li><strong>Validación:</strong> la hace <code>usp_validar_valor_parametro_externo_interno</code>, con las mismas reglas de tipo, rango y lista que la edición local. No aplica la lista blanca de edición ni la regla cruzada <code>PRM_007</code>, porque la fuente es el Catálogo y una regla entre dos parámetros rechazaría valores correctos según el orden de llegada de los eventos.</li>
+      <li><strong><code>DELETE</code>:</strong> si el parámetro se borró en el Catálogo, la fila <strong>nunca se borra</strong> (los SP la leen): el valor vuelve a <code>valorDefecto</code> de la propia fila. Es el estado «sin valor externo».</li>
+      <li><strong>Concurrencia:</strong> transacción propia (o <code>SAVE TRANSACTION</code> si ya hay una) y la fila del parámetro bloqueada con <code>UPDLOCK, HOLDLOCK</code>; <code>SET XACT_ABORT ON</code>.</li>
+    </ul>
+    <h4>La bitácora</h4>
+    <p><code>SincronizacionParametroExterno</code> guarda, por cada evento, el resultado, el valor anterior y el nuevo, el <code>occurredAt</code> y la correlación. Un índice único filtrado sobre <code>idEvento</code> (<code>UX_SincronizacionParametroExterno_Evento</code>) hace la idempotencia; el índice <code>IX_SincronizacionParametroExterno_Parametro_Ocurrido</code> sirve para hallar el último valor aplicado por parámetro. Con <code>@idEvento</code> se registra todo resultado (menos <code>DUPLICADO</code>); sin él, la reconciliación solo registra los <code>APLICADO</code>.</p>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/schema/stored-procedures/usp_sincronizar_parametro_catalogo_externo.sql</code>, <code>GestioAsistenciaDB/migrations/73_int004_sincronizar_parametros_up.sql</code> y <code>GestioAsistenciaDB/schema/security/rol_asistencias_runtime_int004.sql</code>.</small></p>
+    <div class="nota alerta"><strong>El Catálogo manda.</strong> Con el proveedor <code>catalogoparametros</code> activo, un valor cambiado solo en <code>dbo.CatalogoParametro</code> se sobrescribe en la siguiente reconciliación o evento. Los valores de datos de prueba del laboratorio que difieren de los sembrados (por ejemplo <code>RED.CIDRS_CAMPUS</code>) deben vivir en el Catálogo, no solo en la BD. La edición local de parámetros queda bloqueada con <code>PRM_010</code> cuando el catálogo activo no es <code>sqlserver</code>.</div>
+
     <h3 id="tiempo">Manejo del tiempo y la zona horaria</h3>
     <p>Regla de oro: <strong>todo instante se guarda en UTC</strong> (<code>TIEMPO/<wbr>ALMACENAMIENTO_<wbr>INSTANTES = UTC</code>, columnas <code>DATETIME2</code> con sufijo <code>Utc</code>). La zona de la institución sale de parámetros: <code>TIEMPO/<wbr>ZONA_<wbr>HORARIA_<wbr>IANA = America/<wbr>Bogota</code> (para el backend y el frontend) y <code>TIEMPO/<wbr>ZONA_<wbr>HORARIA_<wbr>SQLSERVER = SA Pacific Standard Time</code> (la que entiende <code>AT TIME ZONE</code>). Cuando una regla habla de «día» (festivo, receso, plazo de reclamo) se convierte primero el instante a fecha <strong>local</strong>:</p>
     <pre><code>AND df.fecha = CAST((s.fechaHoraInicio AT TIME ZONE 'UTC') AT TIME ZONE @zonaHorariaSqlServer AS DATE)</code></pre>
@@ -980,8 +1021,8 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
     </ul>
 
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Cantidad de versiones de migración por década de numeración, de la 01 a la 72" role="img" data-grafica='{"type":"bar","data":{"labels":["01-09","10-19","20-29","30-39","40-49","50-59","60-69","70-72"],"datasets":[{"label":"Versiones de migración","data":[9,10,10,9,10,10,10,3]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
-      <figcaption>Línea de tiempo por numeración (2026-11-22): 71 versiones entre la 01 y la 72, sin la 35. Las 15 a 28 son el paquete CULM-001 (festivos, tomas, alertas, parámetros editables…); 61 a 64 son grupos compartidos, matrícula por programa y calendario del semestre; 68 es el receso; 69 y 70 son la revisión final P3 y la auditoría de BD; 71 retira las plantillas por la separación de Notificaciones y 72 agrega el rótulo del estado CANCELADA.</figcaption>
+      <div class="lienzo"><canvas aria-label="Cantidad de versiones de migración por década de numeración, de la 01 a la 73" role="img" data-grafica='{"type":"bar","data":{"labels":["01-09","10-19","20-29","30-39","40-49","50-59","60-69","70-73"],"datasets":[{"label":"Versiones de migración","data":[9,10,10,9,10,10,10,4]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Línea de tiempo por numeración (2026-11-22): 72 versiones entre la 01 y la 73, sin la 35. Las 15 a 28 son el paquete CULM-001 (festivos, tomas, alertas, parámetros editables…); 61 a 64 son grupos compartidos, matrícula por programa y calendario del semestre; 68 es el receso; 69 y 70 son la revisión final P3 y la auditoría de BD; 71 retira las plantillas por la separación de Notificaciones 72 agrega el rótulo del estado CANCELADA y 73 (INT-004) crea la bitácora de sincronización de parámetros con el Catálogo externo.</figcaption>
     </figure>
     <details class="acordeon">
       <summary>Hitos de la línea de tiempo (migraciones destacadas)</summary>
@@ -1005,6 +1046,7 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
             <tr><td>68</td><td><code>68_receso_academico</code></td><td>Receso académico (DEC-081).</td></tr>
             <tr><td>69–70</td><td><code>69_p3_revision_final</code>, <code>70_auditoria_bd_2026_11_22</code></td><td>Revisión final y auditoría de BD (<code>usp_actualizar_grupo</code> transaccional, 28 índices de llaves foráneas, <code>XACT_ABORT</code>).</td></tr>
             <tr><td>71–72</td><td><code>71_p3_f5_notificaciones_servicio</code>, <code>72_p3_regresion_estado_cancelada</code></td><td>Retiro de plantillas y cola administrativa (servicio de Notificaciones) y rótulo <code>RPT_ASISTENCIA_ESTADO_CANCELADA</code>.</td></tr>
+            <tr><td>73</td><td><code>73_int004_sincronizar_parametros</code></td><td>INT-004: tabla <code>SincronizacionParametroExterno</code> (bitácora e idempotencia por <code>idEvento</code>), mensajes <code>PRM_013</code> a <code>PRM_016</code> y <code>GRANT EXECUTE</code> de <code>usp_sincronizar_parametro_catalogo_externo</code> al rol runtime.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1027,13 +1069,13 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
     <div class="nota alerta"><strong>Regla de contrato.</strong> Toda modificación de un contrato exige formalización previa, actualización del hash y verificación cruzada de repositorios. Nunca se «acomoda» la base para que el backend o el frontend compilen; si la forma difiere, se reconstruye desde el contrato.</div>
 
     <h2 id="pruebas">Suite de pruebas y gate</h2>
-    <p>El resultado más reciente del <strong>gate de BD</strong> es 1107 casos críticos y 0 fallos, con migraciones 01–72 (medido el 2026-11-22). La regla de oro de <code>AGENTS.md</code> aplica sin excepción: si una prueba falla, se corrige el código de producción, no la prueba.</p>
+    <p>El resultado más reciente del <strong>gate de BD</strong> es 1118 casos críticos y 0 fallos, con migraciones 01–73 (medido el 2026-11-22, después de INT-004). La regla de oro de <code>AGENTS.md</code> aplica sin excepción: si una prueba falla, se corrige el código de producción, no la prueba.</p>
     <div class="tabla-contenedor">
       <table>
         <thead><tr><th>Pieza</th><th>Rol</th></tr></thead>
         <tbody>
           <tr><td><code>test_suite.sql</code></td><td>Incluye con <code>:r /tmp/test/...</code> 174 archivos T-SQL de <code>test/</code>; cada caso imprime <code>TEST_PASS:&lt;ID&gt;</code>.</td></tr>
-          <tr><td><code>test_summary.ps1</code></td><td>Ejecuta la suite en el contenedor y exige que aparezcan los ids de <code>$criticalIds</code> y <code>$resultIds</code> (1107 en total). Valida los bloques de resultado canónico (<code>TEST_RESULT_BEGIN/END</code>, estado, mensaje de usuario y <code>DBCODE</code> esperado contra el catálogo).</td></tr>
+          <tr><td><code>test_summary.ps1</code></td><td>Ejecuta la suite en el contenedor y exige que aparezcan los ids de <code>$criticalIds</code> y <code>$resultIds</code> (1118 en total). Valida los bloques de resultado canónico (<code>TEST_RESULT_BEGIN/END</code>, estado, mensaje de usuario y <code>DBCODE</code> esperado contra el catálogo).</td></tr>
           <tr><td><code>scripts/<wbr>check-test-summary-parity.ps1</code></td><td>Verifica que los ids que exige el resumen existan en las pruebas (<code>-Check</code>: sin ids «fantasma»; <code>-Strict</code>: también sin ids emitidos que nadie exige, salvo la lista permitida).</td></tr>
           <tr><td><code>scripts/<wbr>freeze-manifest.ps1</code></td><td>Verifica los hashes WORM.</td></tr>
           <tr><td><code>test/*.ps1</code> (38)</td><td>Concurrencia, migraciones y deploy limpio con bases temporales (<code>test_<wbr>culm001_<wbr>b2_<wbr>concurrencia.ps1</code>, <code>test_val_migrar.ps1</code>…).</td></tr>
@@ -1043,7 +1085,7 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
 
     <figure class="grafica">
       <div class="lienzo"><canvas aria-label="Casos críticos del gate de BD agrupados por área" role="img" data-grafica='{"type":"bar","data":{"labels":["Núcleo: asistencia, sesión, grupo, plan, HU","CULM-001: tomas, festivos, alertas, paquete D","Otros","Validación, correcciones y auditoría","Consultas por rol (W1-W3)","ATA y avisos","Puntos de control","Tiempo UTC"],"datasets":[{"label":"Casos críticos","data":[328,299,144,128,78,57,41,25]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
-      <figcaption>1107 casos críticos agrupados por el prefijo de su identificador en <code>test_summary.ps1</code> (2026-11-22). La agrupación es una lectura aproximada por prefijo, no una clasificación oficial.</figcaption>
+      <figcaption>1118 casos críticos agrupados por el prefijo de su identificador en <code>test_summary.ps1</code>. El gráfico es la agrupación de la medición previa a INT-004 (2026-11-22); los 11 casos de INT-004 se suman al total de 1118. La agrupación es una lectura aproximada por prefijo, no una clasificación oficial.</figcaption>
     </figure>
 
     <h3 id="correr-gate">Cómo correr el gate de BD</h3>
@@ -1093,7 +1135,7 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
       <div class="tarjeta"><div class="icono">3️⃣</div><h4>Atómico y ordenado</h4><p>Transacción propia o savepoint, <code>UPDLOCK, HOLDLOCK</code> y un orden de bloqueos fijo.</p></div>
       <div class="tarjeta"><div class="icono">4️⃣</div><h4>Ámbito en la BD</h4><p>Las vistas <code>uv_auth_*</code> y la titularidad jerárquica aíslan docente, coordinador, decano y administrador.</p></div>
       <div class="tarjeta"><div class="icono">5️⃣</div><h4>Migrar con cuidado</h4><p><code>Estado</code> antes de <code>Aplicar</code>, siempre; los contratos congelados solo se supersedan con hash.</p></div>
-      <div class="tarjeta"><div class="icono">6️⃣</div><h4>Gate desde cero</h4><p>Despliegue limpio más <code>test_summary.ps1</code>: 1107 casos y 0 fallos.</p></div>
+      <div class="tarjeta"><div class="icono">6️⃣</div><h4>Gate desde cero</h4><p>Despliegue limpio más <code>test_summary.ps1</code>: 1118 casos y 0 fallos.</p></div>
     </div>
   </main>
 </div>

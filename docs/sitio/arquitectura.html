@@ -73,7 +73,7 @@ flowchart LR
   subgraph externos["Sistemas de otros equipos"]
     SEG["Security Baseline: identidad y permisos"]
     MSG["MessageUcoLab: textos de usuario"]
-    PAR["Catalogo de Parametros"]
+    PAR["Catalogo de Parametros: M2M y eventos"]
   end
   NOT["Servicio de Notificaciones: correo"]
   SMTP["Servidor SMTP institucional"]
@@ -117,6 +117,7 @@ flowchart TB
   subgraph cat["Catalogos externos"]
     ML["MessageUcoLab via Kong"]
     CP["Catalogo de Parametros"]
+    PP["Pulsar del Catalogo"]
   end
   NS["Servicio de Notificaciones"]
   OBS["Alloy, Tempo, Loki, Prometheus, Grafana"]
@@ -131,7 +132,8 @@ flowchart TB
   API -->|"decision"| PEP
   PEP --> PDP
   API --> ML
-  API --> CP
+  API -->|"M2M"| CP
+  PP -.->|"eventos de cambio"| API
   API -->|"OTLP"| OBS
       </pre>
       <figcaption>Contenedores: el navegador nunca llega a MinIO ni a los catálogos. Todo adjunto pasa por la API, que lo escanea con ClamAV antes de guardarlo.</figcaption>
@@ -201,7 +203,7 @@ flowchart LR
         <tbody>
           <tr><td>Estado de las entidades, folios (<code>SES-01</code>, <code>DEC-01</code>), catálogos relacionales</td><td>SQL Server</td><td>Procedimientos y vistas</td></tr>
           <tr><td>Textos para el usuario y mensajes técnicos</td><td>Catálogo de mensajes (MessageUcoLab o BD según el escenario)</td><td><code>MessageCatalogPort</code></td></tr>
-          <tr><td>Parámetros de negocio ajustables</td><td>Catálogo de Parámetros (o <code>dbo.CatalogoParametro</code> sin él)</td><td><code>ParameterCatalogPort</code></td></tr>
+          <tr><td>Parámetros de negocio ajustables</td><td>Catálogo de Parámetros (o <code>dbo.CatalogoParametro</code> sin él); con el Catálogo activo, la tabla es una copia mantenida por eventos y reconciliación</td><td><code>ParameterCatalogPort</code></td></tr>
           <tr><td>Secretos</td><td>Almacén de secretos (Key Vault en producción, <code>.env</code> local no versionado)</td><td><code>SecretVaultPort</code></td></tr>
           <tr><td>Normas de diseño y hardening</td><td><code>CONSTITUTION.md</code> y <code>HARDENING_QUICK_GUIDE.md</code> en Infra</td><td>No se duplican en otros repos</td></tr>
           <tr><td>Contratos públicos</td><td>Infra, con firma SHA-256</td><td>Copias verificadas por paridad</td></tr>
@@ -316,12 +318,12 @@ flowchart LR
         <tbody>
           <tr><td><code>basico</code></td><td>Desde la BD (<code>sqlserver</code>)</td><td>Desde la BD (<code>dbo.CatalogoParametro</code>)</td></tr>
           <tr><td><code>mensajes</code></td><td>MessageUcoLab (caché de 5 minutos; respaldo configurable)</td><td>Desde la BD</td></tr>
-          <tr><td><code>parametros</code></td><td>Desde la BD</td><td>Catálogo de Parámetros (caché de 5 minutos)</td></tr>
+          <tr><td><code>parametros</code></td><td>Desde la BD</td><td>Catálogo de Parámetros (consulta M2M, caché de 5 minutos invalidada por eventos de su Pulsar, copia en <code>dbo.CatalogoParametro</code>)</td></tr>
           <tr><td><code>completo</code></td><td>MessageUcoLab</td><td>Catálogo de Parámetros</td></tr>
         </tbody>
       </table>
     </div>
-    <p>El adaptador se elige con las propiedades <code>app.adapters.message-catalog.provider</code> y <code>app.adapters.parameter-catalog.provider</code> de <code>application.yml</code>. Más detalle en <a href="componentes-externos.html">Componentes externos</a>.</p>
+    <p>El adaptador se elige con las propiedades <code>app.adapters.message-catalog.provider</code> y <code>app.adapters.parameter-catalog.provider</code> de <code>application.yml</code>. Desde INT-004 el Catálogo avisa de sus cambios por un Pulsar propio y el backend los refleja en la caché y en la BD (<a href="componentes-externos.html#parametros">flujo completo</a>). Más detalle en <a href="componentes-externos.html">Componentes externos</a>.</p>
 
     <h2 id="observabilidad">Observabilidad</h2>
     <ul>
@@ -360,6 +362,7 @@ flowchart TB
     end
     subgraph p["ext-parametros"]
       CP["Catalogo y microfrontend"]
+      PPA["pulsar-parametros"]
     end
     subgraph v["asis-antivirus"]
       CLAM["ClamAV"]
@@ -381,6 +384,7 @@ flowchart TB
   BE -.-> GR
   RMQ -.-> BE
   PUL -.-> BE
+  PPA -.-> BE
       </pre>
       <figcaption>Las líneas punteadas son secciones opcionales según el escenario. <code>asis-contingencia</code> (Keycloak propio) no se muestra porque reemplaza a <code>ext-seguridad</code> solo en emergencias.</figcaption>
     </figure>
@@ -391,8 +395,8 @@ flowchart TB
           <tr><td><code>minimo</code></td><td>datos</td><td>2,5 GB</td><td>Gate de BD y scripts SQL</td></tr>
           <tr><td><code>basico</code></td><td>datos, seguridad, notificaciones, app</td><td>5,75 GB</td><td>HU de los 5 roles</td></tr>
           <tr><td><code>mensajes</code></td><td>básico + mensajes</td><td>9,05 GB</td><td>Catálogo de mensajes y textos de pantalla</td></tr>
-          <tr><td><code>parametros</code></td><td>básico + parámetros</td><td>6,35 GB</td><td>Catálogo de Parámetros</td></tr>
-          <tr><td><code>completo</code></td><td>básico + mensajes + parámetros</td><td>9,65 GB de 9,7 GB</td><td>Flujos con los tres componentes externos</td></tr>
+          <tr><td><code>parametros</code></td><td>básico + parámetros</td><td>7,25 GB</td><td>Catálogo de Parámetros</td></tr>
+          <tr><td><code>completo</code></td><td>básico + mensajes + parámetros</td><td>10,55 GB (supera el límite de 9,7 GB)</td><td>Flujos con los tres componentes externos; hoy <code>stack up</code> lo rechaza por memoria</td></tr>
           <tr><td><code>soportes</code></td><td>básico + antivirus</td><td>7,05 GB</td><td>Adjuntos con MinIO y ClamAV</td></tr>
           <tr><td><code>observabilidad</code></td><td>básico + obs</td><td>6,65 GB</td><td>Trazas, métricas y logs</td></tr>
           <tr><td><code>contingencia</code></td><td>datos, contingencia, notificaciones, app</td><td>5,05 GB</td><td>Arranque con el Keycloak propio</td></tr>

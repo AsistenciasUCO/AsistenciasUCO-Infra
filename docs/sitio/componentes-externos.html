@@ -20,7 +20,7 @@
       <div class="etiquetas">
         <span class="etiqueta">Security Baseline 0.1.14</span>
         <span class="etiqueta">MessageUcoLab 0.3.0</span>
-        <span class="etiqueta">Catálogo de Parámetros 0.1.7</span>
+        <span class="etiqueta">Catálogo de Parámetros 0.1.17</span>
         <span class="etiqueta">Un componente de otro equipo no se modifica</span>
       </div>
     </header>
@@ -34,7 +34,7 @@
         <tbody>
           <tr><td>Security Baseline</td><td>0.1.14</td><td>Identidad, sesión, roles y permisos por política</td><td>Adaptadores <code>securitybaseline</code> (PEP y PDP) y selector <code>APP_ADAPTERS_SECURITY_PROVIDER</code></td><td><code>ext-seguridad</code></td><td><code>assignment.changed</code> por RabbitMQ</td></tr>
           <tr><td>MessageUcoLab</td><td>0.3.0</td><td>Catálogo de textos de usuario</td><td><code>MessageCatalogPort</code> con <code>MessageUcoLabMessageCatalogAdapter</code></td><td><code>ext-mensajes</code></td><td>Cambios de mensajes por Pulsar</td></tr>
-          <tr><td>Catálogo de Parámetros</td><td>0.1.7 (microfrontend 0.1.6)</td><td>Valores de negocio ajustables</td><td><code>ParameterCatalogPort</code> con <code>CatalogoParametrosHttpParameterCatalogAdapter</code></td><td><code>ext-parametros</code></td><td>Ninguno (caché con refresco)</td></tr>
+          <tr><td>Catálogo de Parámetros</td><td>0.1.17 (microfrontend 0.1.16)</td><td>Valores de negocio ajustables</td><td><code>ParameterCatalogPort</code> con <code>CatalogoParametrosHttpParameterCatalogAdapter</code></td><td><code>ext-parametros</code></td><td>Cambios de parámetros por su Pulsar propio (INT-004)</td></tr>
         </tbody>
       </table>
     </div>
@@ -60,15 +60,17 @@ flowchart LR
   end
   subgraph par["ext-parametros"]
     CAT["Catalogo de Parametros"]
+    PULP["Pulsar del Catalogo"]
   end
   PEPF -->|"decision"| PEP --> PDP
   PEPF -->|"JWT del emisor"| KC
   MCP -->|"lectura publica"| KONG --> MUL
   PUL -.->|"cambio de mensaje"| EVT
   RMQ -.->|"assignment.changed"| EVT
-  PCP -->|"token y secreto"| CAT
+  PCP -->|"M2M client_credentials"| CAT
+  PULP -.->|"cambio de parametro"| EVT
       </pre>
-      <figcaption>Las líneas punteadas son eventos. El catálogo de parámetros no emite eventos: el backend lo consulta con caché.</figcaption>
+      <figcaption>Las líneas punteadas son eventos. Desde INT-004 el Catálogo de Parámetros también emite eventos, por su propio broker Pulsar, distinto del de MessageUcoLab.</figcaption>
     </figure>
 
     <h2 id="seguridad">Security Baseline 0.1.14</h2>
@@ -106,22 +108,88 @@ flowchart LR
     <p><code>MESSAGEUCOLAB_URL</code>, <code>MESSAGEUCOLAB_TIMEOUT</code>, <code>MESSAGEUCOLAB_CACHE_TTL</code>, <code>MESSAGEUCOLAB_FALLBACK</code>, <code>MESSAGEUCOLAB_CODE_PREFIX</code>, <code>MESSAGEUCOLAB_TOKEN_URI</code>, <code>MESSAGEUCOLAB_CLIENT_ID</code>, <code>MESSAGEUCOLAB_CLIENT_SECRET</code>, <code>MESSAGEUCOLAB_EVENTS_ENABLED</code>, <code>MESSAGEUCOLAB_PULSAR_URL</code>, <code>MESSAGEUCOLAB_EVENTS_TOPIC_PREFIX</code>, <code>MESSAGEUCOLAB_EVENTS_SUBSCRIPTION</code>. En el frontend, <code>MENSAJES_UI_DESDE_CATALOGO</code>.</p>
     <div class="nota alerta"><strong>En curso (2026-11-22)</strong> Los nueve textos de pantalla nuevos (UI136 a UI144) ya están importados en MessageUcoLab (ambiente Develop). Faltan la prueba viva contra el servicio real, que necesita <code>doppler login</code>, y decidir si <code>MENSAJES_UI_DESDE_CATALOGO</code> se enciende por defecto (ítems MSG-03 y MSG-06 de la lista de chequeo).</div>
 
-    <h2 id="parametros">Catálogo de Parámetros 0.1.7</h2>
+    <h2 id="parametros">Catálogo de Parámetros 0.1.17</h2>
     <h3>Qué hace</h3>
-    <p>Guarda los valores de negocio que cambian sin recompilar: días límite para reclamar, umbrales de alerta, segmentos de red del campus, entre otros. Trae un microfrontend (0.1.6) para administrarlos y se protege con Seguridad.</p>
+    <p>Guarda los valores de negocio que cambian sin recompilar: días límite para reclamar, umbrales de alerta, segmentos de red del campus, entre otros. Desde INT-004 (2026-11-22) corre la versión 0.1.17 (microfrontend 0.1.16), que trae su <strong>propio broker Pulsar</strong> (<code>pulsar-parametros</code>) y tres formas de integrarse con Asistencias.</p>
+    <h3>Las tres integraciones</h3>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Integración</th><th>Quién la usa</th><th>Cómo funciona</th></tr></thead>
+        <tbody>
+          <tr><td>Microfrontend de administración</td><td>La SPA, en la pantalla del administrador</td><td>Carga <code>parametros-administration.js</code> con el <code>applicationId</code> y la sesión web del usuario. El frontend nunca recibe secretos ni tokens M2M.</td></tr>
+          <tr><td>Consulta M2M</td><td>El backend</td><td><code>client_credentials</code> contra Keycloak de Security con la identidad de servicio y luego <code>GET /catalogo-parametros/api/v1/parametros/consulta/m2m</code> (opcional <code>?nombre=</code>). El Catálogo resuelve aplicación y ambiente desde el <code>client_id</code>.</td></tr>
+          <tr><td>Eventos por Pulsar</td><td>El backend</td><td>Un topic por identidad: <code>persistent://public/default/catalogo-parametros-events-&lt;client_id&gt;</code>. Eventos <code>Parameter*</code>, <code>Metadata*</code> y <code>MetadataEnvironment*</code>, <code>schemaVersion</code> 3, con <code>resourceName</code> y <code>resourceValue</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Desde la versión anterior (0.1.7) desaparecieron el token interno del Catálogo (<code>CATALOGO_PARAMETROS_TOKEN_ID</code> y <code>CATALOGO_PARAMETROS_SECRETO</code>) y la ruta <code>/tokens/{id}/parametros</code>. El detalle del lado del backend está en <a href="backend.html#proveedor-parametros">Backend</a> y el de la tabla de auditoría en <a href="base-datos.html#sincronizacion-parametros">Base de datos</a>.</p>
     <h3>Cómo está integrado</h3>
     <ul>
-      <li><strong>Puerto:</strong> <code>ParameterCatalogPort</code>. Adaptador <code>CatalogoParametrosHttpParameterCatalogAdapter</code> en <code>infrastructure/adapter/secondary/catalog/catalogoparametros/</code>.</li>
+      <li><strong>Puerto:</strong> <code>ParameterCatalogPort</code>. Adaptador <code>CatalogoParametrosHttpParameterCatalogAdapter</code> en <code>infrastructure/adapter/secondary/catalog/catalogoparametros/</code>, con cliente M2M (<code>CatalogoParametrosM2mClient</code>) y token en caché (<code>CatalogoParametrosM2mTokenProvider</code>).</li>
       <li><strong>Valor por defecto:</strong> <code>ParametroConValorPorDefectoCatalogAdapter</code> devuelve el valor sembrado si el catálogo no responde o no tiene el parámetro, de modo que el sistema no cae.</li>
-      <li><strong>Caché:</strong> 5 minutos; vencida, se sirve y se refresca en segundo plano. El tiempo máximo de lectura es de 10 segundos porque la lectura en frío del componente tarda varios.</li>
+      <li><strong>Caché:</strong> 5 minutos; vencida, se sirve y se refresca en segundo plano. El tiempo máximo de lectura es de 10 segundos porque la lectura en frío del componente tarda varios. Un evento la invalida.</li>
       <li><strong>Selector:</strong> <code>APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER</code>: <code>azure_appconfig</code> (por defecto en el código), <code>sqlserver</code> o <code>catalogoparametros</code>. El stack elige <code>catalogoparametros</code> si <code>ext-parametros</code> está arriba.</li>
-      <li><strong>Stack:</strong> sección <code>ext-parametros</code> (600 MB): Redis, SurrealDB, la aplicación y el microfrontend (puerto 4201). Su API usa el puerto 8081, por eso no puede convivir con <code>asis-contingencia</code>.</li>
+      <li><strong>Stack:</strong> sección <code>ext-parametros</code> (1500 MB; se mide cerca de 1,45 GB): Redis, SurrealDB, la aplicación, el microfrontend (puerto 4201) y su Pulsar (845 MB). Su API usa el puerto 8081, por eso no puede convivir con <code>asis-contingencia</code>.</li>
       <li><strong>Edición en la app:</strong> mientras llega el componente, la pantalla de parámetros del administrador es un puente (DEC-067) con una lista blanca de parámetros editables.</li>
     </ul>
+    <h3>Identificadores del laboratorio (no secretos)</h3>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Dato</th><th>Valor</th></tr></thead>
+        <tbody>
+          <tr><td>Aplicación <code>AsistenciasUCO</code> (<code>applicationId</code>)</td><td><code>0d24a3a4-8c9d-4ac3-9b1a-a97ef16ea186</code></td></tr>
+          <tr><td>Ambiente <code>Desarrollo</code> (<code>environmentId</code>)</td><td><code>00000000-0000-0000-0000-000000000011</code></td></tr>
+          <tr><td>Parámetros sembrados</td><td>21 (la consulta M2M devuelve los 20 que tienen metadato)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>En 0.1.17 los ambientes son un catálogo fijo (Producción <code>…0010</code>, Desarrollo <code>…0011</code>, Pruebas <code>…0012</code>); el ambiente <code>Develop</code> anterior ya no existe (TD-127), así que los metadatos sembrados se migraron al ambiente Desarrollo sin perder valores. La identidad de servicio de Asistencias (rol técnico <code>PARAMETROS_CONSUMER</code>, que solo permite <code>GET …/parametros/consulta/m2m</code>) se asocia a la aplicación y al ambiente en el Catálogo.</p>
+    <h3>Del cambio de un parámetro a la base de datos</h3>
+    <div class="flujo" data-flujo data-titulo="Cambio de parámetro, evento, backend y BD">
+      <div class="paso" data-actor="Administrador" data-detalle="Cambia el valor de un parámetro en el microfrontend de administración del Catálogo. En 0.1.17 el valor vive en el metadato, así que el cambio se publica como MetadataUpdated, con resourceName igual al nombre del parámetro (por ejemplo RED.CIDRS_CAMPUS).">Cambia el valor</div>
+      <div class="paso" data-actor="Catálogo" data-detalle="Publica el evento en el topic de la identidad de servicio de Asistencias (catalogo-parametros-events-client_id), schemaVersion 3, con applicationId y environmentId. Llega en cerca de un segundo.">Publica el evento</div>
+      <div class="paso" data-actor="Backend" data-detalle="CatalogoParametrosEventListener, suscripción durable Shared. Si el evento es ajeno, ilegible o sin eventType, lo confirma y lo descarta. Filtra por aplicación y ambiente y recuerda el eventId para no repetirlo.">Recibe y filtra</div>
+      <div class="paso" data-actor="Backend" data-detalle="Invalida la caché y vuelve a consultar el parámetro por M2M con ?nombre=. No usa el resourceValue del evento: el valor se relee siempre del Catálogo, que es la fuente.">Relee por M2M</div>
+      <div class="paso" data-actor="Backend" data-detalle="Parte el nombre GRUPO.CLAVE con el separador y llama a usp_sincronizar_parametro_catalogo_externo con la operación UPSERT, el eventId y el occurredAt del evento.">Invoca el SP</div>
+      <div class="paso" data-actor="Base de datos" data-detalle="Valida tipo, rango y lista; ignora eventos duplicados u obsoletos (el último por occurredAt gana); actualiza dbo.CatalogoParametro.valor y deja la fila en SincronizacionParametroExterno con resultado APLICADO.">Actualiza y audita</div>
+      <div class="paso" data-actor="Backend" data-detalle="Confirma el mensaje (ack) y suma la métrica catalogo_parametros_eventos_total con resultado procesado. Los SP que leen dbo.CatalogoParametro ya ven el valor vigente.">Confirma</div>
+      <div class="paso" data-actor="Backend" data-tipo="error" data-detalle="Si el Catálogo o la BD están caídos, el evento no se confirma: negativeAcknowledge con espera creciente de 1 a 60 segundos, y el broker lo reentrega. Mientras tanto se sirve la caché y la BD.">Falla y reintenta</div>
+    </div>
+    <figure class="diagrama">
+      <pre class="mermaid">
+sequenceDiagram
+  participant ADM as Administrador
+  participant CAT as Catalogo de Parametros
+  participant PUL as Pulsar del Catalogo
+  participant BE as Backend
+  participant KC as Keycloak
+  participant BD as SQL Server
+  ADM->>CAT: cambia el valor del parametro
+  CAT->>PUL: publica MetadataUpdated (schemaVersion 3)
+  PUL->>BE: entrega el evento (suscripcion Shared)
+  BE->>BE: filtra aplicacion y ambiente y descarta repetidos
+  BE->>KC: client_credentials (token en cache, margen de 30 s)
+  KC-->>BE: access_token
+  BE->>CAT: GET parametros/consulta/m2m con nombre
+  CAT-->>BE: parametro con su valor vigente
+  BE->>BD: EXEC usp_sincronizar_parametro_catalogo_externo
+  BD-->>BE: resultado APLICADO, SIN_CAMBIOS, OBSOLETO u otro
+  BE->>PUL: ack despues de procesar
+      </pre>
+      <figcaption>Secuencia de un cambio de parámetro. El evento solo avisa: el valor se relee por M2M y la base de datos aplica la regla de «el último evento gana».</figcaption>
+    </figure>
     <h3>Eventos</h3>
-    <p>No emite eventos. Un valor distinto solo en <code>dbo.CatalogoParametro</code> no se usa cuando el escenario <code>parametros</code> está activo: el backend lee del Catálogo. El cambio de un parámetro desde la app publica <code>PARAMETER_UPDATED</code> solo para el administrador.</p>
+    <p>El backend reconcilia además al arrancar con una sola lectura M2M (no es sondeo) para cubrir eventos emitidos con el backend apagado. Con el escenario <code>parametros</code> arriba, el Catálogo es la fuente de verdad: <code>dbo.CatalogoParametro</code> es una copia mantenida por el backend. Los valores del laboratorio que difieren de los sembrados (por ejemplo <code>RED.CIDRS_CAMPUS</code> para las pruebas de marcación) deben vivir en el Catálogo, porque un valor solo en la BD se sobrescribe en la siguiente reconciliación.</p>
     <h3>Variables (solo nombres)</h3>
-    <p><code>CATALOGO_PARAMETROS_BASE_URL</code>, <code>CATALOGO_PARAMETROS_TOKEN_ID</code>, <code>CATALOGO_PARAMETROS_SECRETO</code>, <code>CATALOGO_PARAMETROS_APPLICATION_ID</code>, <code>CATALOGO_PARAMETROS_ENVIRONMENT_ID</code>, <code>CATALOGO_PARAMETROS_TIMEOUT</code>, <code>CATALOGO_PARAMETROS_CACHE_TTL</code>, <code>CATALOGO_PARAMETROS_SEPARADOR</code>. El secreto del token se muestra una sola vez al crearlo y se guarda solo en el backend o en el almacén de secretos, nunca en el frontend.</p>
+    <p><code>CATALOGO_PARAMETROS_BASE_URL</code>, <code>CATALOGO_PARAMETROS_M2M_TOKEN_URI</code>, <code>CATALOGO_PARAMETROS_M2M_CLIENT_ID</code>, <code>CATALOGO_PARAMETROS_M2M_CLIENT_SECRET</code>, <code>CATALOGO_PARAMETROS_APPLICATION_ID</code>, <code>CATALOGO_PARAMETROS_ENVIRONMENT_ID</code>, <code>CATALOGO_PARAMETROS_TIMEOUT</code>, <code>CATALOGO_PARAMETROS_CACHE_TTL</code>, <code>CATALOGO_PARAMETROS_SEPARADOR</code>, <code>CATALOGO_PARAMETROS_EVENTS_ENABLED</code>, <code>CATALOGO_PARAMETROS_PULSAR_URL</code>, <code>CATALOGO_PARAMETROS_EVENTS_TOPIC</code>, <code>CATALOGO_PARAMETROS_EVENTS_TOPIC_PREFIX</code>, <code>CATALOGO_PARAMETROS_EVENTS_SUBSCRIPTION</code>, <code>CATALOGO_PARAMETROS_RECONCILE_ON_STARTUP</code>. El secreto M2M vive solo en el <code>.env</code> del backend o en el baúl de secretos, nunca en el frontend ni en Git.</p>
+    <div class="nota alerta"><strong>Hallazgos abiertos de INT-004</strong>
+      <ul>
+        <li><strong>TD-127:</strong> el Catálogo reasignó ambientes y estados de metadato sin migración (equipo de Parámetros).</li>
+        <li><strong>TD-128:</strong> el compose del Catálogo exige su observabilidad completa (<code>otel-collector</code>, <code>jaeger</code>); el overlay de Infra la omite con <code>depends_on: !override</code> y el app registra un <code>UnknownHostException</code> inofensivo (equipo de Parámetros).</li>
+        <li><strong>TD-129:</strong> al crear una identidad de servicio, el PDP responde 500 por un <code>TimeoutException</code> de 3000 ms y deja un cliente huérfano en Keycloak (equipo de Seguridad).</li>
+        <li><strong>MessageUcoLab y el Catálogo:</strong> el consumo de mensajes de MessageUcoLab por parte del Catálogo está apagado en el laboratorio (<code>PULSAR_ENABLED=false</code>) porque ese escenario necesita <code>doppler login</code>. La publicación de eventos del Catálogo sigue activa; solo se pierde la sincronización de los mensajes propios del Catálogo.</li>
+      </ul>
+      Se reportan a sus equipos; el componente no se parcha.</div>
 
     <h2 id="versiones">Versiones y escenarios</h2>
     <div class="tabla-contenedor">
@@ -136,6 +204,7 @@ flowchart LR
         </tbody>
       </table>
     </div>
+    <div class="nota alerta"><strong>Memoria de <code>completo</code></strong> Con la sección <code>ext-parametros</code> en 1500 MB, la suma de <code>completo</code> es 10 550 MB y supera el límite de 9700 MB: <code>stack up completo</code> se rechaza por memoria. Use <code>mensajes</code> o <code>parametros</code> por separado.</div>
     <p>Fuente: <code>AsistenciasUCO-Infra/stack/secciones.json</code> y <code>stack/README.md</code>. Las versiones de los componentes de otros equipos se fijan en sus kits de <code>Complementos/</code> y no se usa <code>latest</code>.</p>
 
     <h2 id="receta">Receta de ocho pasos para integrar un componente externo</h2>
