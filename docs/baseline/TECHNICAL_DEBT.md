@@ -162,6 +162,9 @@ Equivalencias con el registro histórico del backend (congelado al 2026-11-12): 
 | [TD-124](#td-124) | Notificaciones: autenticación entre servicios con `X-Api-Key` (secreto compartido); falta OAuth2 client-credentials | ABIERTA | no; requisito de producción |
 | [TD-125](#td-125) | Prueba inestable del Backend `CatalogoParametrosHttpParameterCatalogAdapterTest.fallo_sincrono_al_lanzar_el_refresco` (TooManyActualInvocations por tiempos) | ABIERTA | no |
 | [TD-126](#td-126) | Notificaciones: el token de verificación de correo vive en memoria (`VerificacionCorreoMarcadorProvider`); un reinicio entre intentos reemite y revoca el enlace previo | ABIERTA | no |
+| [TD-127](#td-127) | Catálogo de Parámetros 0.1.17: los ambientes y estados de metadato-ambiente pasaron a ids fijos sin migrar los datos de 0.1.7 (metadatos huérfanos; `GET /ambientes/<id viejo>` 404) | ABIERTA | no |
+| [TD-128](#td-128) | Catálogo de Parámetros 0.1.17: el compose obliga a `app` a depender de `otel-collector` y este de `jaeger`; sin observabilidad no se puede levantar solo el núcleo | ABIERTA | no |
+| [TD-129](#td-129) | Seguridad 0.1.13/0.1.14: crear una identidad de servicio puede responder 500 por timeout de 3 s y dejar el cliente en Keycloak sin fila en el PDP | ABIERTA | no |
 
 ## TD-001
 
@@ -1580,5 +1583,35 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Impacto:** Bajo/Medio: caso residual acotado a reinicios entre intentos de despacho.
 - **Evidencia:** `GestioAsistenciaBackend`, `VerificacionCorreoMarcadorProvider`.
 - **Resolución esperada:** persistir el marcador con un procedimiento almacenado idempotente (emitir-o-reutilizar token vigente por usuario y propósito) en la BD, en vez de memoria del proceso; cambio de DB y Backend con su contrato.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-127
+
+- **Origen:** INT-004, actualización del Catálogo de Parámetros a 0.1.17 (2026-11-22).
+- **Descripción:** en 0.1.17 los ambientes son un catálogo fijo (`00000000-0000-0000-0000-000000000010/11/12`: Producción, Desarrollo, Pruebas) y los estados de metadato-ambiente también (`…0020` Activo, `…0021` Inactivo). Los metadatos y metadatos-ambiente creados con 0.1.7 conservaron sus ids viejos (ambiente `36ddaf78-…`, estado `829875d4-…`), que ya no existen (`GET /ambientes/36ddaf78-…` 404). El volumen persiste y no hay migración ni aviso: la consulta M2M no devuelve parámetros hasta corregir cada fila a mano.
+- **Impacto:** Medio para quien actualiza con datos: la configuración parece intacta en el listado y la consulta sale vacía.
+- **Evidencia:** `Complementos/CatalogoParametros/Catalogo-Parametros`, `/administracion` de la aplicación `AsistenciasUCO` antes y después de la migración (INT-004 §4).
+- **Resolución esperada:** del equipo de Parámetros (migración de datos o nota de actualización). En el laboratorio se migró con `PUT` de cada fila; se reporta al equipo, no se parcha su componente.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-128
+
+- **Origen:** INT-004, kit del Catálogo 0.1.17.
+- **Descripción:** `docker-compose.yml` hace depender `app` de `otel-collector` (`service_started`) y este de `jaeger`: `docker compose up app` arranca Prometheus, Grafana, Loki y Jaeger aunque no se quieran. Infra lo evita con `depends_on: !override` en `stack/secciones/ext-parametros.yml`. El app, sin collector, registra `UnknownHostException` cada minuto.
+- **Impacto:** Bajo (memoria del laboratorio).
+- **Evidencia:** compose del kit; `stack/secciones/ext-parametros.yml`.
+- **Resolución esperada:** del equipo de Parámetros: perfil `observabilidad` para esos servicios y exportación OTLP apagada por defecto.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-129
+
+- **Origen:** INT-004, creación de la identidad `asistencias-uco-a-catalogo-parametros-dev` (2026-11-22); mismo patrón que INT-002 (identidad `…-dev` de Catálogo → MessageUcoLab).
+- **Descripción:** `POST /api/v1/applications/{id}/service-identities` respondió 500 `INTERNAL_ERROR` (`TimeoutException` de 3000 ms en `ServiceIdentityAdministrationController#create`) pero el cliente `svc-…` ya estaba creado en Keycloak y el PDP no tenía la fila: el nombre queda ocupado y el secreto perdido. En el laboratorio se borró el cliente huérfano por el Admin REST de Keycloak y se reintentó.
+- **Impacto:** Medio en el laboratorio; operación riesgosa en cualquier ambiente.
+- **Evidencia:** log de `ext-seguridad-pdp` (`Error no manejado al atender la petición`), clientes `svc-*` de `security-baseline`.
+- **Resolución esperada:** del equipo de Seguridad: timeout configurable, creación idempotente o compensación (borrar el cliente si falla el registro).
 - **Bloquea línea base:** no.
 - **Estado:** ABIERTA / NON_BLOCKING.

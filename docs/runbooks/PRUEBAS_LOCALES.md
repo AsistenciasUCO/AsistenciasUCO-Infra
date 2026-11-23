@@ -103,6 +103,15 @@ Guion de pruebas manuales por rol para la demostración (qué cambió en el cier
 - Los scripts siembran el período 2026-2 (1 de agosto a 15 de diciembre de 2026): después de esa fecha el generador
   de sesiones rechaza el período y hay que mover las fechas en `generar_datos_prueba.py`.
 
+## Catálogo de Parámetros (escenario `parametros`)
+
+* `.\AsistenciasUCO-Infra\infra.ps1 stack up parametros` levanta Catálogo 0.1.17, su microfrontend (`http://localhost:4201`) y su Pulsar propio
+  (`http://localhost:8082/admin/v2/brokers/health`). No necesita ClamAV ni observabilidad; con MessageUcoLab apagado el kit lleva `PULSAR_ENABLED=false`.
+* El Backend lee los parámetros por M2M con la identidad `asistencias-uco → Catálogo` (variables `CATALOGO_PARAMETROS_M2M_*` del `.env` del Backend)
+  y recibe los cambios por `pulsar://pulsar-parametros:6650`. Preparación única en Seguridad y en el Catálogo: [INT-004](../work-items/INT-004-parametros-m2m-eventos/ESTADO.md) §7.
+* Si la consulta M2M devuelve `parametros: []`, revise que los metadatos del Catálogo apunten al ambiente Desarrollo
+  (`00000000-0000-0000-0000-000000000011`) y que la identidad esté asociada a él (TD-127).
+
 ## Auto-registro de Keycloak desactivado (laboratorio)
 
 El realm `security-baseline` del componente de Seguridad llega con `registrationAllowed=true`, lo que muestra el enlace "Register" en el login y permite crear cuentas fuera del flujo de la app. `infra.ps1 stack up` (seccion `ext-seguridad`) ejecuta `scripts/security/Disable-KeycloakSelfRegistration.ps1`, idempotente, que lo pone en `false` por el Admin REST con las credenciales de `lab.env`. Manual: `powershell -File AsistenciasUCO-Infra\scripts\security\Disable-KeycloakSelfRegistration.ps1`.

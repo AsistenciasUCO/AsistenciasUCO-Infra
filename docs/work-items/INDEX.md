@@ -138,6 +138,7 @@ Actualizada a mano el 2026-11-16: `sync-work-items.ps1` copia carpetas de los ot
 | IDENT-002-activacion-cuentas | 1 | contrato acordado 2026-11-15 | [Ver carpeta](IDENT-002-activacion-cuentas/) |
 | INT-002-complementos-seguridad-mensajes-parametros | 1 | N/A | [Ver carpeta](INT-002-complementos-seguridad-mensajes-parametros/) |
 | INT-003-eventos-complementos | 1 | N/A | [Ver carpeta](INT-003-eventos-complementos/) |
+| INT-004-parametros-m2m-eventos | 1 | fase Infra y laboratorio: [ESTADO](INT-004-parametros-m2m-eventos/ESTADO.md) | [Ver carpeta](INT-004-parametros-m2m-eventos/) |
 | NOTOMA-001-aviso-coordinador-sesion-sin-toma | 3 | propuesto: [PLAN](NOTOMA-001-aviso-coordinador-sesion-sin-toma/PLAN.md) y [CONTRATO](NOTOMA-001-aviso-coordinador-sesion-sin-toma/CONTRATO.md) | [Ver carpeta](NOTOMA-001-aviso-coordinador-sesion-sin-toma/) |
 | P0-D-estabilizacion-workspace-oficial | 2 | active | [Ver carpeta](P0-D-estabilizacion-workspace-oficial/) |
 | VAL-migrar-detectar | 1 | active | [Ver carpeta](VAL-migrar-detectar/) |
