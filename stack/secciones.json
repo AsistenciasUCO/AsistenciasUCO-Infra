@@ -8,7 +8,11 @@
   "volumenesExternos": [
     "asis-datos-mssql",
     "asistencias-minio-data",
-    "ext-mensajes-pulsar-data"
+    "ext-mensajes-pulsar-data",
+    "catalogo-parametros_redis-data",
+    "catalogo-parametros_surrealdb-data",
+    "catalogo-parametros_pulsar-parametros-data",
+    "catalogo-parametros_pulsar-parametros-conf"
   ],
   "limiteMemoriaMb": 9700,
   "secciones": {
@@ -124,8 +128,8 @@
       ]
     },
     "ext-parametros": {
-      "descripcion": "Catalogo de Parametros 0.1.7 y su microfrontend 0.1.6 (kit del equipo).",
-      "memoriaMb": 600,
+      "descripcion": "Catalogo de Parametros 0.1.17 y su microfrontend 0.1.16, con su broker Pulsar propio (kit del equipo; consulta M2M y eventos de cambios).",
+      "memoriaMb": 1500,
       "directorio": "Complementos/CatalogoParametros/Catalogo-Parametros",
       "compose": [
         "docker-compose.yml",
@@ -137,6 +141,7 @@
       "servicios": [
         "redis",
         "surrealdb",
+        "pulsar-parametros",
         "app",
         "frontend"
       ],
@@ -145,11 +150,13 @@
       ],
       "salud": [
         "contenedor:ext-parametros-app",
-        "http:http://localhost:8081/actuator/health"
+        "http:http://localhost:8081/actuator/health",
+        "http:http://localhost:8082/admin/v2/brokers/health"
       ],
       "urls": [
         "API: http://localhost:8081/catalogo-parametros/api/v1",
-        "Microfrontend: http://localhost:4201"
+        "Microfrontend: http://localhost:4201",
+        "Pulsar del Catalogo: pulsar://localhost:6652 (desde asis-red: pulsar://pulsar-parametros:6650), administracion http://localhost:8082"
       ],
       "proyectosAnteriores": [
         "catalogo-parametros"

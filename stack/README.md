@@ -26,7 +26,7 @@ otros equipos.
 | `asis-datos` | SQL Server (`sql_server_asistencias`) y MinIO | 2,5 GB | Siempre (único con reinicio automático) |
 | `ext-seguridad` | Seguridad 0.1.13 del equipo (Keycloak, PDP, PEP, OPA) y su consola de administración en `5175` | 1,6 GB | Casi siempre |
 | `ext-mensajes` | MessageUcoLab 0.3.0 (Kong, Pulsar, app; sin observabilidad ni Ollama) | 3,3 GB | Pruebas de mensajes |
-| `ext-parametros` | Catálogo de Parámetros 0.1.7 y su microfrontend | 0,6 GB | Pruebas de parámetros |
+| `ext-parametros` | Catálogo de Parámetros 0.1.17 y su microfrontend 0.1.16, con su Pulsar propio (`pulsar-parametros`: consulta M2M y eventos de cambios) | 1,5 GB | Pruebas de parámetros |
 | `ext-notificaciones` | Servicio de Notificaciones UCO 0.1.0 (componente propio, `Complementos/Notificaciones`): correos con plantillas y cola en `notificacionesdb` | 0,45 GB | Con `asis-app` (en todos los escenarios salvo `minimo`) |
 | `asis-antivirus` | ClamAV | 1,3 GB | Pruebas de soportes |
 | `asis-obs` | Grafana, Prometheus, Loki, Tempo, Alloy | 0,9 GB | Diagnóstico |
@@ -88,6 +88,24 @@ Ajustes que salieron de estas pruebas:
 * `asis-app` monta `GestioAsistenciaBackend/infra/observability/logs` (Alloy → Loki, archivo `backend-contenedor.jsonl`) y publica
   el puerto de gestión `8090` solo en `127.0.0.1`; el Backend lo abre (`MANAGEMENT_SERVER_ADDRESS=0.0.0.0`) solo con `asis-obs`.
 * El Backend reintenta la suscripción a Pulsar si falla (PR del Backend `fix/int003-reintento-suscripcion-pulsar`).
+
+## Catálogo de Parámetros 0.1.17: M2M y eventos (INT-004)
+
+`ext-parametros` levanta además el broker propio del Catálogo (`ext-parametros-pulsar`, alias `pulsar-parametros` en `asis-red`).
+
+| Qué | Dirección |
+| :--- | :--- |
+| API del Catálogo desde el Backend en contenedor | `http://ext-parametros-app:8080/catalogo-parametros/api/v1` |
+| Consulta M2M | `GET …/parametros/consulta/m2m[?nombre=]` con `client_credentials` de la identidad `asistencias-uco → Catálogo` |
+| Pulsar desde el Backend en contenedor | `pulsar://pulsar-parametros:6650` (listener `internal`; `localhost:6652` no sirve dentro del contenedor porque el broker se anuncia con ese nombre) |
+| Pulsar desde el PC (Backend fuera de Docker) | `pulsar://localhost:6652`; administración `http://localhost:8082` |
+| Topic y suscripción | `persistent://public/default/catalogo-parametros-events-<client_id>` y `asistencias-uco-backend` |
+
+`stack up` pasa al Backend `CATALOGO_PARAMETROS_M2M_TOKEN_URI`, `CATALOGO_PARAMETROS_PULSAR_URL`, `CATALOGO_PARAMETROS_EVENTS_TOPIC` y
+`CATALOGO_PARAMETROS_EVENTS_SUBSCRIPTION`; `CATALOGO_PARAMETROS_M2M_CLIENT_ID` y `…_CLIENT_SECRET` salen del `.env` del Backend
+(se crean una vez en Seguridad: ver [INT-004](../docs/work-items/INT-004-parametros-m2m-eventos/ESTADO.md)).
+El kit trae `PULSAR_ENABLED=false` (consumo de los eventos de MessageUcoLab) mientras `ext-mensajes` no esté arriba (necesita `doppler login`);
+la publicación de eventos del Catálogo sigue activa. Consumo de memoria medido de la sección: ~1,45 GB.
 
 ## Cómo está armado
 

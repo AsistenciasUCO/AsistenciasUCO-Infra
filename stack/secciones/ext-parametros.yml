@@ -1,9 +1,20 @@
-# Seccion ext-parametros: Catalogo de Parametros 0.1.7 / frontend 0.1.6 (kit del equipo, Complementos/CatalogoParametros/Catalogo-Parametros).
-# Se aplica sobre su docker-compose.yml (sin tocarlo); solo app, frontend, redis y surrealdb (sin su observabilidad).
+# Seccion ext-parametros: Catalogo de Parametros 0.1.17 / frontend 0.1.16 (kit del equipo, Complementos/CatalogoParametros/Catalogo-Parametros).
+# Se aplica sobre su docker-compose.yml (sin tocarlo); solo app, frontend, redis, surrealdb y su broker propio pulsar-parametros
+# (sin su observabilidad: el escenario `parametros` no necesita ClamAV ni asis-obs).
 # Usa el puerto 8081 del PC: no puede convivir con asis-contingencia (Keycloak propio, tambien 8081).
 services:
   app:
     container_name: ext-parametros-app
+    # El compose del equipo hace depender a app de otel-collector (y este de jaeger): sin esto `up app` arrancaria su
+    # observabilidad completa. Se conservan solo las dependencias reales (el app registra un UnknownHostException de
+    # otel-collector, inofensivo).
+    depends_on: !override
+      surrealdb:
+        condition: service_started
+      redis:
+        condition: service_started
+      pulsar-parametros:
+        condition: service_healthy
     networks:
       asis-red:
         aliases: [ext-parametros-app]
@@ -11,6 +22,17 @@ services:
       asistencias.seccion: ext-parametros
   frontend:
     container_name: ext-parametros-frontend
+    labels:
+      asistencias.seccion: ext-parametros
+  # Broker propio del Catalogo (eventos de cambios de parametros). El Backend (asis-red) llega por el alias
+  # pulsar-parametros:6650 (listener "internal": el broker se anuncia como pulsar-parametros:6650, que resuelve en asis-red).
+  # Desde el PC: pulsar://localhost:6652 (listener "external"); administracion http://localhost:8082.
+  pulsar-parametros:
+    container_name: ext-parametros-pulsar
+    networks:
+      catalogo: {}
+      asis-red:
+        aliases: [pulsar-parametros]
     labels:
       asistencias.seccion: ext-parametros
   redis:
@@ -46,6 +68,12 @@ volumes:
     external: true
   prometheus-data:
     name: catalogo-parametros_prometheus-data
+    external: true
+  pulsar-parametros-data:
+    name: catalogo-parametros_pulsar-parametros-data
+    external: true
+  pulsar-parametros-conf:
+    name: catalogo-parametros_pulsar-parametros-conf
     external: true
 
 networks:

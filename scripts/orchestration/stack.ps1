@@ -284,6 +284,17 @@ function New-ConfiguracionApp([string[]]$secciones) {
     if ($secciones -contains 'ext-parametros') {
         $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'] = 'catalogoparametros'
         $b['CATALOGO_PARAMETROS_BASE_URL'] = 'http://ext-parametros-app:8080/catalogo-parametros/api/v1'
+        # INT-004 (Catalogo 0.1.17): consulta M2M (client_credentials) y eventos de cambios por el Pulsar propio del Catalogo.
+        # CATALOGO_PARAMETROS_M2M_CLIENT_ID/SECRET salen del .env del checkout (no se escriben aqui). pulsar-parametros es un
+        # alias de asis-red (ver secciones/ext-parametros.yml): el listener "internal" del broker lo anuncia con ese nombre.
+        $b['CATALOGO_PARAMETROS_M2M_TOKEN_URI'] = "$kcLoopback/realms/security-baseline/protocol/openid-connect/token"
+        $b['CATALOGO_PARAMETROS_PULSAR_URL'] = 'pulsar://pulsar-parametros:6650'
+        $b['CATALOGO_PARAMETROS_EVENTS_SUBSCRIPTION'] = 'asistencias-uco-backend'
+        if ($b['CATALOGO_PARAMETROS_M2M_CLIENT_ID']) {
+            $b['CATALOGO_PARAMETROS_EVENTS_TOPIC'] = 'persistent://public/default/catalogo-parametros-events-' + $b['CATALOGO_PARAMETROS_M2M_CLIENT_ID']
+        } else {
+            Write-Host '  * Catalogo de Parametros sin CATALOGO_PARAMETROS_M2M_CLIENT_ID en el .env del Backend: sin consulta M2M ni topic de eventos (INT-004).' -ForegroundColor DarkYellow
+        }
     } else {
         $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'] = 'sqlserver'
     }
