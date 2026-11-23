@@ -78,7 +78,7 @@ Scripts de la sesión (Python de vcpkg con `-X utf8 -I`; carpeta `scratchpad\int
 ## 8. Pendiente y hallazgos
 
 * TD-127 (ambientes y estados reasignados sin migración), TD-128 (compose del Catálogo con observabilidad obligatoria) y TD-129 (Seguridad: timeout al crear identidades): los dos primeros son del equipo de Parámetros y el tercero del de Seguridad; se reportan, no se parchan.
-* `scripts/tests/test_catalogo_parametros.ps1` sigue en el modelo de token propio y fallará hasta migrarlo a M2M (fase Backend/pruebas).
+* `scripts/tests/test_catalogo_parametros.ps1` ya está migrada a M2M y eventos (ver §9).
 * `provision_asistencias.py verify` (paso del `stack up`) informa `SOBRA=141` con `FALTA=0`: concesiones del PDP que el catálogo de endpoints del Backend ya no declara; no es de esta fase.
 
 ## 9. Validación en vivo con el Backend (2026-11-23) y datos de prueba
