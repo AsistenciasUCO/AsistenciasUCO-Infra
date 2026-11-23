@@ -42,6 +42,14 @@ candidato se prueba con `python -c "import sys"` (15 s máximo); el alias de la 
 de MSYS se descartan. Si no hay ninguno, falla de inmediato, antes de tocar la base, pidiendo definir `ASISTENCIAS_PYTHON`
 (`$env:ASISTENCIAS_PYTHON = 'C:\Users\<usuario>\AppData\Local\Programs\Python\Python312\python.exe'`).
 
+Catálogo de Parámetros (INT-004): con el escenario `parametros` el Catálogo es la fuente de verdad y el Backend reconcilia
+`dbo.CatalogoParametro` contra él al arrancar y por evento; un `UPDATE` de los datos de prueba que no esté en el Catálogo se
+revertiría solo (así pasó con `RED.CIDRS_CAMPUS`: el QR/PIN daba 403 `AQR_002` desde Docker). Por eso `datos-prueba cargar`
+termina con `datos-prueba catalogo` (se omite si `ext-parametros-app` no está arriba): lee los `UPDATE dbo.CatalogoParametro`
+de `01_estructura.sql` y, si el valor del Catálogo (AsistenciasUCO / Desarrollo) es otro, lo cambia por la API
+administrativa con la sesión de `lab-pdp-admin`; el evento hace que el Backend lo aplique a la BD en segundos. Idempotente.
+Prueba del Catálogo: `scripts/tests/test_catalogo_parametros.ps1` (M2M y eventos; cambia y restaura un parámetro entero).
+
 Concesiones del PDP: `stack up` (con Seguridad y la app) y `datos-prueba cargar|seguridad` ejecutan
 `provision_asistencias.py verify` y, si hay líneas `FALTA`, `pdp` (aditivo, nunca `--prune`), de modo que un endpoint
 nuevo ya no responde 403. Se omite con `-SinPdp`. Guía de la demo final: [DEMO_DOCKER](DEMO_DOCKER.md).
@@ -50,6 +58,7 @@ nuevo ya no responde 403. Se omite con `-SinPdp`. Guía de la demo final: [DEMO_
 | :--- | :--- |
 | Solo cuentas y perfiles de Seguridad | `infra.ps1 datos-prueba seguridad` |
 | Solo la verificación por rol (lectura) | `infra.ps1 datos-prueba verificar` |
+| Empujar al Catálogo de Parámetros lo que los datos de prueba fijan solo en la BD (`RED.CIDRS_CAMPUS`) | `infra.ps1 datos-prueba catalogo` |
 | Guardar el estado actual antes de probar | `infra.ps1 db-reset-qa -Mode Snapshot` |
 | Volver a ese estado | `infra.ps1 db-reset-qa -Mode Restore -Backup <archivo.bak> -Yes` (detener antes el backend) |
 
