@@ -175,7 +175,7 @@
         "asis-datos"
       ],
       "requiereImagenes": [
-        "notificaciones-uco:0.1.0"
+        "notificaciones-uco:0.1.1"
       ],
       "salud": [
         "contenedor:ext-notificaciones-servicio",

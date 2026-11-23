@@ -58,7 +58,7 @@ Copy-Item .\GestioAsistenciaDB\.env.example          .\GestioAsistenciaDB\.env
 
 ```powershell
 .\AsistenciasUCO-Infra\infra.ps1 stack build            # una vez: imágenes asistencias-backend/frontend:develop
-.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones   # una vez: imagen notificaciones-uco:0.1.0 (componente propio)
+.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones   # una vez: imagen notificaciones-uco:0.1.1 (componente propio)
 .\AsistenciasUCO-Infra\infra.ps1 stack up basico        # BD + Seguridad + Backend y Frontend
 .\AsistenciasUCO-Infra\infra.ps1 stack status
 ```

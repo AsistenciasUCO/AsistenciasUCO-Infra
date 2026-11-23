@@ -13,7 +13,7 @@
       status                    Estado y memoria por seccion.
       build  [backend|frontend|notificaciones]
                                 Construye las imagenes asistencias-backend:develop / asistencias-frontend:develop /
-                                notificaciones-uco:0.1.0 (componente propio, Complementos/Notificaciones).
+                                notificaciones-uco:0.1.1 (componente propio, Complementos/Notificaciones).
 
     Un objetivo es una seccion (asis-datos, ext-seguridad, ext-mensajes, ext-parametros, ext-notificaciones, asis-antivirus,
     asis-obs, asis-contingencia, asis-app) o un escenario (minimo, basico, mensajes, parametros, completo, soportes, observabilidad,
@@ -569,8 +569,8 @@ switch ($Accion) {
                     # El Dockerfile compila con -DskipTests (las pruebas del componente las corre su equipo); ver Complementos/Notificaciones/README.md.
                     $repo = Join-Path $workspace 'Complementos\Notificaciones\notificaciones-uco'
                     if (-not (Test-Path (Join-Path $repo 'Dockerfile'))) { throw "Falta $repo\Dockerfile (componente Complementos/Notificaciones)." }
-                    Write-Host '==> notificaciones-uco:0.1.0 desde Complementos/Notificaciones/notificaciones-uco' -ForegroundColor Cyan
-                    & docker build -t notificaciones-uco:0.1.0 $repo
+                    Write-Host '==> notificaciones-uco:0.1.1 desde Complementos/Notificaciones/notificaciones-uco' -ForegroundColor Cyan
+                    & docker build -t notificaciones-uco:0.1.1 $repo
                     if ($LASTEXITCODE -ne 0) { throw 'Fallo el build de Notificaciones.' }
                 }
                 default { throw "build acepta backend, frontend o notificaciones, no '$c'." }

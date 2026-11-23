@@ -12,7 +12,7 @@ secciones** o por **escenarios de prueba**. Todo está descrito en [`secciones.j
 .\AsistenciasUCO-Infra\infra.ps1 stack status            # estado y memoria por sección
 .\AsistenciasUCO-Infra\infra.ps1 stack down              # todo menos asis-datos (nunca borra volúmenes)
 .\AsistenciasUCO-Infra\infra.ps1 stack build             # imágenes asistencias-backend/frontend:develop
-.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones   # imagen notificaciones-uco:0.1.0 (componente propio)
+.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones   # imagen notificaciones-uco:0.1.1 (componente propio)
 .\AsistenciasUCO-Infra\infra.ps1 stack up asis-app -Conservar       # recrea solo la app tras un build; se configura con lo que ya está arriba
 ```
 
@@ -112,7 +112,7 @@ Componente propio en `Complementos/Notificaciones` (sin repositorio git propio).
 `ext-notificaciones-servicio`, en `asis-red` (`http://ext-notificaciones-servicio:8080`; en el PC `http://localhost:18090`).
 
 ```powershell
-.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones     # una vez (o al cambiar el código): notificaciones-uco:0.1.0
+.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones     # una vez (o al cambiar el código): notificaciones-uco:0.1.1
 .\AsistenciasUCO-Infra\infra.ps1 stack up basico                # o cualquier escenario con asis-app
 ```
 
