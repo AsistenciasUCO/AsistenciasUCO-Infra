@@ -26,13 +26,13 @@
       </div>
     </header>
 
-    <div class="nota exito"><strong>Migración cerrada</strong> Esta página describe el servicio propio de <code>Complementos/Notificaciones</code> (versión 0.1.1), que ya tiene las plantillas, el SMTP y el tope de envíos. Las fases F1 a F7 están terminadas: el backend entrega por su canal HTTP, la base de datos ya no tiene plantillas (migración 71), el frontend administra el servicio y la validación de extremo a extremo (F7) pasó. La tabla de <a href="#fases">fases</a> y la sección <a href="#validacion">Validación F7</a> dan el detalle.</div>
+    <div class="nota exito"><strong>Migración cerrada</strong> Esta página describe el servicio propio de <code>GestioAsistenciaBackend/servicios/notificaciones</code> (versión 0.1.1), que ya tiene las plantillas, el SMTP y el tope de envíos. Las fases F1 a F7 están terminadas: el backend entrega por su canal HTTP, la base de datos ya no tiene plantillas (migración 71), el frontend administra el servicio y la validación de extremo a extremo (F7) pasó. La tabla de <a href="#fases">fases</a> y la sección <a href="#validacion">Validación F7</a> dan el detalle.</div>
 
     <h2 id="por-que">Por qué es un componente aparte</h2>
     <ul>
       <li><strong>Reemplazable.</strong> Otro equipo puede entregar su propio componente de notificaciones. Mientras cumpla el contrato OpenAPI, solo cambian la URL y la clave del backend y la sección del stack.</li>
       <li><strong>Autónomo.</strong> Tiene su base de datos (<code>notificacionesdb</code>), sus plantillas versionadas, su cola y su SMTP. No comparte tablas ni procedimientos con la BD de Asistencias.</li>
-      <li><strong>Pensado para el monorepo.</strong> Vive en <code>Complementos/Notificaciones/</code> junto a Seguridad, CatalogoMensajes y CatalogoParametros, sin repositorio git propio, por decisión del responsable del 2026-11-22.</li>
+      <li><strong>Pensado para el monorepo.</strong> Desde el 2026-11-23 está versionado en el repo del Backend, en <code>GestioAsistenciaBackend/servicios/notificaciones/</code> (PR #189), fuera de <code>src/</code> y sin ser módulo Maven del Backend, hasta que exista el monorepo. El laboratorio lo construye y lo levanta desde ahí.</li>
       <li><strong>Sin pérdida de avisos.</strong> El backend conserva una cola de salida (outbox) escrita con su propio procedimiento (<code>usp_registrar_notificacion_saliente</code>) justo después del procedimiento de negocio. Una vez en la outbox, el aviso no se pierde: el despachador reserva con lease y reintenta con la misma <code>idempotencyKey</code>. Si el servicio está caído, lo pendiente se entrega cuando vuelva.</li>
     </ul>
     <div class="tarjetas">
@@ -69,7 +69,7 @@ flowchart LR
       <figcaption>El backend entrega el aviso ya resuelto (tipo, destinatarios y datos). El servicio decide cómo se ve el correo y cuándo se envía.</figcaption>
     </figure>
     <p>En el backend, los archivos relevantes están en <code>GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/infrastructure/adapter/secondary/notification/</code>: <code>outbox/OutboxNotificacionAdapter</code> y <code>NotificacionOutboxDispatcher</code>, <code>service/NotificacionesServiceClient</code>, <code>service/ServicioNotificacionChannelSender</code>, <code>service/AdministracionNotificacionServicioAdapter</code> y <code>contact/ContactoDestinatarioResolver</code>. Los puertos de la aplicación (<code>NotificacionPort</code> y <code>AdministracionNotificacionPort</code>) no cambiaron.</p>
-    <p>Dentro del servicio (<code>Complementos/Notificaciones/notificaciones-uco</code>, Spring Boot 4.0.8 y Java 25, hexagonal) hay 72 archivos de producción y 28 de pruebas. El dominio y la aplicación no usan Spring ni JPA; el Composition Root es <code>infrastructure.config.AplicacionConfig</code>.</p>
+    <p>Dentro del servicio (<code>GestioAsistenciaBackend/servicios/notificaciones/notificaciones-uco</code>, Spring Boot 4.0.8 y Java 25, hexagonal) hay 72 archivos de producción y 28 de pruebas. El dominio y la aplicación no usan Spring ni JPA; el Composition Root es <code>infrastructure.config.AplicacionConfig</code>.</p>
 
     <h2 id="entrega">Cómo se entrega un correo</h2>
     <div class="flujo" data-flujo data-titulo="Del caso de uso al buzón">
@@ -114,7 +114,7 @@ stateDiagram-v2
     </div>
 
     <h2 id="api">Resumen de la API</h2>
-    <p>Contrato congelado: <code>Complementos/Notificaciones/contrato/openapi-notificaciones.yaml</code>, con copia y firma en <code>AsistenciasUCO-Infra/docs/contracts/notificaciones/</code>. Todo <code>/api/v1/**</code> exige la cabecera <code>X-Api-Key</code>. <code>X-Correlation-Id</code> y <code>traceparent</code> son opcionales y se propagan.</p>
+    <p>Contrato congelado: <code>GestioAsistenciaBackend/servicios/notificaciones/contrato/openapi-notificaciones.yaml</code>, con copia y firma en <code>AsistenciasUCO-Infra/docs/contracts/notificaciones/</code>. Todo <code>/api/v1/**</code> exige la cabecera <code>X-Api-Key</code>. <code>X-Correlation-Id</code> y <code>traceparent</code> son opcionales y se propagan.</p>
     <div class="tabla-contenedor">
       <table>
         <thead><tr><th>Operación</th><th>Método y ruta</th><th>Qué hace</th></tr></thead>
@@ -154,7 +154,7 @@ Content-Type: application/json
   "tipo": "SESION_CANCELADA", "idioma": "es",
   "destinatarios": [ { "correo": "estudiante@dominio", "nombre": "Nombre" } ],
   "datos": { "asignatura": "Bases de Datos", "grupo": "G01", "fecha": "2026-11-06" } }</code></pre>
-    <p class="nota"><strong>Fuente</strong> Fragmento resumido de <code>Complementos/Notificaciones/Guia-integracion-Notificaciones.md</code>, sección 3. No lleva datos reales.</p>
+    <p class="nota"><strong>Fuente</strong> Fragmento resumido de <code>GestioAsistenciaBackend/servicios/notificaciones/Guia-integracion-Notificaciones.md</code>, sección 3. No lleva datos reales.</p>
 
     <h2 id="plantillas">Plantillas y marcadores</h2>
     <p>Cada tipo tiene una plantilla versionada por idioma. La versión 1 es la de fábrica y sirve de respaldo si la versión activa no se puede renderizar con los datos recibidos. Los marcadores se escriben <code>{nombre}</code>. Reglas al crear una versión: el asunto tiene hasta 200 caracteres y el cuerpo hasta 4000; deben aparecer todos los marcadores obligatorios; solo se permiten los marcadores del tipo; las llaves deben estar balanceadas. El HTML siempre se escapa y el marcador <code>enlace</code> solo se vuelve vínculo si su valor es una URL <code>http</code> o <code>https</code>.</p>
@@ -195,7 +195,7 @@ Content-Type: application/json
     <div class="nota"><strong>Saludo genérico en avisos agrupados</strong> Cuando un aviso lleva varios destinatarios en un mismo mensaje (copia oculta, BCC), el saludo es genérico a propósito: no se puede personalizar un correo que llega a varias personas sin revelar sus nombres.</div>
 
     <h2 id="datos">Modelo de datos</h2>
-    <p>Migraciones Flyway <code>V1__esquema_inicial.sql</code>, <code>V2__siembra_plantillas.sql</code> y <code>V3__descripciones_con_tildes.sql</code> en <code>Complementos/Notificaciones/notificaciones-uco/src/main/resources/db/migration/</code>. La unicidad <code>(aplicacion, idempotencyKey)</code> es la que impide duplicar un envío.</p>
+    <p>Migraciones Flyway <code>V1__esquema_inicial.sql</code>, <code>V2__siembra_plantillas.sql</code> y <code>V3__descripciones_con_tildes.sql</code> en <code>GestioAsistenciaBackend/servicios/notificaciones/notificaciones-uco/src/main/resources/db/migration/</code>. La unicidad <code>(aplicacion, idempotencyKey)</code> es la que impide duplicar un envío.</p>
     <figure class="diagrama">
       <pre class="mermaid">
 erDiagram

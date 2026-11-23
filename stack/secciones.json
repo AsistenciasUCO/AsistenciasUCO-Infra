@@ -166,9 +166,9 @@
       ]
     },
     "ext-notificaciones": {
-      "descripcion": "Servicio de Notificaciones UCO 0.1.0 (componente propio: correos con plantillas, cola en notificacionesdb del SQL Server del laboratorio).",
+      "descripcion": "Servicio de Notificaciones UCO 0.1.1 (componente propio en GestioAsistenciaBackend/servicios/notificaciones: correos con plantillas, cola en notificacionesdb del SQL Server del laboratorio).",
       "memoriaMb": 450,
-      "directorio": "Complementos/Notificaciones/notificaciones-local",
+      "directorio": "GestioAsistenciaBackend/servicios/notificaciones/notificaciones-local",
       "compose": [
         "compose.yaml"
       ],

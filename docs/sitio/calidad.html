@@ -50,7 +50,7 @@ flowchart TB
           <tr><td>2. Backend</td><td>Casos de uso, adaptadores, ArchUnit (Clean Architecture, aislamiento de JPA y de mensajería), integración con SQL Server</td><td><code>.\mvnw.cmd verify</code> y <code>-Pintegration</code></td><td>5215 pruebas; 95,9 % de líneas y 87,1 % de ramas</td></tr>
           <tr><td>3. Frontend</td><td>Componentes, servicios, interceptores, tiempo real y E2E de autenticación, guardas y flujos por rol</td><td><code>npm run verify</code> (pruebas, cobertura, compilación)</td><td>3903 pruebas; realtime ≈95 % de líneas y ≈87 % de ramas; E2E 21/21</td></tr>
           <tr><td>4. HU de extremo a extremo</td><td>Los endpoints de las HU con cinco roles y datos reales</td><td><code>AsistenciasUCO-Infra/scripts/tests/test_all_hus.ps1</code></td><td>81 PASS, 0 FAIL y 1 SKIP (regresión corregida y en verde con ClamAV)</td></tr>
-          <tr><td>Servicio de Notificaciones</td><td>Contrato, despachador, plantillas y SMTP</td><td><code>mvnw verify</code> en <code>Complementos/Notificaciones/notificaciones-uco</code></td><td>146 pruebas; 98,5 % de líneas y 92,4 % de ramas</td></tr>
+          <tr><td>Servicio de Notificaciones</td><td>Contrato, despachador, plantillas y SMTP</td><td><code>mvnw verify</code> en <code>GestioAsistenciaBackend/servicios/notificaciones/notificaciones-uco</code></td><td>146 pruebas; 98,5 % de líneas y 92,4 % de ramas</td></tr>
         </tbody>
       </table>
     </div>

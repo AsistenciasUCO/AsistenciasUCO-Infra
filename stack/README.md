@@ -27,7 +27,7 @@ otros equipos.
 | `ext-seguridad` | Seguridad 0.1.13 del equipo (Keycloak, PDP, PEP, OPA) y su consola de administración en `5175` | 1,6 GB | Casi siempre |
 | `ext-mensajes` | MessageUcoLab 0.3.0 (Kong, Pulsar, app; sin observabilidad ni Ollama) | 3,3 GB | Pruebas de mensajes |
 | `ext-parametros` | Catálogo de Parámetros 0.1.17 y su microfrontend 0.1.16, con su Pulsar propio (`pulsar-parametros`: consulta M2M y eventos de cambios) | 1,5 GB | Pruebas de parámetros |
-| `ext-notificaciones` | Servicio de Notificaciones UCO 0.1.0 (componente propio, `Complementos/Notificaciones`): correos con plantillas y cola en `notificacionesdb` | 0,45 GB | Con `asis-app` (en todos los escenarios salvo `minimo`) |
+| `ext-notificaciones` | Servicio de Notificaciones UCO 0.1.1 (componente propio, `GestioAsistenciaBackend/servicios/notificaciones`): correos con plantillas y cola en `notificacionesdb` | 0,45 GB | Con `asis-app` (en todos los escenarios salvo `minimo`) |
 | `asis-antivirus` | ClamAV | 1,3 GB | Pruebas de soportes |
 | `asis-obs` | Grafana, Prometheus, Loki, Tempo, Alloy | 0,9 GB | Diagnóstico |
 | `asis-contingencia` | Keycloak propio (realm `asistencias-uco`) | 0,9 GB | **Solo emergencias**, si falla la Seguridad del equipo |
@@ -126,7 +126,8 @@ la publicación de eventos del Catálogo sigue activa. Consumo de memoria medido
 
 ## `ext-notificaciones` (Servicio de Notificaciones UCO)
 
-Componente propio en `Complementos/Notificaciones` (sin repositorio git propio). Un solo contenedor,
+Componente propio versionado en el repo del Backend, `GestioAsistenciaBackend/servicios/notificaciones` (hasta el mono repo;
+el checkout del Backend debe estar en `develop`). Un solo contenedor,
 `ext-notificaciones-servicio`, en `asis-red` (`http://ext-notificaciones-servicio:8080`; en el PC `http://localhost:18090`).
 
 ```powershell
@@ -137,8 +138,8 @@ Componente propio en `Complementos/Notificaciones` (sin repositorio git propio).
 Antes de levantar el contenedor, `stack up` (función `Initialize-Notificaciones` de `stack.ps1`):
 
 1. Genera `NOTIFICACIONES_API_KEY` y `NOTIFICACIONES_DB_PASSWORD` en `stack/.env` si no existen.
-2. Escribe `Complementos/Notificaciones/notificaciones-local/.env` (fuera de Git: la carpeta no es un repositorio y
-   `.env` no se versiona) desde su `.env.example`, con esos secretos y los `SMTP_NOTIFICATION_*` del `.env` del checkout del Backend
+2. Escribe `GestioAsistenciaBackend/servicios/notificaciones/notificaciones-local/.env` (fuera de Git: `.env` está ignorado
+   en `servicios/notificaciones/.gitignore`) desde su `.env.example`, con esos secretos y los `SMTP_NOTIFICATION_*` del `.env` del checkout del Backend
    (mismos nombres, incluido el modo de pruebas que redirige todo al buzón de prueba). Canal `smtp`. Esas variables SMTP
    llegan **solo** a este `.env`: el Backend ya no las lee y `stack/generado/backend.env` las omite (recibe
    `OUTBOX_NOTIFICATION_SENDER=servicio`, `NOTIFICACIONES_PLATFORM_URL` y `NOTIFICACIONES_REQUIRE_CONFIRMED_EMAIL`, tomadas de

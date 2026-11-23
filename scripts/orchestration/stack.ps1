@@ -13,7 +13,7 @@
       status                    Estado y memoria por seccion.
       build  [backend|frontend|notificaciones]
                                 Construye las imagenes asistencias-backend:develop / asistencias-frontend:develop /
-                                notificaciones-uco:0.1.1 (componente propio, Complementos/Notificaciones).
+                                notificaciones-uco:0.1.1 (componente propio, GestioAsistenciaBackend/servicios/notificaciones).
 
     Un objetivo es una seccion (asis-datos, ext-seguridad, ext-mensajes, ext-parametros, ext-notificaciones, asis-antivirus,
     asis-obs, asis-contingencia, asis-app) o un escenario (minimo, basico, mensajes, parametros, completo, soportes, observabilidad,
@@ -366,7 +366,7 @@ function Get-SecretosNotificaciones {
 function Initialize-Notificaciones {
     $dir = Join-Path $workspace (Get-Seccion 'ext-notificaciones').directorio
     $ejemplo = Join-Path $dir '.env.example'
-    if (-not (Test-Path $ejemplo)) { throw "Falta $ejemplo (componente Complementos/Notificaciones)." }
+    if (-not (Test-Path $ejemplo)) { throw "Falta $ejemplo (componente GestioAsistenciaBackend/servicios/notificaciones; el checkout del Backend debe estar en develop)." }
     $envStack = Get-SecretosNotificaciones
     if (-not $envStack['MSSQL_SA_PASSWORD']) { throw 'stack/.env no define MSSQL_SA_PASSWORD (necesaria para crear notificacionesdb).' }
     # .env del servicio = .env.example + secretos de stack/.env + SMTP_NOTIFICATION_* del .env del checkout del Backend (solo fuente; al contenedor del Backend no llegan; mismos nombres,
@@ -577,10 +577,10 @@ switch ($Accion) {
                     if ($LASTEXITCODE -ne 0) { throw 'Fallo el build del Frontend.' }
                 }
                 'notificaciones' {
-                    # El Dockerfile compila con -DskipTests (las pruebas del componente las corre su equipo); ver Complementos/Notificaciones/README.md.
-                    $repo = Join-Path $workspace 'Complementos\Notificaciones\notificaciones-uco'
-                    if (-not (Test-Path (Join-Path $repo 'Dockerfile'))) { throw "Falta $repo\Dockerfile (componente Complementos/Notificaciones)." }
-                    Write-Host '==> notificaciones-uco:0.1.1 desde Complementos/Notificaciones/notificaciones-uco' -ForegroundColor Cyan
+                    # El Dockerfile compila con -DskipTests (las pruebas del componente las corre su equipo); ver GestioAsistenciaBackend/servicios/notificaciones/README.md.
+                    $repo = Join-Path $workspace 'GestioAsistenciaBackend\servicios\notificaciones\notificaciones-uco'
+                    if (-not (Test-Path (Join-Path $repo 'Dockerfile'))) { throw "Falta $repo\Dockerfile (componente GestioAsistenciaBackend/servicios/notificaciones; el checkout del Backend debe estar en develop)." }
+                    Write-Host '==> notificaciones-uco:0.1.1 desde GestioAsistenciaBackend/servicios/notificaciones/notificaciones-uco' -ForegroundColor Cyan
                     & docker build -t notificaciones-uco:0.1.1 $repo
                     if ($LASTEXITCODE -ne 0) { throw 'Fallo el build de Notificaciones.' }
                 }
