@@ -300,7 +300,7 @@ flowchart LR
       <table>
         <thead><tr><th>Pieza</th><th>Contrato</th><th>Ruta</th></tr></thead>
         <tbody>
-          <tr><td>Salida de todo procedimiento de comando</td><td>Tupla <code>idResultado</code>, <code>exitoso</code>, <code>mensajeUsuario</code>, <code>mensajeTecnico</code></td><td><code>GestioAsistenciaDB/schema/stored-procedures</code></td></tr>
+          <tr><td>Salida de todo procedimiento de comando</td><td>Tupla <code>idCorrelacion</code>, <code>mensajeUsuarioResultado</code>, <code>mensajeTecnicoResultado</code>, <code>estadoResultado</code></td><td><code>GestioAsistenciaDB/schema/stored-procedures</code></td></tr>
           <tr><td>Error HTTP</td><td><code>ApiErrorResponse</code>: <code>timestamp</code>, <code>status</code>, <code>error</code>, <code>code</code>, <code>message</code>, <code>path</code>, <code>correlationId</code> y <code>details[]</code> opcional</td><td><code>GestioAsistenciaBackend/src/main/java/.../infrastructure/adapter/primary/controller/error/</code></td></tr>
           <tr><td>Respuestas correctas</td><td><code>ApiDataResponse&lt;T&gt;</code> y <code>ApiPageResponse&lt;T&gt;</code> (<code>elementos</code>, <code>numeroPagina</code>, <code>tamanoPagina</code>, <code>totalElementos</code>, <code>totalPaginas</code>)</td><td>Contrato OpenAPI Golden Path</td></tr>
           <tr><td>Frontend</td><td>Un interceptor avisa los 403 y 5xx; un aviso global cubre 400, 409 y 422 que ninguna pantalla haya mostrado (TD-120)</td><td><code>GestioAsistenciaFrontend/src/app/core/interceptors</code></td></tr>

@@ -16,17 +16,18 @@
   <main class="contenido">
     <header class="hero">
       <h1>Pruebas, cobertura y estado de las HU</h1>
-      <p>La evidencia de calidad al 2026-11-22: pirámide de pruebas, métricas por capa, historias de usuario, lista de chequeo, deuda técnica, verificación de contratos y la validación funcional por rol con cinco agentes.</p>
+      <p>La evidencia de calidad al cierre del 2026-11-22: pirámide de pruebas, métricas por capa, historias de usuario, lista de chequeo, deuda técnica, verificación de contratos, la validación funcional por rol con cinco agentes y la auditoría final de las cuatro capas.</p>
       <div class="etiquetas">
-        <span class="etiqueta">5177 pruebas de backend</span>
-        <span class="etiqueta">3862 de frontend</span>
-        <span class="etiqueta">1100 casos de BD</span>
+        <span class="etiqueta">5162 pruebas de backend</span>
+        <span class="etiqueta">3903 de frontend</span>
+        <span class="etiqueta">1107 casos de BD</span>
         <span class="etiqueta">22 defectos corregidos</span>
+        <span class="etiqueta">Auditoría de 4 capas</span>
         <span class="etiqueta">Contratos WORM</span>
       </div>
     </header>
 
-    <div class="nota"><strong>Alcance de las cifras</strong> Medidas el 2026-11-22 sobre las ramas <code>feat/p3-revision-final</code> (BD, Backend y Frontend) y <code>feat/p2-revision-final</code> (Infra). Los cambios de esas ramas están en commits locales y todavía no se empujan. El detalle de cada corrida está en <code>docs/INFORME_P1_P2_P3_2026-11-21.md</code> y <code>docs/LISTA_CHEQUEO_Y_HU_ACTUALIZADA_2026-11-22.md</code> del workspace.</div>
+    <div class="nota"><strong>Alcance de las cifras</strong> Medidas al cierre del 2026-11-22 (corrida final tras la auditoría de las cuatro capas) sobre las ramas <code>feat/p3-revision-final</code> (BD, Backend y Frontend) y <code>feat/p2-revision-final</code> (Infra). Los cambios de esas ramas están en commits locales y todavía no se empujan. El detalle de cada corrida está en <code>docs/INFORME_P1_P2_P3_2026-11-21.md</code> y <code>docs/LISTA_CHEQUEO_Y_HU_ACTUALIZADA_2026-11-22.md</code> del workspace.</div>
 
     <h2 id="piramide">La pirámide de pruebas</h2>
     <p>Todo cambio pasa por cuatro capas, de abajo hacia arriba. La regla innegociable: <strong>no se altera una prueba para que pase</strong>. Si falla, se corrige el código de producción; solo se modifica una prueba si tiene un error técnico real o si cambió el contrato de manera formal.</p>
@@ -45,60 +46,60 @@ flowchart TB
       <table>
         <thead><tr><th>Capa</th><th>Qué valida</th><th>Cómo se ejecuta</th><th>Resultado (2026-11-22)</th></tr></thead>
         <tbody>
-          <tr><td>1. Base de datos</td><td>Integridad, transacciones con rollback, tupla de salida estándar, aislamiento por rol, concurrencia</td><td><code>GestioAsistenciaDB/test_summary.ps1</code> tras <code>deploy_schema.ps1</code> desde cero</td><td>1100 casos, 0 fallos, migraciones 01 a 70</td></tr>
-          <tr><td>2. Backend</td><td>Casos de uso, adaptadores, ArchUnit (Clean Architecture, aislamiento de JPA y de mensajería), integración con SQL Server</td><td><code>.\mvnw.cmd verify</code> y <code>-Pintegration</code></td><td>5177 pruebas; 95,9 % de líneas y 87,5 % de ramas</td></tr>
-          <tr><td>3. Frontend</td><td>Componentes, servicios, interceptores, tiempo real y E2E de autenticación, guardas y flujos por rol</td><td><code>npm run verify</code> (pruebas, cobertura, compilación)</td><td>3862 pruebas; realtime 95,24 % de líneas y 86,81 % de ramas; E2E 21/21</td></tr>
-          <tr><td>4. HU de extremo a extremo</td><td>Los endpoints de las HU con cinco roles y datos reales</td><td><code>AsistenciasUCO-Infra/scripts/tests/test_all_hus.ps1</code></td><td>Regresión corregida y en verde con ClamAV</td></tr>
-          <tr><td>Servicio de Notificaciones</td><td>Contrato, despachador, plantillas y SMTP</td><td><code>mvnw verify</code> en <code>Complementos/Notificaciones/notificaciones-uco</code></td><td>145 pruebas; 98,5 % de líneas y 92,6 % de ramas</td></tr>
+          <tr><td>1. Base de datos</td><td>Integridad, transacciones con rollback, tupla de salida estándar, aislamiento por rol, concurrencia</td><td><code>GestioAsistenciaDB/test_summary.ps1</code> tras <code>deploy_schema.ps1</code> desde cero</td><td>1107 casos, 0 fallos, migraciones 01 a 72</td></tr>
+          <tr><td>2. Backend</td><td>Casos de uso, adaptadores, ArchUnit (Clean Architecture, aislamiento de JPA y de mensajería), integración con SQL Server</td><td><code>.\mvnw.cmd verify</code> y <code>-Pintegration</code></td><td>5162 pruebas; 95,9 % de líneas y 87,1 % de ramas</td></tr>
+          <tr><td>3. Frontend</td><td>Componentes, servicios, interceptores, tiempo real y E2E de autenticación, guardas y flujos por rol</td><td><code>npm run verify</code> (pruebas, cobertura, compilación)</td><td>3903 pruebas; realtime ≈95 % de líneas y ≈87 % de ramas; E2E 21/21</td></tr>
+          <tr><td>4. HU de extremo a extremo</td><td>Los endpoints de las HU con cinco roles y datos reales</td><td><code>AsistenciasUCO-Infra/scripts/tests/test_all_hus.ps1</code></td><td>81 PASS, 0 FAIL y 1 SKIP (regresión corregida y en verde con ClamAV)</td></tr>
+          <tr><td>Servicio de Notificaciones</td><td>Contrato, despachador, plantillas y SMTP</td><td><code>mvnw verify</code> en <code>Complementos/Notificaciones/notificaciones-uco</code></td><td>146 pruebas; 98,5 % de líneas y 92,4 % de ramas</td></tr>
         </tbody>
       </table>
     </div>
 
     <h2 id="metricas">Métricas</h2>
     <div class="kpis">
-      <div class="kpi"><div class="valor">11 184</div><div class="rotulo">pruebas automáticas sumadas (BD, backend, frontend y servicio)</div></div>
+      <div class="kpi"><div class="valor">10 318</div><div class="rotulo">pruebas automáticas sumadas (BD, backend, frontend y servicio)</div></div>
       <div class="kpi"><div class="valor">0</div><div class="rotulo">fallos en el gate de BD</div></div>
       <div class="kpi"><div class="valor">21/21</div><div class="rotulo">E2E de Playwright</div></div>
       <div class="kpi"><div class="valor">95,9 %</div><div class="rotulo">líneas del backend</div></div>
     </div>
     <div class="dos-columnas">
       <figure class="grafica">
-        <div class="lienzo"><canvas aria-label="Cantidad de pruebas por capa: 1100 de base de datos, 5177 de backend, 3862 de frontend y 145 del servicio de notificaciones" role="img" data-grafica='{"type":"bar","data":{"labels":["BD","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1100,5177,3862,145]}]},"options":{"plugins":{"legend":{"display":false}},"scales":{"y":{"title":{"display":true,"text":"Pruebas"}}}}}'></canvas></div>
+        <div class="lienzo"><canvas aria-label="Cantidad de pruebas por capa: 1107 de base de datos, 5162 de backend, 3903 de frontend y 146 del servicio de notificaciones" role="img" data-grafica='{"type":"bar","data":{"labels":["BD","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1107,5162,3903,146]}]},"options":{"plugins":{"legend":{"display":false}},"scales":{"y":{"title":{"display":true,"text":"Pruebas"}}}}}'></canvas></div>
         <figcaption>Pruebas por capa. La BD cuenta casos del gate, no archivos.</figcaption>
       </figure>
       <figure class="grafica">
-        <div class="lienzo"><canvas aria-label="Cobertura en porcentaje de líneas y ramas: backend 95,9 y 87,5, realtime del frontend 95,24 y 86,81, servicio de notificaciones 98,5 y 92,6" role="img" data-grafica='{"type":"bar","data":{"labels":["Backend","Frontend realtime","Notificaciones"],"datasets":[{"label":"Líneas (%)","data":[95.9,95.24,98.5]},{"label":"Ramas (%)","data":[87.5,86.81,92.6]}]},"options":{"scales":{"y":{"min":60,"max":100,"title":{"display":true,"text":"Cobertura (%)"}}}}}'></canvas></div>
+        <div class="lienzo"><canvas aria-label="Cobertura en porcentaje de líneas y ramas: backend 95,9 y 87,1, realtime del frontend ≈95 y ≈87, servicio de notificaciones 98,5 y 92,4" role="img" data-grafica='{"type":"bar","data":{"labels":["Backend","Frontend realtime","Notificaciones"],"datasets":[{"label":"Líneas (%)","data":[95.9,95,98.5]},{"label":"Ramas (%)","data":[87.1,87,92.4]}]},"options":{"scales":{"y":{"min":60,"max":100,"title":{"display":true,"text":"Cobertura (%)"}}}}}'></canvas></div>
         <figcaption>Cobertura frente a los umbrales mínimos: backend 80 y 70, realtime 90 y 80, servicio 80 y 70.</figcaption>
       </figure>
     </div>
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Evolución de las pruebas en cuatro mediciones: la base de datos pasa de 1058 a 1100, el backend de 5076 a 5177 y el frontend de 3785 a 3862" role="img" data-grafica='{"type":"line","data":{"labels":["Informe P1-P3","Lista de chequeo","Validación por rol","Medición final"],"datasets":[{"label":"BD","data":[1058,1074,1089,1100]},{"label":"Backend","data":[5076,5113,5130,5177]},{"label":"Frontend","data":[3785,3808,3841,3862]}]},"options":{"scales":{"y":{"title":{"display":true,"text":"Pruebas"}}}}}'></canvas></div>
-      <figcaption>Las pruebas crecieron con cada ronda: cada defecto corregido dejó su caso. Fuentes: informe P1-P3 (secciones 3, 7 y 8), lista de chequeo y medición final del 2026-11-22.</figcaption>
+      <div class="lienzo"><canvas aria-label="Evolución de las pruebas en cinco mediciones: la base de datos pasa de 1058 a 1107, el backend de 5076 a 5162 (con un máximo de 5177 antes de la auditoría) y el frontend de 3785 a 3903" role="img" data-grafica='{"type":"line","data":{"labels":["Informe P1-P3","Lista de chequeo","Validación por rol","Medición del 22 (previa)","Cierre del 22"],"datasets":[{"label":"BD","data":[1058,1074,1089,1100,1107]},{"label":"Backend","data":[5076,5113,5130,5177,5162]},{"label":"Frontend","data":[3785,3808,3841,3862,3903]}]},"options":{"scales":{"y":{"title":{"display":true,"text":"Pruebas"}}}}}'></canvas></div>
+      <figcaption>Las pruebas crecieron con cada ronda: cada defecto corregido dejó su caso. La medición final del backend (5162) es la de la última corrida de <code>mvnw verify</code>, 15 menos que la medición previa (5162); la BD y el frontend siguen creciendo. Fuentes: informe P1-P3 (secciones 3, 7 y 8), lista de chequeo y cierre del 2026-11-22.</figcaption>
     </figure>
-    <p>Medidas del código en el mismo corte: 845 archivos de prueba Java en <code>GestioAsistenciaBackend/src/test</code> y 314 archivos <code>.spec.ts</code> en <code>GestioAsistenciaFrontend/src/app</code>, además de 238 archivos en <code>GestioAsistenciaDB/test</code>.</p>
+    <p>Medidas del código en el mismo corte: 848 archivos de prueba Java en <code>GestioAsistenciaBackend/src/test</code> y 319 archivos <code>.spec.ts</code> en <code>GestioAsistenciaFrontend/src/app</code>, además de 242 archivos de primer nivel en <code>GestioAsistenciaDB/test</code> (202 <code>.sql</code> y 40 <code>.ps1</code>).</p>
 
     <h2 id="hu">Historias de usuario</h2>
-    <p>La fuente es <code>AsistenciasUCO-Infra/docs/user-stories/HU-CATALOG.md</code>, contada fila por fila. El catálogo tiene 173 historias en <code>develop</code>; con HU179 y HU180 (receso académico, por registrar) suman 175.</p>
+    <p>La fuente es <code>AsistenciasUCO-Infra/docs/user-stories/HU-CATALOG.md</code>, contada fila por fila. El catálogo tiene 175 historias: 144 certificadas, 29 descartadas y 2 abiertas. HU179 y HU180 (receso académico) ya están registradas y certificadas, y HU014 y HU015 se certificaron con ClamAV encendido.</p>
     <div class="dos-columnas">
       <figure class="grafica">
-        <div class="lienzo"><canvas aria-label="Estado de las historias de usuario: 140 certificadas, 29 descartadas, 4 abiertas y 2 por registrar" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Certificadas","Descartadas","Abiertas","Por registrar (HU179 y HU180)"],"datasets":[{"data":[140,29,4,2]}]},"options":{"plugins":{"legend":{"position":"bottom"}}}}'></canvas></div>
-        <figcaption>140 certificadas, 29 descartadas, 4 abiertas y 2 por registrar (175 en total).</figcaption>
+        <div class="lienzo"><canvas aria-label="Estado de las historias de usuario: 144 certificadas, 29 descartadas y 2 abiertas" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Certificadas","Descartadas","Abiertas (HU176B Fase 3 y HU177 pendiente)"],"datasets":[{"data":[144,29,2]}]},"options":{"plugins":{"legend":{"position":"bottom"}}}}'></canvas></div>
+        <figcaption>144 certificadas, 29 descartadas y 2 abiertas (175 en total).</figcaption>
       </figure>
       <div>
         <div class="tabla-contenedor">
           <table>
             <thead><tr><th>HU abierta</th><th>Qué falta</th></tr></thead>
             <tbody>
-              <tr><td>HU014 Justificación médica</td><td>Recorrido con ClamAV encendido (la constancia médica exige soporte). En la rama local ya se certificó en pantalla.</td></tr>
-              <tr><td>HU015 Soportes múltiples</td><td>Mismo recorrido con varios soportes escaneados.</td></tr>
-              <tr><td>HU176B Matrícula autónoma por QR</td><td>Seguridad debe asignar el rol al estudiante nuevo en su primer inicio de sesión; hoy recibe 403 del PDP.</td></tr>
+              
+              
+              <tr><td>HU176B Matrícula autónoma por QR (Fase 3)</td><td>Seguridad debe asignar el rol al estudiante nuevo en su primer inicio de sesión; hoy recibe 403 del PDP.</td></tr>
               <tr><td>HU177</td><td>Pendiente, depende de Seguridad.</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
-    <div class="nota alerta"><strong>Inconsistencia conocida</strong> La tabla «Resumen Cuantitativo» al pie de <code>HU-CATALOG.md</code> se desactualizó respecto al conteo por fila. El conteo por fila manda; hay que corregir el resumen.</div>
+    <div class="nota exito"><strong>Resumen corregido</strong> La tabla «Resumen Cuantitativo» al pie de <code>HU-CATALOG.md</code> ya coincide con el conteo por fila: 144 certificadas, 29 descartadas, 1 en Fase 3 y 1 pendiente (175 en total).</div>
 
     <h2 id="checklist">Lista de chequeo</h2>
     <p>La lista tiene 140 ítems (familias de arquitectura, seguridad, observabilidad, pruebas, realtime y otras). Un ítem solo cambia de estado con evidencia citada.</p>
@@ -115,15 +116,15 @@ flowchart TB
     <p>Lo que sigue pendiente es en su mayoría externo: aprovisionar el PDP compartido, los secretos de Key Vault, los <em>required checks</em> de GitHub y las pruebas de carga con réplicas. Quedan en curso la prueba viva de mensajes con MessageUcoLab y la observabilidad completa con Tempo y Grafana.</p>
 
     <h2 id="deuda">Deuda técnica</h2>
-    <p>El registro vigente y único es <code>AsistenciasUCO-Infra/docs/baseline/TECHNICAL_DEBT.md</code> (el del backend es histórico). Al 2026-11-22 tiene 126 entradas.</p>
+    <p>El registro vigente y único es <code>AsistenciasUCO-Infra/docs/baseline/TECHNICAL_DEBT.md</code> (el del backend es histórico). Al 2026-11-22 tiene 124 entradas (de TD-001 a TD-126; los identificadores TD-057 y TD-058 no existen).</p>
     <div class="dos-columnas">
       <figure class="grafica">
-        <div class="lienzo"><canvas aria-label="Estado de las 126 entradas de deuda técnica: 45 cerradas, 75 abiertas, 3 pendientes de decisión, 2 pendientes de evidencia o validación y 1 diferida" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Cerradas","Abiertas","Pendientes de decisión","Pendientes de evidencia","Diferidas"],"datasets":[{"data":[45,75,3,2,1]}]},"options":{"plugins":{"legend":{"position":"bottom"}}}}'></canvas></div>
-        <figcaption>Estado de las 126 entradas, según la columna de estado del ledger.</figcaption>
+        <div class="lienzo"><canvas aria-label="Estado de las 124 entradas de deuda técnica: 44 cerradas, 72 abiertas, 5 pendientes de decisión, 2 pendientes de evidencia o validación y 1 diferida" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Cerradas","Abiertas","Pendientes de decisión","Pendientes de evidencia","Diferidas"],"datasets":[{"data":[44,72,5,2,1]}]},"options":{"plugins":{"legend":{"position":"bottom"}}}}'></canvas></div>
+        <figcaption>Estado de las 124 entradas, según la columna de estado del ledger (recuento del 2026-11-22).</figcaption>
       </figure>
       <figure class="grafica">
         <div class="lienzo"><canvas aria-label="Clasificación de la deuda abierta por su efecto en la entrega: ninguna bloquea la demostración, 3 esperan decisión, 19 son requisito de producción y 65 se pueden aplazar" role="img" data-grafica='{"type":"bar","data":{"labels":["Bloquea la demostración","Pendiente de decisión","Requisito para producción","Aplazable"],"datasets":[{"label":"Entradas","data":[0,3,19,65]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}},"scales":{"x":{"title":{"display":true,"text":"Entradas"}}}}}'></canvas></div>
-        <figcaption>Clasificación del ledger por efecto en la entrega (revisión del 2026-11-17; incluye TD-124). Los grupos son listas de identificadores del propio ledger, por eso su suma no coincide con las abiertas.</figcaption>
+        <figcaption>Clasificación del ledger por efecto en la entrega (revisión del 2026-11-17; incluye TD-124; TD-125 y TD-126 se abrieron después y no bloquean). Los grupos son listas de identificadores del propio ledger, por eso su suma no coincide con las abiertas.</figcaption>
       </figure>
     </div>
     <div class="tabla-contenedor">
@@ -134,6 +135,7 @@ flowchart TB
           <tr><td>TD-011</td><td>Outbox y consistencia durable de eventos</td><td>Requisito de producción</td></tr>
           <tr><td>TD-110</td><td>Cookies HttpOnly con CSRF, solo si la sesión se gobierna por cookies</td><td>Requisito de producción</td></tr>
           <tr><td>TD-124</td><td>Notificaciones: autenticación entre servicios con <code>X-Api-Key</code>; falta OAuth2 con credenciales de cliente</td><td>Requisito de producción</td></tr>
+          <tr><td>TD-126</td><td>Notificaciones: el token de verificación de correo vive en memoria; un reinicio entre intentos reemite y revoca el enlace previo</td><td>Abierta, no bloquea</td></tr>
           <tr><td>TD-116 a TD-118</td><td>Cifras de pérdida por matrículas o por personas, enlace directo a decisiones pendientes y semántica de <code>esResolutorActual</code></td><td>Pendiente de decisión del responsable</td></tr>
         </tbody>
       </table>
@@ -156,6 +158,7 @@ flowchart TB
       <div class="paso" data-actor="CI" data-tipo="error" data-detalle="Si alguien edita un contrato sin regenerar el hash, o una copia diverge, el verificador responde FAIL y la integración se detiene.">Drift detectado</div>
     </div>
     <p>Hay contratos adicionales congelados con su hash: el del servicio de notificaciones (<code>docs/contracts/notificaciones</code>) y el addendum de tomas y avisos.</p>
+    <div class="nota exito"><strong>Addendum aplicado el 2026-11-22</strong> El OpenAPI Golden Path ya incluye <code>RECESO</code> en <code>CancelacionSesion.tipo</code> (ahora <code>DOCENTE</code>, <code>FESTIVO</code> o <code>RECESO</code>), según <code>AsistenciasUCO-Infra/docs/contracts/openapi/ADDENDUM_P3_RECESO_CANCELACION.md</code>. Las tres copias (Infra, Backend y Frontend) llevan el mismo contenido y el mismo hash.</div>
 
     <h2 id="validacion-roles">Validación funcional por rol (2026-11-22)</h2>
     <p>Cinco agentes, uno por rol (administrador, decano, coordinador, docente y estudiante), recorrieron el sistema en un navegador real (Playwright con Chrome) contra el laboratorio. Cubrieron creación de grupos, cancelación de sesiones, sesiones por solicitud al coordinador, toma manual, toma por QR (PIN tecleado), varias tomas, reclamos de faltas, aprobación y rechazo de la cancelación por el docente, revisión escalada al coordinador, cierre masivo, recesos, consolidados y la pasada a 375 px.</p>
@@ -198,6 +201,27 @@ flowchart TB
     </details>
     <div class="nota exito"><strong>Resultado</strong> Tras las correcciones: gate de BD con 1089 casos y 0 fallos, backend con más de 5130 pruebas, frontend con más de 3841 pruebas y E2E 21/21. Las tres rondas de re-validación en el navegador (gestión, aula y final) quedaron en PASS.</div>
     <div class="nota alerta"><strong>Pendientes menores</strong> Si un campo no pasa la validación, el mensaje todavía no dice cuál. Los grupos sembrados usan otra base de semanas que los grupos nuevos. No se tocó el documento mayor a 2<sup>31</sup> (columna INT).</div>
+
+    <h2 id="auditoria">Auditoría final del 2026-11-22</h2>
+    <p>Después de la validación por rol, cuatro auditorías independientes revisaron cada capa (base de datos, backend, frontend e Infra) contra las reglas del proyecto. Cada hallazgo se corrigió en su capa y dejó su prueba; luego se corrió la regresión completa y las validaciones finales.</p>
+    <div class="kpis">
+      <div class="kpi"><div class="valor">4</div><div class="rotulo">auditorías, una por capa</div></div>
+      <div class="kpi"><div class="valor">28</div><div class="rotulo">índices nuevos sobre llaves foráneas</div></div>
+      <div class="kpi"><div class="valor">81/0/1</div><div class="rotulo">PASS, FAIL y SKIP de la suite de HU</div></div>
+      <div class="kpi"><div class="valor">PASS</div><div class="rotulo">regresión y validaciones finales</div></div>
+    </div>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Capa</th><th>Correcciones</th></tr></thead>
+        <tbody>
+          <tr><td>Base de datos</td><td><code>usp_actualizar_grupo</code> con transacción y bloqueos; la validación de ámbito pasa a vivir dentro del SP; 28 índices sobre llaves foráneas; <code>SET XACT_ABORT ON</code> en 7 SP que lo omitían; tildes en textos del catálogo; script de paridad de ids de prueba (<code>scripts/check-test-summary-parity.ps1</code>). Migraciones 70 a 72.</td></tr>
+          <tr><td>Backend</td><td>Los códigos de BD sin mapear responden 4xx, con una prueba de paridad entre los códigos de la BD y los del traductor; mensajes del catálogo para las confirmaciones <code>OK_*</code> y los rótulos <code>RPT_*</code>; la generación de Excel sale del controlador; la IP real del cliente se toma de proxies de confianza; se retiró un archivo <code>.bak</code> que estaba en git.</td></tr>
+          <tr><td>Frontend</td><td>Los mocks quedan fuera del paquete de producción; configuración regional <code>es-CO</code>; <code>takeUntilDestroyed</code> en las suscripciones; se eliminaron componentes sin uso; mejoras de accesibilidad.</td></tr>
+          <tr><td>Infra y documentación</td><td>El OpenAPI Golden Path incluye <code>RECESO</code> en <code>CancelacionSesion.tipo</code> (addendum con hash nuevo); <code>AGENTS.md</code> se alineó con el código (columnas de la tupla <code>idCorrelacion</code>, <code>mensajeUsuarioResultado</code>, <code>mensajeTecnicoResultado</code> y <code>estadoResultado</code>, repositorios <code>*JpaRepository</code> e <code>InstitutionalScopePort</code>).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota exito"><strong>Validaciones finales</strong> Gate de BD con 1107 casos y 0 fallos (migraciones 01 a 72), <code>mvnw verify</code> con 5162 pruebas, frontend con 3903 pruebas y E2E 21/21, y la suite <code>test_all_hus.ps1</code> con 81 PASS, 0 FAIL y 1 SKIP. Todo en verde.</div>
   </main>
 </div>
 </body>

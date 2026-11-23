@@ -21,8 +21,8 @@
         <span class="etiqueta">SQL Server 2022</span>
         <span class="etiqueta">Smart / Thick database</span>
         <span class="etiqueta">315 procedimientos</span>
-        <span class="etiqueta">1100 casos de prueba</span>
-        <span class="etiqueta">Migraciones 01–70</span>
+        <span class="etiqueta">1107 casos de prueba</span>
+        <span class="etiqueta">Migraciones 01–72</span>
       </div>
     </header>
 
@@ -32,7 +32,7 @@
       <div class="kpi"><div class="valor">315</div><div class="rotulo">procedimientos <code>usp_*</code></div></div>
       <div class="kpi"><div class="valor">28</div><div class="rotulo">funciones <code>ufn_*</code></div></div>
       <div class="kpi"><div class="valor">524</div><div class="rotulo">códigos de mensaje</div></div>
-      <div class="kpi"><div class="valor">1100</div><div class="rotulo">casos del gate, 0 fallos</div></div>
+      <div class="kpi"><div class="valor">1107</div><div class="rotulo">casos del gate, 0 fallos</div></div>
     </div>
 
     <h2 id="rol-de-la-bd">El rol de la base de datos: Smart / Thick database</h2>
@@ -58,7 +58,7 @@ flowchart LR
     </figure>
 
     <h3 id="tupla-canonica">La tupla de resultado estándar</h3>
-    <p>El contrato congelado (<code>AsistenciasUCO-Infra/<wbr>docs/<wbr>contracts/<wbr>db/<wbr>DB_<wbr>BASELINE_<wbr>CONTRACT.md</code>, sección <em>Public SP Result</em>) obliga a que todo procedimiento público de negocio devuelva <strong>una sola fila con cuatro columnas, en este orden exacto</strong>. En la documentación general se resume como «idResultado, exitoso, mensajeUsuario, mensajeTecnico»; los nombres reales de las columnas en SQL son:</p>
+    <p>El contrato congelado (<code>AsistenciasUCO-Infra/<wbr>docs/<wbr>contracts/<wbr>db/<wbr>DB_<wbr>BASELINE_<wbr>CONTRACT.md</code>, sección <em>Public SP Result</em>) obliga a que todo procedimiento público de negocio devuelva <strong>una sola fila con cuatro columnas, en este orden exacto</strong>. Antes de la corrección del 2026-11-22, la documentación general lo resumía como «idResultado, exitoso, mensajeUsuario, mensajeTecnico»; hoy <code>AGENTS.md</code> usa los nombres reales de las columnas en SQL, que son:</p>
     <div class="tabla-contenedor">
       <table>
         <thead><tr><th>#</th><th>Columna real en SQL</th><th>Tipo</th><th>Equivale a</th><th>Qué contiene</th></tr></thead>
@@ -143,23 +143,23 @@ sequenceDiagram
     <p>El esquema se guarda <strong>un objeto por archivo</strong> y se despliega con <code>deploy_schema.ps1</code> en un orden fijo (tablas, triggers, funciones, vistas, procedimientos, seguridad y semillas). Raíz: <code>GestioAsistenciaDB/</code>.</p>
 
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Cantidad de archivos por carpeta del esquema de la base de datos" role="img" data-grafica='{"type":"bar","data":{"labels":["stored-procedures","views","seed","tables","security","migrations (versiones)","functions","triggers"],"datasets":[{"label":"Archivos","data":[315,107,86,76,53,69,28,1]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
-      <figcaption>Archivos por carpeta (2026-11-22). Las tablas son 76 archivos porque uno es <code>zz_foreign_keys.sql</code>, que agrupa 94 llaves foráneas: quedan 75 tablas. Migraciones: 69 versiones distintas (la 35 no existe).</figcaption>
+      <div class="lienzo"><canvas aria-label="Cantidad de archivos por carpeta del esquema de la base de datos" role="img" data-grafica='{"type":"bar","data":{"labels":["stored-procedures","views","seed","tables","security","migrations (versiones)","functions","triggers"],"datasets":[{"label":"Archivos","data":[303,106,80,74,53,71,28,1]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Archivos por carpeta (cierre del 2026-11-22). Las tablas son 74 archivos porque uno es <code>zz_foreign_keys.sql</code>, que agrupa 94 llaves foráneas: quedan 73 tablas. Migraciones: 71 versiones distintas (la 35 no existe).</figcaption>
     </figure>
 
     <div class="tabla-contenedor">
       <table>
         <thead><tr><th>Carpeta</th><th>Contenido</th><th>Archivos</th></tr></thead>
         <tbody>
-          <tr><td><code>schema/tables</code></td><td>DDL idempotente (<code>IF OBJECT_ID(...) IS NULL</code>), índices y restricciones. <code>zz_foreign_keys.sql</code> va al final del orden alfabético.</td><td>76</td></tr>
-          <tr><td><code>schema/views</code></td><td>Vistas de lectura <code>uv_*</code> (107), de las cuales 13 son <code>uv_auth_*</code> filtradas por rol.</td><td>107</td></tr>
+          <tr><td><code>schema/tables</code></td><td>DDL idempotente (<code>IF OBJECT_ID(...) IS NULL</code>), índices y restricciones. <code>zz_foreign_keys.sql</code> va al final del orden alfabético.</td><td>74</td></tr>
+          <tr><td><code>schema/views</code></td><td>Vistas de lectura <code>uv_*</code> (106), de las cuales 13 son <code>uv_auth_*</code> filtradas por rol.</td><td>106</td></tr>
           <tr><td><code>schema/functions</code></td><td>Funciones <code>ufn_*</code>: parámetros, validaciones puras, cálculo de horas y porcentajes, ámbito de programas.</td><td>28</td></tr>
-          <tr><td><code>schema/stored-procedures</code></td><td>213 fachadas públicas y 102 núcleos internos (16 <code>usp_internal_*</code> y 86 <code>*_interno</code>).</td><td>315</td></tr>
+          <tr><td><code>schema/stored-procedures</code></td><td>207 fachadas públicas y 96 núcleos internos (16 <code>usp_internal_*</code> y 80 <code>*_interno</code>).</td><td>303</td></tr>
           <tr><td><code>schema/triggers</code></td><td><code>tr_<wbr>Sesion_<wbr>procedencia_<wbr>temporal</code>: defensa contra DML directo sobre <code>Sesion</code>.</td><td>1</td></tr>
           <tr><td><code>schema/security</code></td><td>Roles y permisos del backend (<code>rol_asistencias_runtime*</code>), uno por paquete de trabajo.</td><td>53</td></tr>
-          <tr><td><code>schema/seed</code></td><td>Catálogos, mensajes, parámetros y plantillas (<code>MERGE</code> idempotentes).</td><td>86</td></tr>
+          <tr><td><code>schema/seed</code></td><td>Catálogos, mensajes y parámetros (<code>MERGE</code> idempotentes).</td><td>80</td></tr>
           <tr><td><code>migrations</code></td><td>Cambios incrementales para bases existentes: <code>NN_nombre_up.sql</code> y <code>_down.sql</code>.</td><td>143</td></tr>
-          <tr><td><code>test</code> y <code>test_suite.sql</code></td><td>199 pruebas T-SQL y 38 scripts PowerShell; la suite incluye 173 archivos con <code>:r</code>.</td><td>237</td></tr>
+          <tr><td><code>test</code> y <code>test_suite.sql</code></td><td>202 pruebas T-SQL y 40 scripts PowerShell; la suite incluye 174 archivos con <code>:r</code>.</td><td>242</td></tr>
           <tr><td><code>scripts</code></td><td><code>migrar.ps1</code>, <code>freeze-manifest.ps1</code>, <code>check-test-summary-parity.ps1</code>, <code>generar-catalogo-mensajes.ps1</code>, datos de prueba.</td><td>—</td></tr>
           <tr><td><code>docs</code></td><td>Catálogos generados (mensajes y parámetros), contratos y documentación de procedimientos.</td><td>—</td></tr>
         </tbody>
@@ -169,8 +169,8 @@ sequenceDiagram
     <div class="nota"><strong>Sin tipos de tabla (TVP).</strong> <code>AGENTS.md</code> menciona una carpeta <code>types</code>, pero hoy no existe en el esquema: los lotes (asistencia, horarios, carga masiva) viajan como JSON en un <code>NVARCHAR(MAX)</code> y se leen con <code>OPENJSON</code>, validando primero con <code>ISJSON</code>.</div>
 
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Distribución de los 315 procedimientos almacenados por familia" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Consultas públicas (usp_consultar_*)","Comandos públicos (crear, actualizar, registrar, etc.)","Núcleos internos (usp_internal_* y *_interno)"],"datasets":[{"label":"Procedimientos","data":[104,109,102]}]}}'></canvas></div>
-      <figcaption>315 procedimientos: 104 consultas públicas, 109 comandos y utilidades públicas, y 102 núcleos internos sin permiso de ejecución para el backend.</figcaption>
+      <div class="lienzo"><canvas aria-label="Distribución de los 303 procedimientos almacenados por familia" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Consultas públicas (usp_consultar_*)","Comandos públicos (crear, actualizar, registrar, etc.)","Núcleos internos (usp_internal_* y *_interno)"],"datasets":[{"label":"Procedimientos","data":[101,106,96]}]}}'></canvas></div>
+      <figcaption>303 procedimientos: 101 consultas públicas, 106 comandos y utilidades públicas, y 96 núcleos internos sin permiso de ejecución para el backend.</figcaption>
     </figure>
 
     <h2 id="modelo-de-datos">Modelo de datos por dominio</h2>
@@ -497,7 +497,6 @@ erDiagram
   CatalogoParametro ||--o{ CambioParametro : "historial"
   Usuario ||--o{ CambioParametro : "cambia"
   EstadoNotificacion ||--o{ NotificacionSaliente : "estado"
-  PlantillaNotificacion ||--o{ PlantillaNotificacionMarcador : "marcadores"
   AuditoriaEvento {
     guid id PK
     datetime occurredAt
@@ -538,13 +537,6 @@ erDiagram
     datetime proximoIntentoEn
     guid idCorrelacion
   }
-  PlantillaNotificacion {
-    guid id PK
-    varchar tipo
-    char idioma
-    int version
-    bit activa
-  }
   MigracionAplicada {
     guid id PK
     int version
@@ -556,7 +548,7 @@ erDiagram
       <figcaption>Tablas transversales. <code>AuditoriaEvento</code> es la única tabla donde el backend inserta directamente. <code>MigracionAplicada</code> es el registro de migraciones con el checksum de cada archivo.</figcaption>
     </figure>
 
-    <div class="nota alerta"><strong>Notificaciones en transición.</strong> El estado destino es el servicio propio <code>Complementos/<wbr>Notificaciones</code>: allí viven las plantillas, el SMTP y el tope de envíos. La BD conserva la <strong>outbox</strong> (<code>NotificacionSaliente</code> y sus SP <code>usp_<wbr>registrar_<wbr>notificacion_<wbr>saliente</code>, <code>usp_<wbr>reservar_<wbr>notificaciones_<wbr>salientes</code>, <code>usp_<wbr>marcar_<wbr>notificacion_<wbr>entregada</code>, <code>usp_<wbr>registrar_<wbr>fallo_<wbr>notificacion</code>, <code>usp_<wbr>reintentar_<wbr>notificacion_<wbr>saliente</code>, <code>usp_<wbr>depurar_<wbr>notificaciones_<wbr>salientes</code>) y el backend entrega por HTTP con una <code>idempotencyKey</code>. Mientras la separación sigue en curso, <code>PlantillaNotificacion</code>, <code>PlantillaNotificacionMarcador</code> y los SP <code>usp_<wbr>guardar_<wbr>plantilla_<wbr>notificacion</code> y <code>usp_<wbr>consultar_<wbr>plantilla_<wbr>notificacion_<wbr>activa</code> siguen presentes en este repositorio. Ver <code>docs/<wbr>PLAN_<wbr>COMPONENTE_<wbr>NOTIFICACIONES.md</code> en la raíz del workspace.</div>
+    <div class="nota exito"><strong>Notificaciones: separación cerrada.</strong> El servicio propio <code>Complementos/<wbr>Notificaciones</code> guarda las plantillas, el SMTP y el tope de envíos. La migración 71 retiró de esta BD <code>PlantillaNotificacion</code>, <code>PlantillaNotificacionMarcador</code>, los 6 SP públicos de plantillas y de cola administrativa (con sus núcleos internos) y la vista <code>uv_<wbr>notificacion_<wbr>saliente_<wbr>admin</code>, y sembró los mensajes <code>OK_*</code> y los rótulos <code>RPT_*</code>; la migración 72 agregó <code>RPT_<wbr>ASISTENCIA_<wbr>ESTADO_<wbr>CANCELADA</code>. La BD conserva la <strong>outbox</strong> (<code>NotificacionSaliente</code> y sus SP <code>usp_<wbr>registrar_<wbr>notificacion_<wbr>saliente</code>, <code>usp_<wbr>reservar_<wbr>notificaciones_<wbr>salientes</code>, <code>usp_<wbr>marcar_<wbr>notificacion_<wbr>entregada</code>, <code>usp_<wbr>registrar_<wbr>fallo_<wbr>notificacion</code> y <code>usp_<wbr>depurar_<wbr>notificaciones_<wbr>salientes</code>) y la verificación de correo (<code>TokenVerificacionCorreo</code>); el backend entrega por HTTP con una <code>idempotencyKey</code>. Ver <a href="notificaciones.html">Notificaciones</a>.</div>
 
     <h3 id="catalogos-tablas">Catálogos de dominio</h3>
     <p>Los estados, modos y tipos no están quemados en el T-SQL: viven en tablas pequeñas con identificadores fijos y se resuelven por <strong>banderas</strong> (<code>estaAbierta</code>, <code>usaCodigoQr</code>, <code>marcaAusentesAlCerrar</code>, <code>esAutomatica</code>…) o por <strong>parámetros</strong> (<code>MATRICULA/ESTADO_INSCRITA</code>). Las más importantes:</p>
@@ -932,7 +924,7 @@ flowchart LR
     </figure>
     <ul>
       <li><strong>Sin acceso directo a tablas:</strong> no hay <code>SELECT</code> sobre tablas (salvo <code>AuditoriaEvento</code>, donde el backend inserta). Las vistas se conceden una por una (<code>GRANT SELECT ON dbo.uv_x</code>), no con <code>SELECT ON SCHEMA</code>.</li>
-      <li><strong>Sin <code>GRANT EXECUTE ON SCHEMA::dbo</code>:</strong> el script base hace <code>REVOKE EXECUTE ON SCHEMA::dbo</code> y concede procedimiento por procedimiento, derivado del inventario del código Java. Cada paquete de trabajo agrega su script (<code>rol_<wbr>asistencias_<wbr>runtime_<wbr>*.sql</code>, 53 archivos, unas 173 sentencias <code>GRANT EXECUTE</code> y 31 <code>DENY</code>).</li>
+      <li><strong>Sin <code>GRANT EXECUTE ON SCHEMA::dbo</code>:</strong> el script base hace <code>REVOKE EXECUTE ON SCHEMA::dbo</code> y concede procedimiento por procedimiento, derivado del inventario del código Java. Cada paquete de trabajo agrega su script (<code>rol_<wbr>asistencias_<wbr>runtime_<wbr>*.sql</code>, 53 archivos, unas 166 sentencias <code>GRANT EXECUTE</code> y 30 <code>DENY</code>).</li>
       <li><strong>Fallo ruidoso:</strong> si un procedimiento requerido no existe, el script lanza <code>THROW 52120</code> o <code>52401</code> con la lista de faltantes; así un SP nuevo sin permiso no pasa inadvertido (sin él, la ruta respondería 500 «EXECUTE permission was denied»).</li>
       <li><strong>Defensa en profundidad:</strong> el trigger <code>tr_<wbr>Sesion_<wbr>procedencia_<wbr>temporal</code> vigila el DML directo sobre <code>Sesion</code> cuando el login real aún tenga privilegios de propietario.</li>
       <li><strong>Prueba del inventario:</strong> <code>test/<wbr>test_<wbr>runtime_<wbr>grants_<wbr>backend_<wbr>inventory.sql</code> y los scripts <code>verify_runtime_role_*.ps1</code>.</li>
@@ -982,14 +974,14 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
     <h3 id="migraciones-marcadores">Convenciones de las migraciones</h3>
     <ul>
       <li><strong>Pares up/down:</strong> <code>NN_nombre_up.sql</code> y <code>NN_nombre_down.sql</code>. Los <code>down</code> no los aplica <code>migrar.ps1</code>: la reversión es manual (ejecutar el down y borrar la fila de <code>MigracionAplicada</code>). Algunas pruebas verifican que un down no borre datos sin confirmación (<code>test_<wbr>pc_<wbr>migracion_<wbr>37_<wbr>down_<wbr>sin_<wbr>confirmacion.sql</code>).</li>
-      <li><strong>Numeración:</strong> 01 a 04 son cargas iniciales anteriores al esquema por objeto; las administradas empiezan en la 05. Hay 69 versiones (la 35 no existe). Se ordena por versión y luego por nombre.</li>
+      <li><strong>Numeración:</strong> 01 a 04 son cargas iniciales anteriores al esquema por objeto; las administradas empiezan en la 05. Hay 71 versiones (la 35 no existe). Se ordena por versión y luego por nombre.</li>
       <li><strong>Marcadores:</strong> cada migración tiene en <code>migrar-marcadores.json</code> un efecto propio que sigue vigente (tabla, columna, índice, restricción, objeto o fila) para que <code>Detectar</code> sepa si ya se aplicó.</li>
       <li><strong>Idempotencia:</strong> las migraciones se escriben para poder repetirse; los cuerpos de vistas y SP se despliegan con <code>deploy_schema.ps1</code> (<code>CREATE OR ALTER</code>) y la migración solo toca lo que <code>CREATE OR ALTER</code> no puede (tablas, columnas, datos, restricciones).</li>
     </ul>
 
     <figure class="grafica">
-      <div class="lienzo"><canvas aria-label="Cantidad de versiones de migración por década de numeración, de la 01 a la 70" role="img" data-grafica='{"type":"bar","data":{"labels":["01-09","10-19","20-29","30-39","40-49","50-59","60-69","70"],"datasets":[{"label":"Versiones de migración","data":[9,10,10,9,10,10,10,1]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
-      <figcaption>Línea de tiempo por numeración (2026-11-22): 69 versiones entre la 01 y la 70, sin la 35. Las 15 a 28 son el paquete CULM-001 (festivos, tomas, alertas, parámetros editables…); 61 a 64 son grupos compartidos, matrícula por programa y calendario del semestre; 68 es el receso; 69 y 70 son la revisión final P3 y la auditoría de BD.</figcaption>
+      <div class="lienzo"><canvas aria-label="Cantidad de versiones de migración por década de numeración, de la 01 a la 72" role="img" data-grafica='{"type":"bar","data":{"labels":["01-09","10-19","20-29","30-39","40-49","50-59","60-69","70-72"],"datasets":[{"label":"Versiones de migración","data":[9,10,10,9,10,10,10,3]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Línea de tiempo por numeración (2026-11-22): 71 versiones entre la 01 y la 72, sin la 35. Las 15 a 28 son el paquete CULM-001 (festivos, tomas, alertas, parámetros editables…); 61 a 64 son grupos compartidos, matrícula por programa y calendario del semestre; 68 es el receso; 69 y 70 son la revisión final P3 y la auditoría de BD; 71 retira las plantillas por la separación de Notificaciones y 72 agrega el rótulo del estado CANCELADA.</figcaption>
     </figure>
     <details class="acordeon">
       <summary>Hitos de la línea de tiempo (migraciones destacadas)</summary>
@@ -1011,7 +1003,8 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
             <tr><td>64</td><td><code>64_<wbr>ses_<wbr>gen_<wbr>01_<wbr>calendario_<wbr>semestre</code></td><td>Semestre de 16 semanas y franjas de horario.</td></tr>
             <tr><td>66</td><td><code>66_<wbr>seg11_<wbr>retiro_<wbr>password_<wbr>usuario</code></td><td>Se retira la contraseña de <code>Usuario</code>.</td></tr>
             <tr><td>68</td><td><code>68_receso_academico</code></td><td>Receso académico (DEC-081).</td></tr>
-            <tr><td>69–70</td><td><code>69_p3_revision_final</code>, <code>70_auditoria_bd_2026_11_22</code></td><td>Revisión final y auditoría de BD.</td></tr>
+            <tr><td>69–70</td><td><code>69_p3_revision_final</code>, <code>70_auditoria_bd_2026_11_22</code></td><td>Revisión final y auditoría de BD (<code>usp_actualizar_grupo</code> transaccional, 28 índices de llaves foráneas, <code>XACT_ABORT</code>).</td></tr>
+            <tr><td>71–72</td><td><code>71_p3_f5_notificaciones_servicio</code>, <code>72_p3_regresion_estado_cancelada</code></td><td>Retiro de plantillas y cola administrativa (servicio de Notificaciones) y rótulo <code>RPT_ASISTENCIA_ESTADO_CANCELADA</code>.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1034,13 +1027,13 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
     <div class="nota alerta"><strong>Regla de contrato.</strong> Toda modificación de un contrato exige formalización previa, actualización del hash y verificación cruzada de repositorios. Nunca se «acomoda» la base para que el backend o el frontend compilen; si la forma difiere, se reconstruye desde el contrato.</div>
 
     <h2 id="pruebas">Suite de pruebas y gate</h2>
-    <p>El resultado más reciente del <strong>gate de BD</strong> es 1100 casos críticos y 0 fallos, con migraciones 01–70 (medido el 2026-11-22). La regla de oro de <code>AGENTS.md</code> aplica sin excepción: si una prueba falla, se corrige el código de producción, no la prueba.</p>
+    <p>El resultado más reciente del <strong>gate de BD</strong> es 1107 casos críticos y 0 fallos, con migraciones 01–72 (medido el 2026-11-22). La regla de oro de <code>AGENTS.md</code> aplica sin excepción: si una prueba falla, se corrige el código de producción, no la prueba.</p>
     <div class="tabla-contenedor">
       <table>
         <thead><tr><th>Pieza</th><th>Rol</th></tr></thead>
         <tbody>
-          <tr><td><code>test_suite.sql</code></td><td>Incluye con <code>:r /tmp/test/...</code> 173 archivos T-SQL de <code>test/</code>; cada caso imprime <code>TEST_PASS:&lt;ID&gt;</code>.</td></tr>
-          <tr><td><code>test_summary.ps1</code></td><td>Ejecuta la suite en el contenedor y exige que aparezcan los ids de <code>$criticalIds</code> y <code>$resultIds</code> (1100 en total). Valida los bloques de resultado canónico (<code>TEST_RESULT_BEGIN/END</code>, estado, mensaje de usuario y <code>DBCODE</code> esperado contra el catálogo).</td></tr>
+          <tr><td><code>test_suite.sql</code></td><td>Incluye con <code>:r /tmp/test/...</code> 174 archivos T-SQL de <code>test/</code>; cada caso imprime <code>TEST_PASS:&lt;ID&gt;</code>.</td></tr>
+          <tr><td><code>test_summary.ps1</code></td><td>Ejecuta la suite en el contenedor y exige que aparezcan los ids de <code>$criticalIds</code> y <code>$resultIds</code> (1107 en total). Valida los bloques de resultado canónico (<code>TEST_RESULT_BEGIN/END</code>, estado, mensaje de usuario y <code>DBCODE</code> esperado contra el catálogo).</td></tr>
           <tr><td><code>scripts/<wbr>check-test-summary-parity.ps1</code></td><td>Verifica que los ids que exige el resumen existan en las pruebas (<code>-Check</code>: sin ids «fantasma»; <code>-Strict</code>: también sin ids emitidos que nadie exige, salvo la lista permitida).</td></tr>
           <tr><td><code>scripts/<wbr>freeze-manifest.ps1</code></td><td>Verifica los hashes WORM.</td></tr>
           <tr><td><code>test/*.ps1</code> (38)</td><td>Concurrencia, migraciones y deploy limpio con bases temporales (<code>test_<wbr>culm001_<wbr>b2_<wbr>concurrencia.ps1</code>, <code>test_val_migrar.ps1</code>…).</td></tr>
@@ -1050,7 +1043,7 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
 
     <figure class="grafica">
       <div class="lienzo"><canvas aria-label="Casos críticos del gate de BD agrupados por área" role="img" data-grafica='{"type":"bar","data":{"labels":["Núcleo: asistencia, sesión, grupo, plan, HU","CULM-001: tomas, festivos, alertas, paquete D","Otros","Validación, correcciones y auditoría","Consultas por rol (W1-W3)","ATA y avisos","Puntos de control","Tiempo UTC"],"datasets":[{"label":"Casos críticos","data":[328,299,144,128,78,57,41,25]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
-      <figcaption>1100 casos críticos agrupados por el prefijo de su identificador en <code>test_summary.ps1</code> (2026-11-22). La agrupación es una lectura aproximada por prefijo, no una clasificación oficial.</figcaption>
+      <figcaption>1107 casos críticos agrupados por el prefijo de su identificador en <code>test_summary.ps1</code> (2026-11-22). La agrupación es una lectura aproximada por prefijo, no una clasificación oficial.</figcaption>
     </figure>
 
     <h3 id="correr-gate">Cómo correr el gate de BD</h3>
@@ -1100,7 +1093,7 @@ DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencia
       <div class="tarjeta"><div class="icono">3️⃣</div><h4>Atómico y ordenado</h4><p>Transacción propia o savepoint, <code>UPDLOCK, HOLDLOCK</code> y un orden de bloqueos fijo.</p></div>
       <div class="tarjeta"><div class="icono">4️⃣</div><h4>Ámbito en la BD</h4><p>Las vistas <code>uv_auth_*</code> y la titularidad jerárquica aíslan docente, coordinador, decano y administrador.</p></div>
       <div class="tarjeta"><div class="icono">5️⃣</div><h4>Migrar con cuidado</h4><p><code>Estado</code> antes de <code>Aplicar</code>, siempre; los contratos congelados solo se supersedan con hash.</p></div>
-      <div class="tarjeta"><div class="icono">6️⃣</div><h4>Gate desde cero</h4><p>Despliegue limpio más <code>test_summary.ps1</code>: 1100 casos y 0 fallos.</p></div>
+      <div class="tarjeta"><div class="icono">6️⃣</div><h4>Gate desde cero</h4><p>Despliegue limpio más <code>test_summary.ps1</code>: 1107 casos y 0 fallos.</p></div>
     </div>
   </main>
 </div>

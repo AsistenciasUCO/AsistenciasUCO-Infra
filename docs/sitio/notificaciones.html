@@ -16,16 +16,17 @@
   <main class="contenido">
     <header class="hero">
       <h1>Servicio de Notificaciones por correo</h1>
-      <p>El correo institucional sale por un componente independiente, no por el backend. Esta página explica por qué, cómo funciona, qué plantillas existen, cómo se reemplaza y en qué fase de la migración estamos (corte 2026-11-22).</p>
+      <p>El correo institucional sale por un componente independiente, no por el backend. Esta página explica por qué, cómo funciona, qué plantillas existen, cómo se reemplaza y cómo quedó cerrada la migración (fases F1 a F7, corte final del 2026-11-22).</p>
       <div class="etiquetas">
-        <span class="etiqueta">Servicio 0.1.0</span>
+        <span class="etiqueta">Servicio 0.1.1</span>
+        <span class="etiqueta">Migración F1 a F7 cerrada</span>
         <span class="etiqueta">Outbox + HTTP idempotente</span>
         <span class="etiqueta">22 plantillas</span>
         <span class="etiqueta">Reemplazable por contrato</span>
       </div>
     </header>
 
-    <div class="nota alerta"><strong>Migración en curso</strong> Esta página describe el <em>estado destino</em>: el servicio propio de <code>Complementos/Notificaciones</code> con las plantillas, el SMTP y el tope de envíos. Las fases F1 a F4 están cerradas (el backend ya usa el canal del servicio); las fases F5 (base de datos) y F6 (frontend) siguen en curso y F7 (validación de extremo a extremo) está pendiente. La tabla de <a href="#fases">fases</a> marca cada una.</div>
+    <div class="nota exito"><strong>Migración cerrada</strong> Esta página describe el servicio propio de <code>Complementos/Notificaciones</code> (versión 0.1.1), que ya tiene las plantillas, el SMTP y el tope de envíos. Las fases F1 a F7 están terminadas: el backend entrega por su canal HTTP, la base de datos ya no tiene plantillas (migración 71), el frontend administra el servicio y la validación de extremo a extremo (F7) pasó. La tabla de <a href="#fases">fases</a> y la sección <a href="#validacion">Validación F7</a> dan el detalle.</div>
 
     <h2 id="por-que">Por qué es un componente aparte</h2>
     <ul>
@@ -190,10 +191,11 @@ Content-Type: application/json
         </table>
       </div>
     </details>
-    <p>Las plantillas se siembran en <code>V2__siembra_plantillas.sql</code> a partir de los recursos del backend y de las versiones activas de la BD de Asistencias. La pantalla de administración del frontend (<code>admin-email-management</code>) sigue igual: el backend reenvía al servicio.</p>
+    <p>Las plantillas se siembran en <code>V2__siembra_plantillas.sql</code> a partir de los recursos del backend y de las versiones activas de la BD de Asistencias, y <code>V3__descripciones_con_tildes.sql</code> corrige las tildes de las descripciones. La pantalla de administración del frontend (<code>admin-email-management</code>) habla con el backend, que reenvía al servicio (ver la fila de F6 en las <a href="#fases">fases</a>).</p>
+    <div class="nota"><strong>Saludo genérico en avisos agrupados</strong> Cuando un aviso lleva varios destinatarios en un mismo mensaje (copia oculta, BCC), el saludo es genérico a propósito: no se puede personalizar un correo que llega a varias personas sin revelar sus nombres.</div>
 
     <h2 id="datos">Modelo de datos</h2>
-    <p>Migración Flyway <code>V1__esquema_inicial.sql</code> en <code>Complementos/Notificaciones/notificaciones-uco/src/main/resources/db/migration/</code>. La unicidad <code>(aplicacion, idempotencyKey)</code> es la que impide duplicar un envío.</p>
+    <p>Migraciones Flyway <code>V1__esquema_inicial.sql</code>, <code>V2__siembra_plantillas.sql</code> y <code>V3__descripciones_con_tildes.sql</code> en <code>Complementos/Notificaciones/notificaciones-uco/src/main/resources/db/migration/</code>. La unicidad <code>(aplicacion, idempotencyKey)</code> es la que impide duplicar un envío.</p>
     <figure class="diagrama">
       <pre class="mermaid">
 erDiagram
@@ -252,7 +254,7 @@ erDiagram
       <li>Logs JSON por la salida estándar con <code>correlationId</code>, <code>traceId</code>, <code>spanId</code> y <code>service</code>.</li>
       <li>Métricas en <code>/actuator/prometheus</code>: <code>notification_dispatch_total</code>, <code>notification_email_send_total</code>, <code>notification_email_throttled_total</code>, <code>notification_template_render_total</code> y <code>notificaciones_recibidas_total</code>.</li>
       <li>Trazas por OTLP, apagadas por defecto (<code>MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=true</code> las activa).</li>
-      <li>Pruebas del servicio, medidas el 2026-11-22: 145 pruebas, 98,5 % de líneas y 92,6 % de ramas. El umbral de JaCoCo es 80 % de líneas y 70 % de ramas, y una prueba verifica que las rutas coincidan con el contrato y que su hash corresponda.</li>
+      <li>Pruebas del servicio, medidas al cierre del 2026-11-22: 146 pruebas, 98,5 % de líneas y 92,4 % de ramas. El umbral de JaCoCo es 80 % de líneas y 70 % de ramas, y una prueba verifica que las rutas coincidan con el contrato y que su hash corresponda.</li>
     </ul>
 
     <h2 id="reemplazo">Cómo reemplazarlo por otro componente</h2>
@@ -263,11 +265,11 @@ erDiagram
       <li>Cambia en el backend <code>NOTIFICACIONES_SERVICE_URL</code> y <code>NOTIFICACIONES_API_KEY</code>. No hay cambios de código mientras el contrato se cumpla.</li>
       <li>Cambia la sección <code>ext-notificaciones</code> de <code>AsistenciasUCO-Infra/stack/secciones.json</code> (directorio, compose, imagen y salud).</li>
       <li>Migra las plantillas: exporta las versiones activas del servicio actual y cárgalas en el nuevo.</li>
-      <li>Ejecuta la prueba de extremo a extremo (fase F7): cada tipo llega al buzón de prueba, con el servicio caído no se pierde nada y no hay duplicados.</li>
+      <li>Ejecuta la prueba de extremo a extremo (como la de la fase F7): cada tipo llega al buzón de prueba, con el servicio caído no se pierde nada y no hay duplicados.</li>
       <li>Si el contrato cambia, publica un addendum con su hash nuevo y ejecuta <code>infra.ps1 verify</code>.</li>
     </ol>
 
-    <h2 id="fases">Fases de la migración</h2>
+    <h2 id="fases">Fases de la migración (todas cerradas)</h2>
     <p>Plan completo en <code>docs/PLAN_COMPONENTE_NOTIFICACIONES.md</code> (raíz del workspace).</p>
     <div class="tabla-contenedor">
       <table>
@@ -277,17 +279,43 @@ erDiagram
           <tr><td>F2 Servicio</td><td>Código, Flyway, plantillas de fábrica, despachador SMTP, API de administración e imagen Docker</td><td>Cerrada</td></tr>
           <tr><td>F3 Infra</td><td>Sección <code>ext-notificaciones</code> en el stack y secretos en <code>.env</code></td><td>Cerrada</td></tr>
           <tr><td>F4 Backend</td><td>Canal de entrega por HTTP (<code>ServicioNotificacionChannelSender</code>, <code>NotificacionesServiceClient</code>), administración por HTTP (<code>AdministracionNotificacionServicioAdapter</code>), retiro de plantillas, SMTP y tope de envíos del backend</td><td>Cerrada</td></tr>
-          <tr><td>F5 BD de Asistencias</td><td>Migración 71 que exporta el historial de plantillas y elimina <code>PlantillaNotificacion*</code> y sus procedimientos (se conservan <code>NotificacionSaliente</code> y <code>TokenVerificacionCorreo</code>)</td><td>En curso</td></tr>
-          <tr><td>F6 Frontend</td><td>La administración sigue con los mismos endpoints; se quitan los metadatos y umbrales quemados</td><td>En curso</td></tr>
-          <tr><td>F7 Validación E2E</td><td>Cada tipo de correo llega; sin pérdidas ni duplicados; administración desde el frontend</td><td>Pendiente</td></tr>
+          <tr><td>F5 BD de Asistencias</td><td>Migración 71: retira <code>PlantillaNotificacion*</code>, sus procedimientos y la vista administrativa, y siembra los mensajes <code>OK_*</code> y <code>RPT_*</code> (se conservan <code>NotificacionSaliente</code> y <code>TokenVerificacionCorreo</code>). La migración 72 agrega <code>RPT_ASISTENCIA_ESTADO_CANCELADA</code></td><td>Cerrada</td></tr>
+          <tr><td>F6 Frontend</td><td>La administración sigue con los mismos endpoints; se quitan los metadatos y umbrales quemados. Si el servicio no responde, cada pestaña muestra «Servicio no disponible» con el botón «Reintentar», y la pestaña del canal muestra «Último envío»</td><td>Cerrada</td></tr>
+          <tr><td>F7 Validación E2E</td><td>Cada tipo de correo llega; sin pérdidas ni duplicados; administración desde el frontend (resultado en <a href="#validacion">Validación F7</a>)</td><td>Cerrada</td></tr>
         </tbody>
       </table>
     </div>
-    <div class="nota alerta"><strong>En curso</strong> F5 y F6 se están cerrando: no se dan por terminadas hasta pasar sus gates (<code>mvnw verify</code>, gate de BD completo y <code>npm run verify</code> con E2E). Mientras tanto, <code>OUTBOX_NOTIFICATION_SENDER</code> elige el canal: vacío usa el servicio si hay <code>NOTIFICACIONES_SERVICE_URL</code> y, si no, solo registra en el log.</div>
-    <div class="nota alerta"><strong>Riesgo abierto</strong> <code>Complementos/</code> no es un repositorio git, así que el código del servicio no tiene respaldo versionado hasta que exista el monorepo. Mitigación: respaldo <code>.zip</code> fechado al cerrar cada fase.</div>
+    <div class="nota exito"><strong>Canal de entrega</strong> <code>OUTBOX_NOTIFICATION_SENDER</code> elige el canal: vacío usa el servicio si hay <code>NOTIFICACIONES_SERVICE_URL</code> y, si no, solo registra en el log.</div>
+    <div class="nota alerta"><strong>Riesgo abierto</strong> <code>Complementos/</code> no es un repositorio git, así que el código del servicio no tiene respaldo versionado hasta que exista el monorepo. Mitigación: respaldos <code>.zip</code> fechados al cerrar cada fase y antes de cambios grandes (el último, antes de F7 y de la correlación).</div>
+    <div class="nota alerta"><strong>TD-126, residual</strong> El backend emite el token de verificación de correo una sola vez por aviso y lo guarda en memoria (<code>VerificacionCorreoMarcadorProvider</code>). Si el backend se reinicia entre dos intentos de entrega, se emite un token nuevo y el enlace anterior queda revocado. No bloquea la demostración.</div>
+
+
+    <h2 id="validacion">Validación F7 (extremo a extremo)</h2>
+    <p>La fase F7 comprobó, con el laboratorio levantado y el SMTP en modo de pruebas, que el aviso llega sin perderse y sin duplicarse, también cuando el servicio está caído.</p>
+    <div class="kpis">
+      <div class="kpi"><div class="valor">78/78</div><div class="rotulo">avisos de la outbox en ENTREGADA</div></div>
+      <div class="kpi"><div class="valor">0</div><div class="rotulo">duplicados</div></div>
+      <div class="kpi"><div class="valor">146</div><div class="rotulo">pruebas del servicio</div></div>
+      <div class="kpi"><div class="valor">98,5 %</div><div class="rotulo">líneas del servicio (ramas 92,4 %)</div></div>
+    </div>
+    <div class="flujo" data-flujo data-titulo="Prueba con el servicio caído">
+      <div class="paso" data-actor="Prueba" data-detalle="Se detiene el contenedor del Servicio de Notificaciones y se ejecutan operaciones de negocio que generan avisos.">Detiene el servicio</div>
+      <div class="paso" data-actor="Backend" data-detalle="Cada aviso queda guardado en la outbox con estado PENDIENTE. La operación de negocio no falla.">Encola en la outbox</div>
+      <div class="paso" data-actor="Backend" data-tipo="error" data-detalle="El despachador intenta entregar, recibe error de conexión y deja la fila FALLIDA_REINTENTABLE con espera creciente.">Reintenta</div>
+      <div class="paso" data-actor="Prueba" data-detalle="Se vuelve a levantar el servicio.">Levanta el servicio</div>
+      <div class="paso" data-actor="Servicio" data-detalle="El despachador reenvía con la misma idempotencyKey; el servicio registra el aviso una sola vez y lo envía.">Entrega una sola vez</div>
+      <div class="paso" data-actor="Prueba" data-detalle="Se cuentan las filas de la outbox: 78 de 78 en ENTREGADA y ninguna clave repetida en la cola del servicio.">Cuenta y verifica</div>
+    </div>
+    <h3 id="ajustes">Ajustes que dejó la validación</h3>
+    <ul>
+      <li>Los instantes que viajan entre el backend y el servicio se truncan a microsegundos, para que SQL Server y el servicio comparen los mismos valores (<code>AdministracionNotificacionServicioAdapter</code>).</li>
+      <li>Los avisos agrupados usan un saludo genérico por diseño (copia oculta).</li>
+      <li>El token de verificación de correo se emite una vez por aviso; queda como deuda residual TD-126 (véase el aviso de <a href="#fases">fases</a>).</li>
+      <li>La pantalla de administración muestra «Servicio no disponible» con «Reintentar» y, en la pestaña del canal, «Último envío».</li>
+    </ul>
 
     <h2 id="operar">Cómo levantarlo</h2>
-    <pre><code>.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones   # una vez: imagen notificaciones-uco:0.1.0
+    <pre><code>.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones   # una vez: imagen notificaciones-uco:0.1.1
 .\AsistenciasUCO-Infra\infra.ps1 stack up basico              # incluye ext-notificaciones</code></pre>
     <p>Fuente: <code>AsistenciasUCO-Infra/stack/README.md</code>. Con la sección arriba, <code>GET http://localhost:18090/actuator/health</code> responde sin clave. Más comandos en <a href="operacion.html">Operación</a>.</p>
   </main>

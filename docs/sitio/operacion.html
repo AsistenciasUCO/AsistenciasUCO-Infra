@@ -38,7 +38,7 @@
           <tr><td><code>stack up &lt;escenario o sección&gt;</code></td><td>Levanta lo necesario y apaga lo que no se use. Con <code>-Conservar</code> agrega sin apagar el resto.</td></tr>
           <tr><td><code>stack status</code></td><td>Estado y memoria por sección.</td></tr>
           <tr><td><code>stack down</code></td><td>Apaga todo menos <code>asis-datos</code>. Nunca borra volúmenes. Con <code>-IncluirDatos</code> apaga también SQL Server y MinIO.</td></tr>
-          <tr><td><code>stack build [backend|frontend|notificaciones]</code></td><td>Construye las imágenes <code>asistencias-backend:develop</code>, <code>asistencias-frontend:develop</code> y <code>notificaciones-uco:0.1.0</code>.</td></tr>
+          <tr><td><code>stack build [backend|frontend|notificaciones]</code></td><td>Construye las imágenes <code>asistencias-backend:develop</code>, <code>asistencias-frontend:develop</code> y <code>notificaciones-uco:0.1.1</code>.</td></tr>
           <tr><td rowspan="5">Datos y BD</td><td><code>datos-prueba cargar -Yes</code></td><td>Respalda y recrea la BD desde el esquema de <code>develop</code>, carga 73 usuarios de todos los roles, los da de alta en Keycloak y el PDP y verifica cada rol (unos 10 minutos).</td></tr>
           <tr><td><code>datos-prueba seguridad</code> y <code>datos-prueba verificar</code></td><td>Solo cuentas y perfiles, o solo la verificación por rol (lectura).</td></tr>
           <tr><td><code>db-deploy</code> · <code>db-seed</code> · <code>db-test</code></td><td>Despliega el esquema, siembra y ejecuta las pruebas T-SQL.</td></tr>
@@ -156,10 +156,10 @@
       <table>
         <thead><tr><th>Capa</th><th>Umbral de la compuerta</th><th>Medido el 2026-11-22</th></tr></thead>
         <tbody>
-          <tr><td>Backend (JaCoCo)</td><td>Líneas 80 % y ramas 70 %</td><td>95,9 % y 87,5 %</td></tr>
-          <tr><td>Frontend, realtime (<code>src/app/core/realtime/**</code>)</td><td>Líneas 90 % y ramas 80 %</td><td>95,24 % y 86,81 %</td></tr>
-          <tr><td>Servicio de Notificaciones (JaCoCo)</td><td>Líneas 80 % y ramas 70 %</td><td>98,5 % y 92,6 %</td></tr>
-          <tr><td>Base de datos</td><td>Todos los casos del gate aprobados</td><td>1100 casos, 0 fallos</td></tr>
+          <tr><td>Backend (JaCoCo)</td><td>Líneas 80 % y ramas 70 %</td><td>95,9 % y 87,1 %</td></tr>
+          <tr><td>Frontend, realtime (<code>src/app/core/realtime/**</code>)</td><td>Líneas 90 % y ramas 80 %</td><td>≈95 % y ≈87 %</td></tr>
+          <tr><td>Servicio de Notificaciones (JaCoCo)</td><td>Líneas 80 % y ramas 70 %</td><td>98,5 % y 92,4 %</td></tr>
+          <tr><td>Base de datos</td><td>Todos los casos del gate aprobados</td><td>1107 casos, 0 fallos</td></tr>
         </tbody>
       </table>
     </div>

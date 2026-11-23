@@ -64,7 +64,7 @@
           <tr><td>Identidad y permisos</td><td>Security Baseline 0.1.14 (Keycloak, PDP, PEP, OPA)</td><td>Inicio de sesión con Authorization Code + PKCE y autorización por política.</td></tr>
           <tr><td>Mensajes</td><td>MessageUcoLab 0.3.0 (Kong, Pulsar)</td><td>Catálogo de textos de usuario.</td></tr>
           <tr><td>Parámetros</td><td>Catálogo de Parámetros 0.1.7</td><td>Valores de negocio ajustables.</td></tr>
-          <tr><td>Correo</td><td>Servicio de Notificaciones UCO 0.1.0 (propio)</td><td>Plantillas, cola, reintentos y entrega SMTP.</td></tr>
+          <tr><td>Correo</td><td>Servicio de Notificaciones UCO 0.1.1 (propio)</td><td>Plantillas, cola, reintentos y entrega SMTP.</td></tr>
           <tr><td>Soportes</td><td>MinIO + ClamAV 1.5.4</td><td>Almacenamiento de objetos y escaneo antivirus de adjuntos.</td></tr>
           <tr><td>Observabilidad</td><td>OpenTelemetry, Actuator, Grafana, Prometheus, Loki, Tempo</td><td>Trazas, métricas y logs correlacionados.</td></tr>
           <tr><td>Automatización</td><td>PowerShell (<code>infra.ps1</code>), Docker Compose</td><td>Laboratorio por secciones, datos de prueba y verificación.</td></tr>
@@ -131,24 +131,24 @@
     </figure>
 
     <h2 id="cifras">Cifras clave (2026-11-22)</h2>
-    <p>Medidas sobre las ramas <code>feat/p3-revision-final</code> (BD, Backend y Frontend) y <code>feat/p2-revision-final</code> (Infra).</p>
+    <p>Corrida final tras la auditoría de las cuatro capas, sobre las ramas <code>feat/p3-revision-final</code> (BD, Backend y Frontend) y <code>feat/p2-revision-final</code> (Infra).</p>
     <div class="kpis">
-      <div class="kpi"><div class="valor">5177</div><div class="rotulo">pruebas de backend</div></div>
-      <div class="kpi"><div class="valor">3862</div><div class="rotulo">pruebas de frontend</div></div>
-      <div class="kpi"><div class="valor">1100</div><div class="rotulo">casos del gate de BD, 0 fallos</div></div>
-      <div class="kpi"><div class="valor">145</div><div class="rotulo">pruebas de Notificaciones</div></div>
+      <div class="kpi"><div class="valor">5162</div><div class="rotulo">pruebas de backend</div></div>
+      <div class="kpi"><div class="valor">3903</div><div class="rotulo">pruebas de frontend</div></div>
+      <div class="kpi"><div class="valor">1107</div><div class="rotulo">casos del gate de BD, 0 fallos</div></div>
+      <div class="kpi"><div class="valor">146</div><div class="rotulo">pruebas de Notificaciones</div></div>
       <div class="kpi"><div class="valor">95,9 %</div><div class="rotulo">líneas en backend (JaCoCo)</div></div>
       <div class="kpi"><div class="valor">21/21</div><div class="rotulo">E2E del frontend</div></div>
-      <div class="kpi"><div class="valor">140</div><div class="rotulo">HU certificadas de 175 registradas</div></div>
+      <div class="kpi"><div class="valor">144</div><div class="rotulo">HU certificadas de 175 registradas</div></div>
       <div class="kpi"><div class="valor">113</div><div class="rotulo">ítems de checklist en CUMPLE de 140</div></div>
     </div>
     <div class="tabla-contenedor">
       <table>
         <thead><tr><th>Medida</th><th>Valor</th><th>Cómo se obtuvo</th></tr></thead>
         <tbody>
-          <tr><td>Procedimientos almacenados</td><td>315</td><td>Archivos en <code>GestioAsistenciaDB/schema/stored-procedures</code></td></tr>
-          <tr><td>Tablas · vistas · funciones</td><td>76 · 107 · 28</td><td>Archivos en <code>GestioAsistenciaDB/schema/tables</code>, <code>views</code>, <code>functions</code></td></tr>
-          <tr><td>Migraciones</td><td>01 a 70</td><td><code>GestioAsistenciaDB/migrations</code> (cada una con <code>up</code> y <code>down</code>)</td></tr>
+          <tr><td>Procedimientos almacenados</td><td>303</td><td>Archivos en <code>GestioAsistenciaDB/schema/stored-procedures</code></td></tr>
+          <tr><td>Tablas · vistas · funciones</td><td>74 · 106 · 28</td><td>Archivos en <code>GestioAsistenciaDB/schema/tables</code>, <code>views</code>, <code>functions</code></td></tr>
+          <tr><td>Migraciones</td><td>01 a 72</td><td><code>GestioAsistenciaDB/migrations</code> (cada una con <code>up</code> y <code>down</code>)</td></tr>
           <tr><td>Controladores · mapeos HTTP</td><td>79 · 208</td><td><code>@RestController</code> y anotaciones <code>@Get/Post/Put/Patch/DeleteMapping</code> en <code>GestioAsistenciaBackend/src/main</code></td></tr>
           <tr><td>Casos de uso (<code>*UseCaseImpl</code>)</td><td>160</td><td>Archivos en <code>GestioAsistenciaBackend/src/main</code></td></tr>
           <tr><td>Componentes · servicios Angular</td><td>172 · 54</td><td>Clases con <code>@Component</code> y <code>@Injectable</code> en <code>GestioAsistenciaFrontend/src/app</code></td></tr>
@@ -165,7 +165,7 @@
       <div class="tarjeta"><div class="icono">🗄️</div><h4><a href="base-datos.html">Base de datos</a></h4><p>Esquema, procedimientos, vistas, migraciones y pruebas T-SQL.</p></div>
       <div class="tarjeta"><div class="icono">⚙️</div><h4><a href="backend.html">Backend</a></h4><p>Capas, puertos, adaptadores, controladores y pruebas.</p></div>
       <div class="tarjeta"><div class="icono">🖥️</div><h4><a href="frontend.html">Frontend</a></h4><p>Rutas por rol, Signals, tiempo real y diseño.</p></div>
-      <div class="tarjeta"><div class="icono">✉️</div><h4><a href="notificaciones.html">Notificaciones por correo</a></h4><p>Servicio independiente, contrato, plantillas, reemplazo y fases de migración.</p></div>
+      <div class="tarjeta"><div class="icono">✉️</div><h4><a href="notificaciones.html">Notificaciones por correo</a></h4><p>Servicio independiente, contrato, plantillas, reemplazo y cierre de la migración (F1 a F7).</p></div>
       <div class="tarjeta"><div class="icono">🔗</div><h4><a href="componentes-externos.html">Seguridad, Mensajes y Parámetros</a></h4><p>Qué hace cada componente externo y cómo se integra.</p></div>
       <div class="tarjeta"><div class="icono">🧰</div><h4><a href="operacion.html">Laboratorio y despliegue</a></h4><p>Comandos de <code>infra.ps1</code>, escenarios, solución de problemas y CI.</p></div>
       <div class="tarjeta"><div class="icono">✅</div><h4><a href="calidad.html">Pruebas, cobertura y HU</a></h4><p>Pirámide de pruebas, métricas, deuda técnica y validación por rol.</p></div>

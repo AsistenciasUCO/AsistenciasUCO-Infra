@@ -37,7 +37,7 @@
       <div class="kpi"><div class="valor">206</div><div class="rotulo">endpoints en el catálogo de acceso</div></div>
       <div class="kpi"><div class="valor">184</div><div class="rotulo">SP distintos invocados con EXEC</div></div>
       <div class="kpi"><div class="valor">59</div><div class="rotulo">vistas uv_* leídas</div></div>
-      <div class="kpi"><div class="valor">5177</div><div class="rotulo">pruebas</div></div>
+      <div class="kpi"><div class="valor">5162</div><div class="rotulo">pruebas</div></div>
       <div class="kpi"><div class="valor">95,9 %</div><div class="rotulo">líneas JaCoCo</div></div>
     </div>
     <p>Conteos: <code>find src/<wbr>main -<wbr>name "*.<wbr>java"</code> (2081), <code>*Controller.java</code> (78), <code>*UseCaseImpl.java</code> (160), <code>*InputPort.java</code> (164), puertos secundarios en <code>application/<wbr>secondaryports</code> (108), repositorios <code>*JpaRepository.java</code> (80), clases <code>*WiringConfiguration</code> (41). Cero usos de <code>JdbcTemplate</code> en <code>src/main</code>.</p>
@@ -130,7 +130,7 @@ flowchart TB
         </tbody>
       </table>
     </div>
-    <div class="nota alerta"><strong>Nombres que cambian entre documentos.</strong> El <code>AGENTS.md</code> del workspace habla de <code>*RepositorySqlServer*Adapter</code> y de <code>UserScopeService</code>. En el código actual el adaptador de persistencia es una clase <code>*JpaRepository</code> con <code>@Repository</code> que implementa directamente el puerto, y el ámbito se resuelve con <code>InstitutionalScopePort</code>. Un test de arquitectura prohíbe que reaparezcan los envoltorios <code>*RepositorySqlServerAdapter</code>.</div>
+    <div class="nota exito"><strong>Nombres alineados.</strong> El <code>AGENTS.md</code> del workspace se corrigió el 2026-11-22 y ya usa los nombres del código: el adaptador de persistencia es una clase <code>*JpaRepository</code> con <code>@Repository</code> que implementa directamente el puerto, y el ámbito se resuelve con <code>InstitutionalScopePort</code>. Un test de arquitectura prohíbe que reaparezcan los envoltorios <code>*RepositorySqlServerAdapter</code>.</div>
 
     <h3>Raíz de composición: las clases WiringConfiguration</h3>
     <p>Los casos de uso, los interactores y los adaptadores seleccionables <strong>no llevan estereotipos de Spring</strong> (<code>@Service</code>, <code>@Component</code>). Se instancian a mano en clases <code>@Configuration</code> de <code>infrastructure/<wbr>config/<wbr>wiring</code>, una por área (<code>AsistenciaWiringConfiguration</code>, <code>Toma<wbr>Asistencia<wbr>Wiring<wbr>Configuration</code>, <code>DocenteWiringConfiguration</code>, etc.). Ventajas: <code>application</code> queda libre de Spring y cada dependencia es explícita. Para cada caso de uso hay dos beans: el <code>UseCase</code> y el <code>InputPort</code> (el interactor).</p>
@@ -638,9 +638,9 @@ flowchart LR
       <li><strong>Tiempos:</strong> conexión 5 s, lectura y escritura 30 s para MinIO; 5 s y 15 s para ClamAV (variables <code>MINIO_*_<wbr>TIMEOUT_<wbr>MILLIS</code> y <code>CLAMAV_*_<wbr>TIMEOUT_<wbr>MILLIS</code>).</li>
     </ul>
 
-    <h2 id="notificaciones">Notificaciones (estado destino)</h2>
+    <h2 id="notificaciones">Notificaciones</h2>
     <p><strong>Decisión.</strong> El correo deja de enviarse desde Asistencias y pasa a un servicio propio e independiente (<code>Complementos/<wbr>Notificaciones</code>). El backend conserva únicamente la <strong>outbox</strong> (cola durable en SQL Server) y entrega cada aviso por HTTP con una <code>idempotencyKey</code>. Las plantillas, el SMTP y el tope de envíos viven en el servicio. Referencias: <code>docs/<wbr>PLAN_<wbr>COMPONENTE_<wbr>NOTIFICACIONES.<wbr>md</code> y <code>Complementos/<wbr>Notificaciones/<wbr>README.<wbr>md</code>.</p>
-    <div class="nota alerta"><strong>Separación en curso.</strong> Otro agente está terminando este subsistema. Lo descrito es el estado destino. Hoy el código ya tiene el canal <code>servicio</code> (<code>infrastructure/<wbr>adapter/<wbr>secondary/<wbr>notification/<wbr>service</code>: <code>Servicio<wbr>Notificacion<wbr>Channel<wbr>Sender</code>, <code>NotificacionesServiceClient</code>, <code>Administracion<wbr>Notificacion<wbr>Servicio<wbr>Adapter</code>, <code>Notificaciones<wbr>Service<wbr>Health<wbr>Indicator</code>); siguen pendientes según el plan el retiro de las plantillas y el SMTP del backend y la migración 70 que elimina <code>PlantillaNotificacion*</code>. Confirma el estado real en el árbol antes de apoyarte en detalles de esta sección.</div>
+    <div class="nota exito"><strong>Separación cerrada (F1 a F7).</strong> El backend entrega por el canal <code>servicio</code> (<code>infrastructure/<wbr>adapter/<wbr>secondary/<wbr>notification/<wbr>service</code>: <code>Servicio<wbr>Notificacion<wbr>Channel<wbr>Sender</code>, <code>NotificacionesServiceClient</code>, <code>Administracion<wbr>Notificacion<wbr>Servicio<wbr>Adapter</code> y el indicador de salud <code>Notificaciones<wbr>Service<wbr>Health<wbr>Indicator</code>). Las plantillas, el SMTP y el tope de envíos ya no están en el backend, y la migración 71 retiró <code>PlantillaNotificacion*</code> de la BD. La validación de extremo a extremo dio 78 de 78 avisos entregados, sin duplicados, y con el servicio caído se reintentó y se entregó una sola vez.</div>
     <figure class="diagrama">
       <pre class="mermaid">
 flowchart LR
@@ -661,6 +661,7 @@ flowchart LR
       <li><strong>Despachador:</strong> <code>NotificacionOutboxDispatcher</code> reserva lotes con un <em>lease</em> (<code>OUTBOX_<wbr>NOTIFICATION_<wbr>LEASE</code>, 60 s por defecto), descarta lo que no alcanza a enviar antes de que venza y purga lo viejo (<code>OUTBOX_<wbr>NOTIFICATION_<wbr>RETENTION_<wbr>DAYS</code>, 30). Funciona con varias instancias porque cada una identifica su reserva.</li>
       <li><strong>Contrato HTTP:</strong> <code>POST /<wbr>api/<wbr>v1/<wbr>notificaciones</code> con <code>aplicacion</code>, <code>idempotencyKey</code>, <code>tipo</code>, <code>idioma</code>, <code>destinatarios[{correo}]</code>, <code>datos{}</code> e <code>idCorrelacion</code>; cabeceras <code>X-Api-Key</code>, <code>X-Correlation-Id</code> y <code>traceparent</code>. El servicio responde 202 o 200 si ya lo tenía.</li>
       <li><strong>Resiliencia:</strong> timeouts 2 s de conexión y 10 s de lectura, circuit breaker <code>notificaciones</code>, y health del servicio.</li>
+      <li><strong>Detalles de cierre:</strong> los instantes que vienen del servicio se truncan a microsegundos; el token de verificación de correo se emite una sola vez por aviso (residual TD-126: vive en memoria y un reinicio entre intentos lo reemite); los avisos agrupados usan un saludo genérico por diseño (BCC).</li>
     </ul>
     <div class="nota"><strong>Transacción.</strong> El caso de uso persiste la operación con su SP y luego llama a <code>NotificacionPort</code>, que registra el aviso en la outbox con su propio SP (<code>usp_registrar_notificacion_saliente</code>); no comparten transacción. Desde que el aviso está en la outbox no se pierde: el despachador lo entrega con reserva (lease) y lo reintenta con la misma <code>idempotencyKey</code> si el servicio no responde.</div>
 
@@ -784,11 +785,11 @@ flowchart LR
     </div>
     <div class="dos-columnas">
       <figure class="grafica">
-        <div class="lienzo"><canvas aria-label="Pruebas por capa medidas el 2026-11-22: base de datos 1100, backend 5177, frontend 3862, servicio de notificaciones 145" role="img" data-grafica='{"type":"bar","data":{"labels":["BD (casos)","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1100,5177,3862,145]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+        <div class="lienzo"><canvas aria-label="Pruebas por capa medidas el 2026-11-22: base de datos 1107, backend 5162, frontend 3903, servicio de notificaciones 146" role="img" data-grafica='{"type":"bar","data":{"labels":["BD (casos)","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1107,5162,3903,146]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
         <figcaption>Pruebas por capa, medidas el 2026-11-22. El backend cuenta casos parametrizados; hay 4936 métodos anotados con <code>@Test</code> o <code>@ParameterizedTest</code>.</figcaption>
       </figure>
       <figure class="grafica">
-        <div class="lienzo"><canvas aria-label="Cobertura en líneas y ramas: backend 95,9 y 87,5; frontend realtime 95,24 y 86,81; notificaciones 98,5 y 92,6; mínimo del gate del backend 80 y 70" role="img" data-grafica='{"type":"bar","data":{"labels":["Backend","Frontend realtime","Notificaciones","Mínimo del gate backend"],"datasets":[{"label":"Líneas %","data":[95.9,95.24,98.5,80]},{"label":"Ramas %","data":[87.5,86.81,92.6,70]}]},"options":{"scales":{"y":{"min":0,"max":100}}}}'></canvas></div>
+        <div class="lienzo"><canvas aria-label="Cobertura en líneas y ramas: backend 95,9 y 87,1; frontend realtime ≈95 y ≈87; notificaciones 98,5 y 92,4; mínimo del gate del backend 80 y 70" role="img" data-grafica='{"type":"bar","data":{"labels":["Backend","Frontend realtime","Notificaciones","Mínimo del gate backend"],"datasets":[{"label":"Líneas %","data":[95.9,95,98.5,80]},{"label":"Ramas %","data":[87.1,87,92.4,70]}]},"options":{"scales":{"y":{"min":0,"max":100}}}}'></canvas></div>
         <figcaption>Cobertura medida el 2026-11-22 frente al umbral de JaCoCo (80 % líneas, 70 % ramas).</figcaption>
       </figure>
     </div>
