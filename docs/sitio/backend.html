@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backend · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>Backend (Spring Boot 4 · Java 25)</h1>
+      <p>API REST hexagonal que orquesta casos de uso, delega toda la escritura a procedimientos almacenados de SQL Server y protege cada ruta con JWT y el PEP/PDP de Security Baseline. Esta guía explica cómo está armado, por qué y cómo moverse en él.</p>
+      <div class="etiquetas">
+        <span class="etiqueta">Java 25</span>
+        <span class="etiqueta">Spring Boot 4.0.8</span>
+        <span class="etiqueta">Arquitectura hexagonal</span>
+        <span class="etiqueta">JPA solo con SP</span>
+        <span class="etiqueta">Medido el 2026-11-22</span>
+      </div>
+    </header>
+
+    <div class="nota"><strong>Alcance y fuente.</strong> Todo lo que sigue sale del repositorio <code>GestioAsistenciaBackend</code> (rama <code>feat/<wbr>p3-<wbr>revision-<wbr>final</code>), de su <code>AGENTS.md</code>, de <code>pom.xml</code>, de <code>application*.yml</code> y de <code>infra/<wbr>security-<wbr>baseline/<wbr>access-<wbr>catalog.<wbr>json</code>. Las rutas se citan relativas al workspace. Las cifras se calcularon con <code>grep</code> y <code>find</code> el 2026-11-22.</div>
+
+    <h2 id="resumen">Resumen en cifras</h2>
+    <p>El backend es una capa delgada: no guarda reglas pesadas ni estado de negocio propio. Valida el ámbito del usuario, llama a un procedimiento almacenado (SP) y publica eventos. Así la base de datos sigue siendo la única fuente de verdad.</p>
+    <div class="kpis">
+      <div class="kpi"><div class="valor">2081</div><div class="rotulo">archivos Java en main</div></div>
+      <div class="kpi"><div class="valor">78</div><div class="rotulo">controladores REST</div></div>
+      <div class="kpi"><div class="valor">160</div><div class="rotulo">casos de uso (UseCaseImpl)</div></div>
+      <div class="kpi"><div class="valor">206</div><div class="rotulo">endpoints en el catálogo de acceso</div></div>
+      <div class="kpi"><div class="valor">184</div><div class="rotulo">SP distintos invocados con EXEC</div></div>
+      <div class="kpi"><div class="valor">59</div><div class="rotulo">vistas uv_* leídas</div></div>
+      <div class="kpi"><div class="valor">5215</div><div class="rotulo">pruebas</div></div>
+      <div class="kpi"><div class="valor">95,9 %</div><div class="rotulo">líneas JaCoCo</div></div>
+    </div>
+    <p>Conteos: <code>find src/<wbr>main -<wbr>name "*.<wbr>java"</code> (2081), <code>*Controller.java</code> (78), <code>*UseCaseImpl.java</code> (160), <code>*InputPort.java</code> (164), puertos secundarios en <code>application/<wbr>secondaryports</code> (108), repositorios <code>*JpaRepository.java</code> (80), clases <code>*WiringConfiguration</code> (41). Cero usos de <code>JdbcTemplate</code> en <code>src/main</code>.</p>
+
+    <h2 id="stack">Stack y versiones</h2>
+    <p>Las versiones salen de <code>Gestio<wbr>Asistencia<wbr>Backend/<wbr>pom.<wbr>xml</code>. Spring Boot hereda de <code>spring-<wbr>boot-<wbr>starter-<wbr>parent</code> y administra el resto; solo se fijan a mano las dependencias que necesitan parches de seguridad (Tomcat, Jackson, OpenTelemetry, Guava, Snappy, commons-compress).</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Pieza</th><th>Versión</th><th>Para qué se usa</th></tr></thead>
+        <tbody>
+          <tr><td>Java</td><td>25 (<code>java.version</code>)</td><td>Hilos virtuales activos (<code>spring.<wbr>threads.<wbr>virtual.<wbr>enabled</code>) para el servidor MVC bloqueante.</td></tr>
+          <tr><td>Spring Boot</td><td>4.0.8</td><td>Base: MVC (<code>spring-<wbr>boot-<wbr>starter-<wbr>webmvc</code>), validación, actuator, seguridad.</td></tr>
+          <tr><td>Spring Data JPA / Hibernate</td><td>administrada por Boot</td><td>Único estándar de persistencia. <code>ddl-auto: none</code> y <code>open-in-view: false</code>.</td></tr>
+          <tr><td>SQL Server (<code>mssql-jdbc</code>)</td><td>administrada por Boot</td><td>Driver; Hikari con pool de 10 por réplica y espera máxima de 5 s.</td></tr>
+          <tr><td>OAuth2 resource server</td><td>Boot 4.0.8</td><td>Valida el JWT (emisor, audiencia, claim de usuario).</td></tr>
+          <tr><td>Reactor Core (sin WebFlux)</td><td>reactor-bom de Boot</td><td>Solo para el canal SSE (<code>Flux&lt;ServerSentEvent&gt;</code> sobre MVC).</td></tr>
+          <tr><td>Resilience4j (<code>resilience4j-<wbr>spring-<wbr>boot4</code>)</td><td>2.4.0</td><td>Circuit breakers de PEP, MinIO, ClamAV y Notificaciones.</td></tr>
+          <tr><td>OpenTelemetry (<code>spring-<wbr>boot-<wbr>starter-<wbr>opentelemetry</code>)</td><td>core 1.67.0</td><td>Trazas OTLP; con Micrometer Prometheus para métricas.</td></tr>
+          <tr><td>MinIO SDK / okhttp-jvm</td><td>9.0.3 / 5.3.2</td><td>Almacenamiento S3 de soportes.</td></tr>
+          <tr><td>ZXing (core y javase)</td><td>3.5.3</td><td>El backend genera el PNG del QR de matrícula.</td></tr>
+          <tr><td>Apache POI (<code>poi-ooxml</code>)</td><td>administrada</td><td>Reportes Excel.</td></tr>
+          <tr><td>Azure SDK (Key Vault, App Configuration, Identity)</td><td>BOM de Azure</td><td>Baúl de secretos y catálogos cloud.</td></tr>
+          <tr><td><code>messageucolab-<wbr>spring-<wbr>boot-<wbr>starter</code> y <code>pulsar-client</code></td><td>0.1.3 / administrada</td><td>Catálogo de mensajes alterno y avisos de cambio (MessageUcoLab).</td></tr>
+          <tr><td><code>spring-<wbr>boot-<wbr>starter-<wbr>amqp</code></td><td>Boot</td><td>Eventos de asignación del PDP por RabbitMQ (apagado por defecto).</td></tr>
+          <tr><td>JaCoCo</td><td>0.8.15</td><td>Gate: líneas al menos 80 % y ramas al menos 70 %.</td></tr>
+          <tr><td>ArchUnit, swagger-parser</td><td>administrada / 2.1.46</td><td>Pruebas de arquitectura y de conformidad OpenAPI.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="arquitectura">Arquitectura hexagonal</h2>
+    <p><strong>Por qué.</strong> Queremos cambiar de proveedor de identidad, de catálogo, de almacenamiento o de canal de notificación sin tocar las reglas de negocio. Por eso la capa <code>application</code> solo conoce interfaces (puertos) y la capa <code>infrastructure</code> las implementa con adaptadores. Un test de arquitectura impide que alguien rompa esa frontera.</p>
+
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart TB
+  subgraph EXT["Mundo exterior"]
+    SPA["Frontend Angular"]
+    SQL[("SQL Server: SP y vistas uv_")]
+    IAM["Security Baseline: Keycloak, PEP, PDP"]
+    OBJ["MinIO y ClamAV"]
+    CAT["Catálogos: Azure, MessageUcoLab, Parámetros"]
+    NOT["Servicio de Notificaciones"]
+  end
+  subgraph INF["infrastructure"]
+    CTRL["adapter/primary: controller, realtime, scheduler, messaging, security"]
+    CFG["config: wiring, security, properties"]
+    SEC["adapter/secondary: repository JPA, identity, storage, malwarescan, notification, catalog, realtime, report"]
+    OBS["observability y ratelimit"]
+  end
+  subgraph APP["application (sin dependencias de infraestructura)"]
+    IP["primaryports: InputPort + Interactor"]
+    UC["usecase: UseCase + UseCaseImpl"]
+    OP["secondaryports: puertos de salida"]
+    EXC["exception: negocio, validación, catálogo"]
+  end
+  CC["crosscutting: validación, sanitización, util, network, exception"]
+  SPA --> CTRL
+  CTRL --> IP --> UC --> OP
+  SEC -.implementa.-> OP
+  SEC --> SQL
+  SEC --> IAM
+  SEC --> OBJ
+  SEC --> CAT
+  SEC --> NOT
+  CFG -.arma beans.-> UC
+  CFG -.arma beans.-> SEC
+  APP --> CC
+      </pre>
+      <figcaption>Las flechas continuas son llamadas en tiempo de ejecución; las punteadas son dependencias de diseño. <code>application</code> no importa nada de <code>infrastructure</code>. Resumen accesible: el controlador entra por un puerto primario, el caso de uso pide datos y efectos por puertos secundarios, y un adaptador secundario habla con SQL Server u otros sistemas.</figcaption>
+    </figure>
+
+    <h3>Mapa de paquetes</h3>
+    <p>Raíz Java: <code>Gestio<wbr>Asistencia<wbr>Backend/<wbr>src/<wbr>main/<wbr>java/<wbr>co/<wbr>edu/<wbr>uco/<wbr>asistenciasuco/</code>.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Paquete</th><th>Contenido real</th></tr></thead>
+        <tbody>
+          <tr><td><code>application/<wbr>primaryports</code></td><td>Contratos genéricos <code>InteractorWithReturn</code>, <code>InteractorWithoutReturn</code>, <code>Interactor<wbr>Without<wbr>Input<wbr>With<wbr>Return</code>.</td></tr>
+          <tr><td><code>application/usecase</code></td><td>Contratos genéricos <code>UseCaseWithReturn</code>, <code>UseCaseWithoutReturn</code>, <code>UseCaseWithoutInputWithReturn</code>.</td></tr>
+          <tr><td><code>application/<wbr>features/*</code></td><td>30 módulos de negocio. Cada caso de uso tiene su carpeta con <code>primaryports</code> (DTO, mapper, <code>InputPort</code>, <code>interactor</code>) y <code>usecase</code> (<code>domain</code>, <code>mapper</code>, interfaz y <code>impl</code>).</td></tr>
+          <tr><td><code>application/<wbr>secondaryports</code></td><td>Puertos de salida por área: <code>academic</code>, <code>calendar</code>, <code>catalog</code>, <code>identity</code>, <code>malwarescan</code>, <code>network</code>, <code>notification</code>, <code>qr</code>, <code>realtime</code>, <code>report</code>, <code>repository</code>, <code>security</code>, <code>storage</code>, <code>vault</code>.</td></tr>
+          <tr><td><code>application/exception</code></td><td><code>ApplicationException</code> y subtipos: <code>business</code> (Conflict, Forbidden, ResourceNotFound, TooManyRequests, FeatureUnavailable), <code>validation</code>, <code>internal</code>, <code>catalog</code>.</td></tr>
+          <tr><td><code>application/security</code></td><td><code>InstitutionalRole</code>: los cinco roles.</td></tr>
+          <tr><td><code>infrastructure/<wbr>adapter/<wbr>primary</code></td><td><code>controller</code> (REST, filtros, errores), <code>realtime/sse</code>, <code>scheduler</code> (5 daemons), <code>messaging</code> (<code>messageucolab</code>, <code>rabbitmq</code>), <code>security</code> (JWT, handlers).</td></tr>
+          <tr><td><code>infrastructure/<wbr>adapter/<wbr>secondary</code></td><td><code>persistence/sqlserver</code> (<code>jpa/repository</code>, <code>entity</code>, <code>projection</code>, <code>mapper</code>, <code>support</code>), <code>identity</code>, <code>storage/minio</code>, <code>malwarescan/clamav</code>, <code>notification</code>, <code>catalog</code>, <code>realtime/localsse</code>, <code>report</code>, <code>securitybaseline</code>, <code>vault</code>, <code>network</code>, <code>qr</code>, <code>calendar</code>, <code>audit</code>.</td></tr>
+          <tr><td><code>infrastructure/config</code></td><td><code>wiring</code> (41 clases), <code>adapters</code> (un paquete por proveedor seleccionable), <code>security</code>, <code>properties</code>, <code>resilience</code>, <code>web</code>.</td></tr>
+          <tr><td><code>infrastructure/<wbr>observability</code>, <code>ratelimit</code>, <code>audit</code>, <code>failure</code></td><td><code>CorrelationIdContext</code>, <code>TraceContextSnapshot</code>, <code>SlidingWindowRateLimiter</code>, auditoría por <code>@AuditableOperation</code>, detector de BD caída.</td></tr>
+          <tr><td><code>crosscutting</code></td><td><code>exception</code> (<code>ErrorDefinition</code>, <code>ErrorKind</code>), <code>validation</code> (<code>Validator</code>, <code>ValidationResult</code>), <code>sanitization</code>, <code>util</code>, <code>network</code> (<code>CidrRange</code>).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota exito"><strong>Nombres alineados.</strong> El <code>AGENTS.md</code> del workspace se corrigió el 2026-11-22 y ya usa los nombres del código: el adaptador de persistencia es una clase <code>*JpaRepository</code> con <code>@Repository</code> que implementa directamente el puerto, y el ámbito se resuelve con <code>InstitutionalScopePort</code>. Un test de arquitectura prohíbe que reaparezcan los envoltorios <code>*RepositorySqlServerAdapter</code>.</div>
+
+    <h3>Raíz de composición: las clases WiringConfiguration</h3>
+    <p>Los casos de uso, los interactores y los adaptadores seleccionables <strong>no llevan estereotipos de Spring</strong> (<code>@Service</code>, <code>@Component</code>). Se instancian a mano en clases <code>@Configuration</code> de <code>infrastructure/<wbr>config/<wbr>wiring</code>, una por área (<code>AsistenciaWiringConfiguration</code>, <code>Toma<wbr>Asistencia<wbr>Wiring<wbr>Configuration</code>, <code>DocenteWiringConfiguration</code>, etc.). Ventajas: <code>application</code> queda libre de Spring y cada dependencia es explícita. Para cada caso de uso hay dos beans: el <code>UseCase</code> y el <code>InputPort</code> (el interactor).</p>
+    <pre><code>// GestioAsistenciaBackend/.../config/wiring/AsistenciaWiringConfiguration.java
+@Configuration(proxyBeanMethods = false)
+public class AsistenciaWiringConfiguration {
+    @Bean
+    public ConsultarAsistenciasPorGrupoUseCase consultarAsistenciasPorGrupoUseCase(
+            final AsistenciaRepositoryPort asistenciaRepositoryPort,
+            final InstitutionalScopePort institutionalScopePort) {
+        return new ConsultarAsistenciasPorGrupoUseCaseImpl(asistenciaRepositoryPort, institutionalScopePort);
+    }
+    @Bean
+    public ConsultarAsistenciasPorGrupoInputPort consultarAsistenciasPorGrupoInputPort(
+            final ConsultarAsistenciasPorGrupoUseCase useCase) {
+        return new ConsultarAsistenciasPorGrupoInteractor(useCase);
+    }
+}</code></pre>
+    <p>Los adaptadores intercambiables (identidad, seguridad, catálogos, almacenamiento, realtime, notificación) se eligen con propiedades <code>app.<wbr>adapters.*.<wbr>provider</code> y condiciones como <code>OutboxAdapterCondition</code> o <code>Legacy<wbr>Security<wbr>Provider<wbr>Condition</code>. Un valor no soportado hace fallar el arranque (fail-closed).</p>
+
+    <h3>Reglas que hace cumplir ArchUnit</h3>
+    <p>Las pruebas viven en <code>Gestio<wbr>Asistencia<wbr>Backend/<wbr>src/<wbr>test/<wbr>java/<wbr>co/<wbr>edu/<wbr>uco/<wbr>asistenciasuco/<wbr>architecture/</code> (34 clases). Las más importantes:</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Prueba</th><th>Qué garantiza</th></tr></thead>
+        <tbody>
+          <tr><td><code>CleanArchitectureRulesTest</code></td><td><code>application</code> no depende de <code>infrastructure</code> ni de Reactor/WebFlux; los controladores no dependen de JDBC ni de <code>UseCaseImpl</code>; el código productivo no referencia procedimientos <code>usp_internal_*</code>.</td></tr>
+          <tr><td><code>Controllers<wbr>Must<wbr>Depend<wbr>Only<wbr>On<wbr>Input<wbr>Ports<wbr>Test</code></td><td>Un controlador solo habla con puertos primarios.</td></tr>
+          <tr><td><code>Jpa<wbr>Repository<wbr>Architecture<wbr>Rules<wbr>Test</code></td><td>Los <code>*JpaRepository</code> llevan <code>@Repository</code>, implementan el puerto directamente, no usan <code>java.sql</code> ni <code>spring.jdbc</code>, y no existen envoltorios <code>*RepositorySqlServerAdapter</code>.</td></tr>
+          <tr><td><code>JpaIsolationRulesTest</code>, <code>JpaBootstrapStandardRulesTest</code></td><td>JPA queda confinado a la infraestructura y usa el arranque estándar de Boot.</td></tr>
+          <tr><td><code>Produccion<wbr>Solo<wbr>Invoca<wbr>Procedimientos<wbr>Publicos<wbr>Test</code></td><td>Solo se llaman SP públicos (<code>usp_*</code>), nunca internos.</td></tr>
+          <tr><td><code>Use<wbr>Cases<wbr>Should<wbr>Not<wbr>Know<wbr>Sql<wbr>Result<wbr>Protocol<wbr>Test</code></td><td>Los casos de uso no conocen la tupla SQL (<code>idResultado</code>, <code>exitoso</code>, ...).</td></tr>
+          <tr><td><code>Messaging<wbr>Isolation<wbr>Architecture<wbr>Test</code></td><td>AR01–AR05: application sin <code>infrastructure.<wbr>notification</code>, controladores sin outbox, adaptadores sin estereotipos, solo <code>@Configuration</code> los instancia, sin service locator.</td></tr>
+          <tr><td><code>Identity<wbr>Provider<wbr>Isolation<wbr>Rules<wbr>Test</code>, <code>Security<wbr>Provider<wbr>Isolation<wbr>Rules<wbr>Test</code>, <code>Storage<wbr>Provider<wbr>Isolation<wbr>Rules<wbr>Test</code></td><td>Ninguna capa interna conoce a Keycloak, Baseline ni MinIO.</td></tr>
+          <tr><td><code>AuditCoverageArchitectureTest</code>, <code>AdminMutacionesAuditadasTest</code></td><td>Todo endpoint mutante de administración lleva <code>@AuditableOperation</code>.</td></tr>
+          <tr><td><code>InstitutionalRolePurityTest</code>, <code>Application<wbr>Should<wbr>Not<wbr>Carry<wbr>Technical<wbr>Correlation<wbr>Test</code></td><td>Los roles son los cinco institucionales; la correlación técnica no entra a <code>application</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="flujo-canonico">Flujo canónico de una petición</h2>
+    <p>Toda petición recorre las mismas capas: <code>Controller</code> → <code>InputPort</code> (interactor) → <code>UseCaseImpl</code> → puerto secundario → <code>*JpaRepository</code> → SP. Ejemplo real: el docente registra la asistencia de una sesión (<code>POST /<wbr>api/<wbr>v1/<wbr>asistencias/<wbr>lote</code>).</p>
+
+    <div class="flujo" data-flujo data-titulo="Registrar asistencia de una sesión (POST /api/v1/asistencias/lote)">
+      <div class="paso" data-actor="AsistenciaController" data-detalle="El filtro de correlación ya puso el X-Correlation-Id; Spring Security validó el JWT y el PEP autorizó la ruta. El controlador valida el cuerpo con @Valid sobre RegistrarAsistenciasSesionRequest, saca el usuario del token con authenticatedUserResolver.requireAuthenticatedUserId() y lo convierte a RegistrarAsistenciasSesionDTO con AsistenciaHttpMapper. La anotación @AuditableOperation registra la acción REGISTRAR_ASISTENCIAS_SESION.">Recibe el lote y arma el DTO</div>
+      <div class="paso" data-actor="RegistrarAsistenciasSesionInteractor" data-detalle="Implementa RegistrarAsistenciasSesionInputPort. Solo traduce el DTO a RegistrarAsistenciasSesionDomain con RegistrarAsistenciasSesionMapper y delega al caso de uso. No tiene lógica.">Puerto primario: DTO a dominio</div>
+      <div class="paso" data-actor="RegistrarAsistenciasSesionUseCaseImpl" data-detalle="1) resolverSesion lee la sesión por SesionProcedenciaQueryPort (vista uv_sesion_v2). 2) autorizarTitularidadDocente llama a InstitutionalScopePort.canDocenteAccessGrupo: si no es el titular lanza ForbiddenException. 3) rechazarSesionCancelada. 4) validarVentanaDeRegistro con el reloj UTC del servidor (inicio <= ahora < fin), regla SES-01.">Valida titularidad, cancelación y ventana UTC</div>
+      <div class="paso" data-actor="AsistenciaRepositoryPort" data-detalle="El caso de uso llama asistenciaRepositoryPort.registrarAsistenciasSesion con un RegistrarAsistenciasSesionRepositoryDTO (RegistrarAsistenciasSesionRepositoryMapper). Application no sabe si detrás hay SQL Server, un mock u otra cosa.">Puerto secundario de persistencia</div>
+      <div class="paso" data-actor="AsistenciaJpaRepository" data-detalle="Serializa los registros a JSON, toma el CorrelationIdContext.require() y manda EXEC dbo.usp_registrar_asistencias_sesion con parámetros nombrados por JpaProcedureExecutor.execute. No hay SQL de negocio en Java: solo la llamada al SP.">Adaptador JPA ejecuta el SP</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="El SP usp_registrar_asistencias_sesion abre la transacción, repite la titularidad y la ventana con su propio reloj (SES_008 si ya cerró), guarda el lote, hace COMMIT y devuelve la tupla canónica: idCorrelacion, mensajeUsuario, mensajeTecnico, estadoResultado.">El SP valida de nuevo y confirma</div>
+      <div class="paso" data-actor="JpaProcedureExecutor" data-detalle="ProcedureResultValidator comprueba que la correlación devuelta sea la enviada y que estadoResultado sea verdadero. Si el SP rechazó, DbExceptionTranslator lanza la excepción semántica (por ejemplo ConflictException) y el GlobalExceptionHandler responde con ApiErrorResponse.">Valida la tupla del SP</div>
+      <div class="paso" data-actor="RealtimePublisherPort" data-detalle="Solo después de persistir con éxito, el caso de uso publica ASISTENCIAS_SESION_ACTUALIZADAS con grupo, sesion y totalRegistros; luego EvaluadorAlertasInasistencia revisa las alertas del grupo. Si algo falló antes, no se publica nada. El controlador responde 201 con ApiMessageResponse.">Publica el evento SSE y responde 201</div>
+      <div class="paso" data-actor="GlobalExceptionHandler" data-tipo="error" data-detalle="Camino de error: un docente que no es titular recibe 403 (ForbiddenException, ERR_DOCENTE_SIN_TITULARIDAD_SESION); una sesión fuera de ventana recibe 409 (ERR_SESION_CERRADA o ERR_SESION_NO_INICIADA). En ambos casos la respuesta es ApiErrorResponse con code, message del catálogo y correlationId, y no se publica evento.">Error: 403 o 409 sin evento</div>
+    </div>
+
+    <figure class="diagrama">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant C as "AsistenciaController"
+  participant I as "RegistrarAsistenciasSesionInteractor"
+  participant U as "UseCaseImpl"
+  participant S as "InstitutionalScopePort"
+  participant R as "AsistenciaJpaRepository"
+  participant X as "JpaProcedureExecutor"
+  participant DB as "SQL Server"
+  participant P as "RealtimePublisherPort"
+  C->>I: execute(dto)
+  I->>U: execute(domain)
+  U->>S: canDocenteAccessGrupo(usuario, grupo)
+  S-->>U: true
+  U->>R: registrarAsistenciasSesion(repositoryDto)
+  R->>X: execute(operacion, EXEC usp_registrar_asistencias_sesion, parametros)
+  X->>DB: EXEC con idCorrelacion
+  DB-->>X: tupla canonica (estadoResultado = 1)
+  X-->>R: ProcedureResult validado
+  R-->>U: void
+  U->>P: publish(ASISTENCIAS_SESION_ACTUALIZADAS)
+  U-->>C: retorno
+  C-->>C: 201 ApiMessageResponse
+      </pre>
+      <figcaption>Misma secuencia del flujo animado, vista como diagrama de mensajes. La escritura ocurre una sola vez, dentro del SP.</figcaption>
+    </figure>
+
+    <div class="nota exito"><strong>Para un caso de uso nuevo</strong> crea: DTO e <code>InputPort</code> con su interactor, <code>Domain</code>, <code>UseCase</code> y <code>UseCaseImpl</code>, el método en el puerto secundario, su implementación en el <code>*JpaRepository</code>, el bean en la <code>*WiringConfiguration</code>, el controlador, la regla en <code>access-catalog.json</code> y las pruebas. Antes, el contrato congelado y el SP.</div>
+
+    <h2 id="persistencia">Persistencia</h2>
+    <p><strong>Regla.</strong> Spring Data JPA es el único estándar. Las <strong>lecturas</strong> salen de vistas <code>uv_*</code> (solo lectura) o de SP de consulta <code>usp_consultar_*</code> paginados. Las <strong>escrituras</strong> pasan siempre por un SP. Nunca se consultan tablas directamente. La migración desde JDBC terminó (ADR-003): no queda <code>JdbcTemplate</code> en <code>src/main</code>.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  UC["UseCaseImpl"] --> PORT["Puerto secundario"]
+  PORT --> REPO["*JpaRepository con @Repository"]
+  REPO --> EX["JpaProcedureExecutor"]
+  REPO --> QX["JpaQueryExecutor / Spring Data JPA"]
+  EX -->|"EXEC dbo.usp_*"| SP[("Procedimientos almacenados")]
+  QX -->|"SELECT sobre uv_*"| VW[("Vistas uv_")]
+  QX -->|"EXEC usp_consultar_*"| SPQ[("SP de consulta paginados")]
+  SP --> RES["Tupla canónica"]
+  RES --> VAL["ProcedureResultValidator"]
+  VAL -->|"estadoResultado = 0"| TR["DbExceptionTranslator + DbFailureClassifier"]
+  TR --> EXC["ApplicationException tipada"]
+      </pre>
+      <figcaption>Dos caminos de entrada a SQL Server (comandos y consultas) y un único camino de salida de errores hacia excepciones tipadas.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Cifras:</strong> 80 clases <code>*JpaRepository</code> en <code>infrastructure/<wbr>adapter/<wbr>secondary/<wbr>persistence/<wbr>sqlserver/<wbr>jpa/<wbr>repository</code>; 184 SP distintos invocados con <code>EXEC dbo.</code> (100 son <code>usp_consultar_*</code>) y 59 vistas <code>uv_*</code> referenciadas.</li>
+      <li><strong>Comandos:</strong> el SQL es un texto fijo con parámetros nombrados, por ejemplo <code>EXEC dbo.<wbr>usp_<wbr>registrar_<wbr>asistencias_<wbr>sesion @id<wbr>Sesion = :id<wbr>Sesion, @asistenciaJSON = :asistenciaJSON, @id<wbr>Correlacion = :id<wbr>Correlacion, @id<wbr>Usuario<wbr>Ejecutor = :id<wbr>Usuario<wbr>Ejecutor</code> en <code>AsistenciaJpaRepository</code>.</li>
+      <li><strong>Correlación a la BD:</strong> cada SP recibe <code>@idCorrelacion</code> tomado de <code>Correlation<wbr>Id<wbr>Context.<wbr>require()</code>; así un fallo se rastrea del log HTTP a la tabla de auditoría.</li>
+      <li><strong>Ámbito en la BD:</strong> docente, coordinador y decano solo ven lo suyo; el SP lo vuelve a forzar aunque Application ya lo haya validado (defensa en profundidad).</li>
+    </ul>
+
+    <h3>La tupla canónica y la traducción de errores</h3>
+    <p>Todo SP de comando responde una fila con cuatro columnas: correlación, mensaje de usuario, mensaje técnico y estado. Cuando falla, el mensaje técnico trae un código con el formato <code>DBCODE=XXX_<wbr>000|detalle</code> (regex en <code>DbTechnicalError</code>).</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Clase</th><th>Responsabilidad</th></tr></thead>
+        <tbody>
+          <tr><td><code>JpaProcedureExecutor</code></td><td>Ejecuta el <code>EXEC</code> con <code>Entity<wbr>Manager.<wbr>create<wbr>Native<wbr>Query</code>. <code>execute</code> y <code>executeWithExtras</code> (columnas extra tras las cuatro canónicas). Una <code>PersistenceException</code> se convierte en <code>DatabaseOperationException</code>.</td></tr>
+          <tr><td><code>ProcedureResultMapper</code> / <code>CanonicalProcedureResult</code></td><td>Mapean la fila a un objeto con <code>idCorrelacion</code>, <code>mensajeUsuarioResultado</code>, <code>mensajeTecnicoResultado</code>, <code>estadoResultado</code>.</td></tr>
+          <tr><td><code>ProcedureResultValidator</code></td><td>Verifica correlación y estado; si el estado es falso, delega al traductor.</td></tr>
+          <tr><td><code>DbFailureClassifier</code></td><td>Tabla de códigos <code>DBCODE</code> a definiciones de error estables (por ejemplo <code>SEC_001</code>, <code>SEC_002</code> a prohibido; <code>ASI_004</code> a no encontrado).</td></tr>
+          <tr><td><code>DbExceptionTranslator</code></td><td><code>throwIfFailed</code> elige la excepción semántica (<code>ForbiddenException</code>, <code>ResourceNotFoundException</code>, <code>ConflictException</code>, <code>ValidationException</code>, <code>FeatureUnavailableException</code>) y conserva el texto de usuario del catálogo cuando aplica. Los SP de consulta usan <code>translateDbCode</code>.</td></tr>
+          <tr><td><code>GlobalExceptionHandler</code></td><td>Convierte cada excepción en <code>ApiErrorResponse</code>; 429 lleva <code>Retry-After</code>; SQL Server caído da 503 <code>ERR_BD_NO_DISPONIBLE</code> (vía <code>DatabaseUnavailableDetector</code>).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flujo" data-flujo data-titulo="Cómo un rechazo del SP llega al cliente como ApiErrorResponse">
+      <div class="paso" data-actor="SQL Server" data-detalle="Una regla de negocio falla dentro del SP (por ejemplo la sesión ya cerró). El SP hace ROLLBACK y devuelve la tupla con estadoResultado = 0 y un mensaje técnico que empieza con DBCODE=SES_008|...">SP devuelve estado 0 y DBCODE</div>
+      <div class="paso" data-actor="JpaProcedureExecutor" data-detalle="ProcedureResultMapper arma el CanonicalProcedureResult y ProcedureResultValidator ve que el estado es falso.">Detecta el rechazo</div>
+      <div class="paso" data-actor="DbFailureClassifier" data-detalle="Busca el código en su tabla y devuelve una ErrorDefinition estable (con su ErrorKind: CONFLICT, FORBIDDEN, NOT_FOUND, VALIDATION). Si el código no se conoce, queda como fallo técnico.">Clasifica el código</div>
+      <div class="paso" data-actor="DbExceptionTranslator" data-detalle="throwIfFailed registra el fallo en el log con operación y correlationId, y lanza la excepción de aplicación que corresponde al tipo. Para algunos códigos conserva el mensaje de usuario parametrizado que armó la BD.">Lanza la excepción tipada</div>
+      <div class="paso" data-actor="GlobalExceptionHandler" data-detalle="ApiErrorCatalog.fromApplicationException arma el descriptor (estado HTTP, code, mensaje del catálogo). Los 5xx se registran con traza; los 4xx, una línea controlada.">Elige estado HTTP y mensaje</div>
+      <div class="paso" data-actor="Cliente" data-detalle="Recibe ApiErrorResponse con timestamp, status, error, code, message (texto institucional listo para mostrar), path, correlationId y, si aplica, details por campo. El frontend no interpreta texto: muestra message.">Respuesta JSON uniforme</div>
+    </div>
+
+    <h2 id="respuestas">Contratos de respuesta</h2>
+    <p>El backend entrega modelos listos para la interfaz. Hay tres formas, todas en <code>infrastructure/<wbr>adapter/<wbr>primary/<wbr>controller</code> (<code>response/</code> y <code>error/</code>):</p>
+    <div class="pestanas">
+      <div role="tablist" aria-label="Formas de respuesta">
+        <button role="tab" type="button">ApiDataResponse</button>
+        <button role="tab" type="button">ApiPageResponse</button>
+        <button role="tab" type="button">ApiErrorResponse</button>
+      </div>
+      <div role="tabpanel">
+        <p>Un recurso o un resultado simple. Ejemplo real: <code>POST /<wbr>api/<wbr>v1/<wbr>archivos/<wbr>subir</code> responde 201 con <code>fileId</code>, <code>nombre</code>, <code>url</code> y <code>tamanio</code>.</p>
+        <pre><code>{
+  "exitoso": true,
+  "datos": {
+    "fileId": "1d0a6c3e-0000-0000-0000-000000000000",
+    "nombre": "certificado.pdf",
+    "url": "/api/v1/archivos/1d0a6c3e-0000-0000-0000-000000000000",
+    "tamanio": 184320
+  }
+}</code></pre>
+      </div>
+      <div role="tabpanel">
+        <p>Listados masivos. <code>totalPaginas</code> es <code>ceil(total<wbr>Elementos / tamano<wbr>Pagina)</code> y la página es base 1. Detrás hay un SP <code>usp_consultar_*</code> con <code>OFFSET ... FETCH</code> y <code>COUNT(*) OVER()</code>.</p>
+        <pre><code>{
+  "exitoso": true,
+  "elementos": [ { "...": "fila lista para la interfaz" } ],
+  "numeroPagina": 1,
+  "tamanoPagina": 20,
+  "totalElementos": 57,
+  "totalPaginas": 3
+}</code></pre>
+      </div>
+      <div role="tabpanel">
+        <p>Todos los errores, sin traza ni excepción (<code>server.<wbr>error.<wbr>include-*</code> en <code>never</code>). El <code>message</code> viene del catálogo de mensajes; el cliente solo lo muestra.</p>
+        <pre><code>{
+  "timestamp": "2026-11-22T15:04:05Z",
+  "status": 409,
+  "error": "Conflict",
+  "code": "ERR_SESION_CERRADA",
+  "message": "(texto institucional resuelto por el catálogo de mensajes)",
+  "path": "/api/v1/asistencias/lote",
+  "correlationId": "7b0f0c1e-0000-0000-0000-000000000000",
+  "details": []
+}</code></pre>
+        <p>El campo <code>details</code> solo aparece si hay errores por campo (<code>@JsonInclude(NON_<wbr>EMPTY)</code>). Los valores del ejemplo son ilustrativos.</p>
+      </div>
+    </div>
+    <p>Además existe <code>ApiMessageResponse</code> (<code>exitoso</code> y <code>mensaje</code>) para comandos sin datos, como el 201 de <code>/asistencias/lote</code>.</p>
+
+    <h2 id="modulos">Módulos de negocio (features)</h2>
+    <p>Cada módulo de <code>application/<wbr>features/*</code> agrupa casos de uso de una capacidad. En total hay 30 carpetas y 160 <code>UseCaseImpl</code> (<code>identidad</code> solo aporta servicios de apoyo).</p>
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Casos de uso por módulo de negocio: admin 24, coordinador 21, decano 13, tomaasistencia 10, docente 9, estudiante 9, grupo 8, sesion 8, matriculaqr 7, sesionmanual 7, asistencia 6, y el resto con 5 o menos" role="img" data-grafica='{"type":"bar","data":{"labels":["admin","coordinador","decano","tomaasistencia","docente","estudiante","grupo","sesion","matriculaqr","sesionmanual","asistencia","asistenciaqr","festivos","revisioncancelacion","catalogo","recesoacademico","alertainasistencia","archivo","sesioncalendario","usuario","configuracion","consultastransversales","faltareclamable","realtime","reporte","seguridad","sesioncancelacion","tipoidentificacion","tipoprograma"],"datasets":[{"label":"Casos de uso","data":[24,21,13,10,9,9,8,8,7,7,6,5,5,5,3,3,2,2,2,2,1,1,1,1,1,1,1,1,1]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}},"scales":{"x":{"title":{"display":true,"text":"Clases UseCaseImpl"}}}}}'></canvas></div>
+      <figcaption>Casos de uso por módulo (conteo de <code>*UseCaseImpl.java</code> por carpeta de <code>application/features</code>, 2026-11-22). Total 160.</figcaption>
+    </figure>
+
+    <h3>Módulos agrupados por rol que los usa</h3>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Rol principal</th><th>Módulos</th><th>Qué resuelven</th></tr></thead>
+        <tbody>
+          <tr><td>Estudiante</td><td><code>estudiante</code>, <code>asistenciaqr</code>, <code>faltareclamable</code>, <code>asistencia</code> (reclamos)</td><td>Materias, horarios, plan de estudio, alertas, marcación por QR o PIN, faltas reclamables y radicación o retiro de reclamos.</td></tr>
+          <tr><td>Docente</td><td><code>docente</code>, <code>tomaasistencia</code>, <code>asistencia</code>, <code>sesion</code>, <code>sesionmanual</code>, <code>sesioncancelacion</code>, <code>sesioncalendario</code>, <code>matriculaqr</code>, <code>grupo</code></td><td>Grupos y horarios propios, tomas de asistencia con QR, registro por lote, sesiones (v1 y v2 UTC), cancelación, QR de matrícula y matrícula manual.</td></tr>
+          <tr><td>Coordinador</td><td><code>coordinador</code>, <code>revisioncancelacion</code>, <code>grupo</code></td><td>Planes de estudio, semestres, asignaturas, docentes, grupos, indicadores y resolución de revisiones de cancelación.</td></tr>
+          <tr><td>Decano</td><td><code>decano</code></td><td>Facultad, programas, coordinadores, cronograma e indicadores de solo lectura.</td></tr>
+          <tr><td>Administrador</td><td><code>admin</code>, <code>festivos</code>, <code>recesoacademico</code>, <code>catalogo</code>, <code>configuracion</code>, <code>consultastransversales</code></td><td>Instituciones, facultades, decanos, parámetros, períodos, recesos, festivos, auditoría, notificaciones y cierre masivo.</td></tr>
+          <tr><td>Transversales</td><td><code>archivo</code>, <code>realtime</code>, <code>reporte</code>, <code>usuario</code>, <code>seguridad</code>, <code>alertainasistencia</code>, <code>tipoidentificacion</code>, <code>tipoprograma</code></td><td>Soportes, SSE, reportes Excel, perfil, alertas del 20 %, catálogos base.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Regla de gobernanza reflejada en el código: solo el <strong>docente titular</strong> registra o modifica asistencia. Coordinador y decano solo leen y auditan.</p>
+
+    <h2 id="endpoints">Mapa de endpoints por rol</h2>
+    <p>La fuente es <code>Gestio<wbr>Asistencia<wbr>Backend/<wbr>infra/<wbr>security-<wbr>baseline/<wbr>access-<wbr>catalog.<wbr>json</code> (esquema 1, aplicación <code>asistencias-uco</code>): <strong>206 reglas</strong> más 5 rutas exentas. Un test (<code>AccessCatalogConsistencyTest</code>) exige que el catálogo coincida exactamente con lo que Spring registra y que la <code>SecurityFilterChain</code> real autorice cada ruta como dice el catálogo.</p>
+    <div class="dos-columnas">
+      <figure class="grafica">
+        <div class="lienzo"><canvas aria-label="Endpoints por rol: administrador 73, coordinador 72, docente 64, decano 48, estudiante 27 en total; exclusivos 49, 42, 43, 26 y 15" role="img" data-grafica='{"type":"bar","data":{"labels":["Administrador","Coordinador","Docente","Decano","Estudiante"],"datasets":[{"label":"Accesibles por el rol","data":[73,72,64,48,27]},{"label":"Exclusivos del rol","data":[49,42,43,26,15]}]},"options":{"plugins":{"legend":{"display":true}}}}'></canvas></div>
+        <figcaption>Endpoints por rol. Un endpoint puede servir a varios roles (31 de los 206 son compartidos); 11 solo exigen estar autenticado.</figcaption>
+      </figure>
+      <figure class="grafica">
+        <div class="lienzo"><canvas aria-label="Endpoints por método HTTP: GET 121, POST 49, PATCH 15, PUT 14, DELETE 7" role="img" data-grafica='{"type":"doughnut","data":{"labels":["GET","POST","PATCH","PUT","DELETE"],"datasets":[{"label":"Endpoints","data":[121,49,15,14,7]}]}}'></canvas></div>
+        <figcaption>Distribución por método: 121 lecturas y 85 escrituras.</figcaption>
+      </figure>
+    </div>
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Endpoints por prefijo de ruta: admin 48, coordinador 45, decano 26, docente 16, sesiones 15, grupos 13, estudiante 13, tomas 7, otros 23" role="img" data-grafica='{"type":"bar","data":{"labels":["admin","coordinador","decano","docente","sesiones","grupos","estudiante","tomas","otros"],"datasets":[{"label":"Endpoints","data":[48,45,26,16,15,13,13,7,23]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Endpoints por primer segmento tras <code>/api/v1</code> (incluye <code>/api/v2/sesiones</code> en <code>sesiones</code>). «Otros»: asistencias, configuracion, identidad, realtime, archivos, estudiantes y catálogos.</figcaption>
+    </figure>
+
+    <h3>Endpoints principales por rol</h3>
+    <div class="pestanas">
+      <div role="tablist" aria-label="Endpoints por rol">
+        <button role="tab" type="button">Estudiante</button>
+        <button role="tab" type="button">Docente</button>
+        <button role="tab" type="button">Coordinador</button>
+        <button role="tab" type="button">Decano</button>
+        <button role="tab" type="button">Administrador</button>
+        <button role="tab" type="button">Compartidos</button>
+      </div>
+      <div role="tabpanel">
+        <div class="tabla-contenedor"><table>
+          <thead><tr><th>Método y ruta</th><th>Para qué</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>estudiante/<wbr>materias</code> y <code>/materias/resumen</code></td><td>Materias inscritas e indicadores.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>estudiante/<wbr>materias/<wbr>{materia<wbr>Id}/<wbr>sesiones</code></td><td>Sesiones paginadas con fecha límite de justificación.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>estudiante/<wbr>asistencia-<wbr>qr</code></td><td>Marcación autónoma: exige red del campus y límites por IP, token y estudiante.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>estudiante/<wbr>faltas-<wbr>reclamables</code></td><td>Tomas en falta con plazo vigente.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>asistencias/<wbr>revisiones</code> y <code>DELETE /<wbr>api/<wbr>v1/<wbr>estudiante/<wbr>reclamos/<wbr>{id}</code></td><td>Radicar y retirar un reclamo.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>estudiante/<wbr>plan-<wbr>estudio</code>, <code>/horarios</code>, <code>/alertas</code></td><td>Plan, horario y alertas del 20 %.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>archivos/<wbr>subir</code></td><td>Subir un soporte (propietario).</td></tr>
+          </tbody></table></div>
+      </div>
+      <div role="tabpanel">
+        <div class="tabla-contenedor"><table>
+          <thead><tr><th>Método y ruta</th><th>Para qué</th></tr></thead>
+          <tbody>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>asistencias/<wbr>lote</code></td><td>Registrar asistencia de una sesión.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>sesiones/<wbr>{sesion<wbr>Id}/<wbr>tomas</code>, <code>POST /<wbr>api/<wbr>v1/<wbr>tomas/<wbr>{toma<wbr>Id}/<wbr>cierre</code></td><td>Abrir y cerrar la toma de asistencia.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>tomas/<wbr>{toma<wbr>Id}/<wbr>qr</code> y <code>/qr/rotacion</code></td><td>Generar y rotar el QR de asistencia (el token solo viaja en la respuesta y en el SSE del titular).</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>grupos/<wbr>{grupo<wbr>Id}/<wbr>matricula-<wbr>qr</code></td><td>QR de matrícula del grupo.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>grupos/<wbr>{grupo<wbr>Id}/<wbr>estudiantes</code></td><td>Matrícula manual por el docente titular.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>docente/<wbr>grupos/<wbr>{grupo<wbr>Id}/<wbr>matriz-<wbr>asistencia</code></td><td>Matriz estudiantes por sesiones.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>docente/<wbr>reclamos</code>, <code>PATCH /<wbr>api/<wbr>v1/<wbr>docente/<wbr>reclamos/<wbr>{id}</code></td><td>Bandeja y resolución de reclamos.</td></tr>
+            <tr><td><code>PATCH /<wbr>api/<wbr>v1/<wbr>docente/<wbr>sesiones/<wbr>{sesion<wbr>Id}/<wbr>cancelar</code></td><td>Cancelar una sesión.</td></tr>
+            <tr><td><code>POST /api/v2/sesiones</code></td><td>Crear sesión con contrato UTC v2.</td></tr>
+          </tbody></table></div>
+      </div>
+      <div role="tabpanel">
+        <div class="tabla-contenedor"><table>
+          <thead><tr><th>Método y ruta</th><th>Para qué</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>coordinador/<wbr>alertas-<wbr>tempranas</code></td><td>Estudiantes cerca del 20 %.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>coordinador/<wbr>planes-<wbr>estudio</code> y rutas hijas</td><td>Planes, semestres y asignaturas asociadas.</td></tr>
+            <tr><td><code>PUT /<wbr>api/<wbr>v1/<wbr>grupos/<wbr>{id}</code></td><td>Editar grupo (solo programas de su coordinación).</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>coordinador/<wbr>sesiones/<wbr>solicitudes</code></td><td>Solicitudes de sesión extraordinaria.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>coordinador/<wbr>sesiones/<wbr>{sesion<wbr>Id}/<wbr>asistencias</code></td><td>Consulta de solo lectura.</td></tr>
+            <tr><td><code>PUT /<wbr>api/<wbr>v1/<wbr>coordinador/<wbr>estudiantes/<wbr>{id<wbr>Estudiante}/<wbr>programas/<wbr>{id<wbr>Programa}/<wbr>semestre</code></td><td>Registrar el semestre actual.</td></tr>
+          </tbody></table></div>
+      </div>
+      <div role="tabpanel">
+        <div class="tabla-contenedor"><table>
+          <thead><tr><th>Método y ruta</th><th>Para qué</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>decano/<wbr>indicadores</code>, <code>/aforo-grupos</code></td><td>Indicadores de la facultad.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>decano/<wbr>programas</code></td><td>Crear programa en su facultad.</td></tr>
+            <tr><td><code>PATCH /<wbr>api/<wbr>v1/<wbr>decano/<wbr>coordinadores/<wbr>{id}/<wbr>estado</code></td><td>Activar o desactivar coordinadores.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>decano/<wbr>estudiantes/<wbr>{estudiante<wbr>Id}</code></td><td>Detalle de lectura.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>decano/<wbr>revisiones-<wbr>cancelacion</code></td><td>Consulta (no resuelve; decide el coordinador).</td></tr>
+          </tbody></table></div>
+      </div>
+      <div role="tabpanel">
+        <div class="tabla-contenedor"><table>
+          <thead><tr><th>Método y ruta</th><th>Para qué</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>admin/<wbr>facultades</code>, <code>/instituciones</code>, <code>/programas</code>, <code>/asignaturas</code></td><td>Estructura institucional.</td></tr>
+            <tr><td><code>PUT /<wbr>api/<wbr>v1/<wbr>admin/<wbr>parametros/<wbr>{id}</code></td><td>Editar parámetros del catálogo.</td></tr>
+            <tr><td><code>DELETE /<wbr>api/<wbr>v1/<wbr>admin/<wbr>periodos-<wbr>academicos/<wbr>{id}</code> y recesos</td><td>Períodos y recesos.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>admin/<wbr>notificaciones/<wbr>plantillas</code>, <code>POST /<wbr>api/<wbr>v1/<wbr>admin/<wbr>notificaciones/<wbr>prueba</code></td><td>Administración de correo (se reenvía al servicio de Notificaciones).</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>admin/<wbr>comparativa-<wbr>facultades</code></td><td>Indicadores comparativos.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>realtime/<wbr>status</code></td><td>Diagnóstico del canal SSE.</td></tr>
+          </tbody></table></div>
+      </div>
+      <div role="tabpanel">
+        <div class="tabla-contenedor"><table>
+          <thead><tr><th>Método y ruta</th><th>Acceso</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /api/v1/auth/me</code>, <code>/usuarios/perfil</code>, <code>/<wbr>configuracion/<wbr>identidad</code></td><td>Cualquier usuario autenticado.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>realtime/<wbr>stream</code></td><td>Autenticado; el ámbito se resuelve en la BD al suscribirse.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>archivos/<wbr>{file<wbr>Id}</code></td><td>Autenticado; el propietario o quien tenga ámbito; otro recibe 404.</td></tr>
+            <tr><td><code>GET /<wbr>api/<wbr>v1/<wbr>tipos-<wbr>identificacion</code>, <code>/tipos-programa</code>, <code>/jornadas-programa</code>, <code>/modalidades-programa</code>, <code>/<wbr>categorias-<wbr>justificacion</code></td><td>Catálogos base de solo lectura.</td></tr>
+            <tr><td><code>POST /<wbr>api/<wbr>v1/<wbr>public/<wbr>verificar-<wbr>correo</code>, <code>/<wbr>public/<wbr>matricula-<wbr>qr/<wbr>validar</code>, <code>/<wbr>public/<wbr>matricula-<wbr>qr/<wbr>registro</code>, <code>GET /<wbr>public/<wbr>mensajes-<wbr>interfaz/<wbr>{codigo}</code></td><td>Públicas y exentas del PEP, con límite de intentos por IP.</td></tr>
+          </tbody></table></div>
+      </div>
+    </div>
+
+    <h2 id="seguridad">Seguridad</h2>
+    <p><strong>Idea.</strong> Hay dos capas independientes. Primero Spring valida que el JWT sea auténtico. Luego el PEP (punto de aplicación) pregunta al PDP (punto de decisión) si ese usuario puede llamar esa ruta. Si el PDP no responde, se niega: fail-closed.</p>
+    <ul>
+      <li><strong>Resource server:</strong> <code>SecurityConfig</code> (<code>infrastructure/<wbr>config/<wbr>security</code>) es stateless, con CSRF ignorado en <code>/api/v1/**</code> (no hay cookie de sesión) y CORS por <code>app.<wbr>security.<wbr>cors.<wbr>allowed-<wbr>origins</code>. El token es un Bearer; no se persiste nada del lado del cliente en el servidor.</li>
+      <li><strong>Validadores JWT:</strong> <code>InstitutionalIssuerValidator</code>, <code>AudienceValidator</code> y <code>RequiredUuidClaimValidator</code> (<code>adapter/<wbr>primary/<wbr>security/<wbr>jwt/<wbr>validation</code>). La audiencia esperada es <code>asistencias-api</code>.</li>
+      <li><strong>Identidad:</strong> <code>Institutional<wbr>Jwt<wbr>Authentication<wbr>Converter</code> usa <code>BaselineJwtClaimsExtractor</code> y <code>ExternalIdentityResolver</code>: la autoridad es el vínculo emisor más <code>sub</code> guardado en SQL Server, no un claim del token.</li>
+      <li><strong>Segunda red en Spring:</strong> además del PEP, <code>SecurityConfig</code> declara <code>hasRole</code> por prefijo (<code>/admin/**</code> exige administrador, <code>/decano/**</code> decano, etc.).</li>
+      <li><strong>PEP embebido:</strong> <code>SecurityPepEnforcementFilter</code> va después de autenticar el Bearer y antes de <code>AuthorizationFilter</code>. No hay bandera para apagarlo: toda ruta que no esté en <code>Security<wbr>Public<wbr>Endpoints.<wbr>pep<wbr>Exempt()</code> exige <code>ALLOW</code>.</li>
+      <li><strong>Resiliencia:</strong> <code>SecurityBaselinePepClient</code> usa el circuit breaker <code>securityBaselinePep</code>; con el PEP caído responde 503 <code>ACCESS_<wbr>DECISION_<wbr>UNAVAILABLE</code>.</li>
+    </ul>
+
+    <figure class="diagrama">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant SPA as "Frontend (Bearer en memoria)"
+  participant CID as "CorrelationIdFilter"
+  participant JWT as "Spring Security (JWT)"
+  participant PEPF as "SecurityPepEnforcementFilter"
+  participant PEP as "PEP de Security Baseline"
+  participant PDP as "PDP (política por rol)"
+  participant CTRL as "Controlador"
+  SPA->>CID: GET /api/v1/docente/horarios
+  CID->>JWT: X-Correlation-Id fijado
+  JWT->>JWT: valida firma, emisor, audiencia
+  JWT->>PEPF: Authentication del usuario
+  PEPF->>PEP: POST decisión con Bearer y correlación
+  PEP->>PDP: evalúa método, ruta y perfil
+  PDP-->>PEP: permitir
+  PEP-->>PEPF: 204 y X-Decision-Id
+  PEPF->>CTRL: continúa la cadena
+  CTRL-->>SPA: 200 ApiDataResponse
+  Note over PEP,PDP: Si el PEP o el PDP no responden: 503 y no se permite el acceso
+      </pre>
+      <figcaption>Secuencia de una petición con JWT. 204 es permitir; 401 y 403 son respuestas sanas del PEP; cualquier otra cosa o un timeout se trata como no disponible (503).</figcaption>
+    </figure>
+
+    <div class="flujo" data-flujo data-titulo="Una petición protegida atraviesa autenticación, PEP y ámbito institucional">
+      <div class="paso" data-actor="CorrelationIdFilter" data-detalle="Con prioridad máxima: acepta el X-Correlation-Id si es un UUID canónico distinto de cero (rechaza saltos de línea) y si no genera uno. Lo deja en CorrelationIdContext y en la respuesta.">Fija la correlación</div>
+      <div class="paso" data-actor="Spring Security" data-detalle="El resource server valida firma con las claves del emisor (descubrimiento OIDC o jwk-set-uri), emisor, audiencia y el claim de usuario. Sin token válido: 401 con ApiAuthenticationEntryPoint.">Valida el JWT</div>
+      <div class="paso" data-actor="SecurityPepEnforcementFilter" data-detalle="Si la ruta no está exenta, SecurityBaselinePepClient envía el Bearer, el método, la ruta, el entorno y la credencial de aplicación al endpoint de decisión embebido del PEP, con X-Correlation-Id.">Consulta al PEP</div>
+      <div class="paso" data-actor="PDP" data-detalle="El perfil asignado al usuario se compara con las reglas aprovisionadas desde access-catalog.json (script provision_asistencias.py pdp). Resultado: 204 con X-Decision-Id, o 401/403.">Decide por perfil y ruta</div>
+      <div class="paso" data-actor="Caso de uso" data-detalle="Con la ruta permitida, el caso de uso aplica la regla de ámbito con InstitutionalScopePort (por ejemplo canDocenteAccessGrupo o canCoordinadorAccessPrograma). Es una validación de datos, que el PDP no conoce.">Valida ámbito institucional</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="El SP repite perfil y titularidad (códigos SEC_001 y SEC_002). Defensa en profundidad: aunque se saltara una capa, la BD no devuelve ni modifica datos ajenos.">La BD fuerza el ámbito otra vez</div>
+      <div class="paso" data-actor="SecurityErrorResponseWriter" data-tipo="error" data-detalle="Si el PEP dice FORBIDDEN responde 403; si no puede decidir, 503 ACCESS_DECISION_UNAVAILABLE. Nunca se concede acceso por defecto.">Denegado: 401, 403 o 503</div>
+    </div>
+
+    <h3>access-catalog.json y el PDP</h3>
+    <p>El catálogo es la única fuente de las reglas de acceso: lista, por método y ruta, los roles permitidos, el tipo de acceso (<code>ROLES</code> en 195 rutas, <code>AUTHENTICATED</code> en 11) y un texto de <em>ownership</em> que explica el ámbito. También define los cinco perfiles y las rutas exentas. Se aprovisiona con <code>infra/<wbr>security-<wbr>baseline/<wbr>scripts/<wbr>provision_<wbr>asistencias.<wbr>py</code>:</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Subcomando</th><th>Efecto</th></tr></thead>
+        <tbody>
+          <tr><td><code>catalog</code></td><td>Sin conexión: compara los endpoints de los controladores con el catálogo. Un endpoint sin regla falla.</td></tr>
+          <tr><td><code>keycloak</code></td><td>Cliente de recurso <code>asistencias-api</code>, cliente público PKCE y cliente de servicio del aprovisionador.</td></tr>
+          <tr><td><code>pdp</code></td><td>Aplicación, recursos, roles, concesiones y perfiles; incremental y con <code>--prune</code> para revocar deriva.</td></tr>
+          <tr><td><code>verify</code>, <code>verify-decisions</code></td><td>Compara el PDP contra el catálogo y prueba decisiones reales del PEP.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota"><strong>Endpoint nuevo con 403.</strong> Si una ruta recién creada responde 403 en el laboratorio, falta provisionarla: corre <code>provision_<wbr>asistencias.<wbr>py verify</code> y luego <code>pdp</code>.</div>
+    <h3>Ámbito institucional</h3>
+    <p><code>InstitutionalScopePort</code> (<code>application/<wbr>secondaryports/<wbr>security</code>) concentra las preguntas de pertenencia: <code>canDocenteAccessGrupo</code>, <code>canEstudianteAccessGrupo</code>, <code>canCoordinadorAccessGrupo</code>, <code>canCoordinadorAccessPrograma</code>, <code>canDecanoAccessGrupo</code>, <code>canDecanoAccessFacultad</code>, <code>canDecanoAccessPrograma</code>, <code>canGestionarCuenta</code>, <code>isAdministradorActivo</code> y los <code>find*Id*</code> que resuelven docente, estudiante, coordinador y decano desde el usuario. Lo implementa <code>Institutional<wbr>Scope<wbr>Jpa<wbr>Repository</code>.</p>
+    <h3>Otras piezas de seguridad</h3>
+    <ul>
+      <li><strong>Eventos de asignación del PDP:</strong> <code>AssignmentEventsRabbitListener</code> (RabbitMQ, apagado con <code>APP_<wbr>ADAPTERS_<wbr>ASSIGNMENT_<wbr>EVENTS_<wbr>ENABLED</code>) solo audita el evento; no cambia decisiones.</li>
+      <li><strong>Sincronización de perfiles PDP:</strong> <code>Security<wbr>Baseline<wbr>Pdp<wbr>Profile<wbr>Client</code>, deshabilitada hasta validar la autorización administrativa del PDP (<code>SECURITY_<wbr>BASELINE_<wbr>PDP_<wbr>PROFILE_<wbr>SYNC_<wbr>ENABLED</code>).</li>
+      <li><strong>Webhook de Azure Event Grid:</strong> <code>AzureEventGridAuthFilter</code> exige el token <code>aeg-sas-token</code>; la ruta está exenta del PEP.</li>
+      <li><strong>Cabeceras:</strong> <code>SecurityHttpHeaders</code> (HSTS solo sobre HTTPS) y <code>UnmappedRouteFilter</code>.</li>
+    </ul>
+    <div class="nota alerta"><strong>Contingencia legacy.</strong> El proveedor <code>legacy</code> (Keycloak propio, <code>KeycloakJwtClaimsExtractor</code>, paquetes <code>keycloak</code>) solo arranca si se pide explícitamente con <code>APP_<wbr>ADAPTERS_<wbr>SECURITY_<wbr>PROVIDER=legacy</code>. Una configuración incompleta del baseline hace fallar el arranque; nunca degrada a legacy. Selector único para seguridad e identidad: si se definen por separado y no coinciden, el arranque falla.</div>
+
+    <h2 id="catalogos">Catálogos de mensajes y parámetros</h2>
+    <p><strong>Por qué.</strong> Los textos que ve el usuario y los parámetros de negocio (tope de soportes, rangos de red, plazos) cambian sin redesplegar. El backend los lee por dos puertos y no sabe de dónde vienen.</p>
+    <ul>
+      <li><code>MessageCatalogPort</code>: <code>getUserMessage(code, args...)</code> y <code>get<wbr>Technical<wbr>Message(code, args...)</code>.</li>
+      <li><code>ParameterCatalogPort</code>: <code>getParameter(grupo, clave)</code>, <code>getRequiredParameter</code> y <code>get<wbr>Parameter<wbr>As(grupo, clave, tipo)</code>.</li>
+    </ul>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  UC["Caso de uso / GlobalExceptionHandler"] --> MP["MessageCatalogPort"]
+  UC --> PP["ParameterCatalogPort"]
+  MP --> M1["azure: App Configuration (predeterminado)"]
+  MP --> M2["messageucolab: MessageUcoLab 0.3.0"]
+  MP --> M3["sqlserver: tablas de la BD"]
+  PP --> P1["azure_appconfig (predeterminado)"]
+  PP --> P2["catalogoparametros: Catálogo de Parámetros por M2M"]
+  PP --> P3["sqlserver: tablas de la BD"]
+  M2 -. "fallback azure o none" .-> M1
+  M2 --- EV["Avisos de cambio por Pulsar"]
+  P2 --- EV2["Eventos de cambio por Pulsar del Catálogo"]
+  M1 --> FB["Texto de respaldo en el enum de errores"]
+  M2 --> FB
+  M3 --> FB
+      </pre>
+      <figcaption>Proveedores seleccionables con <code>app.<wbr>adapters.<wbr>message-<wbr>catalog.<wbr>provider</code> y <code>app.<wbr>adapters.<wbr>parameter-<wbr>catalog.<wbr>provider</code>. Si ninguno responde, el texto sale del enum de errores (respaldo).</figcaption>
+    </figure>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Puerto</th><th>Proveedor</th><th>Clase y variable</th></tr></thead>
+        <tbody>
+          <tr><td>Mensajes</td><td>Azure App Configuration (por defecto en <code>application.yml</code>)</td><td><code>Azure<wbr>App<wbr>Config<wbr>Message<wbr>Catalog<wbr>Adapter</code>; claves <code>messages:user:&lt;CODIGO&gt;</code> y <code>messages:technical:&lt;CODIGO&gt;</code>.</td></tr>
+          <tr><td>Mensajes</td><td>MessageUcoLab</td><td><code>Message<wbr>Uco<wbr>Lab<wbr>Message<wbr>Catalog<wbr>Adapter</code> (<code>MESSAGEUCOLAB_URL</code>, caché <code>MESSAGEUCOLAB_<wbr>CACHE_<wbr>TTL</code>, <code>MESSAGEUCOLAB_<wbr>FALLBACK=azure|none</code>); <code>MessageUcoLabEventListener</code> invalida la caché con los avisos de Pulsar y <code>Message<wbr>Uco<wbr>Lab<wbr>Sincronizacion<wbr>Configuration</code> concilia al arrancar.</td></tr>
+          <tr><td>Mensajes y parámetros</td><td>SQL Server</td><td>Repositorios <code>MessageCatalogJpaRepository</code> y <code>ParameterCatalogJpaRepository</code>; caché con vencimiento <code>ASISTENCIAS_<wbr>CATALOGO_<wbr>SQL_<wbr>CACHE_<wbr>TTL</code> (60 s). Es el valor por defecto de los perfiles <code>local</code> y <code>dev</code>.</td></tr>
+          <tr><td>Parámetros</td><td>Azure App Configuration (por defecto)</td><td><code>Azure<wbr>App<wbr>Config<wbr>Parameter<wbr>Catalog<wbr>Adapter</code>; claves <code>asistencias:&lt;modulo&gt;:&lt;parametro&gt;</code>.</td></tr>
+          <tr><td>Parámetros</td><td>Catálogo de Parámetros (componente del equipo de parámetros)</td><td><code>Catalogo<wbr>Parametros<wbr>Http<wbr>Parameter<wbr>Catalog<wbr>Adapter</code> (<code>CATALOGO_PARAMETROS_*</code>), lectura M2M con eventos por Pulsar (<a href="#proveedor-parametros">detalle</a>); la edición local queda deshabilitada (PRM_010). <code>Parametro<wbr>Con<wbr>Valor<wbr>Por<wbr>Defecto<wbr>Catalog<wbr>Adapter</code> aporta valores por defecto.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Respaldo y pruebas de paridad</h3>
+    <p>Cada código de error tiene un texto de respaldo en su enum (<code>Error<wbr>Definition.<wbr>default<wbr>Message()</code>) para cuando el catálogo no responde. <code>Mensaje<wbr>Respaldo<wbr>Paridad<wbr>Catalogo<wbr>Test</code> compara ese texto con el del catálogo de la BD (archivo <code>/<wbr>messageucolab/<wbr>catalogo-<wbr>mensajes-<wbr>usuario.<wbr>psv</code>) y solo admite una lista corta y justificada de excepciones. <code>Mensaje<wbr>Usuario<wbr>Error<wbr>Code<wbr>Catalogo<wbr>Test</code>, <code>Global<wbr>Exception<wbr>Handler<wbr>Mensaje<wbr>Catalogo<wbr>Test</code> y <code>Sincronizar<wbr>Mensajes<wbr>Catalogo<wbr>Use<wbr>Case<wbr>Impl<wbr>Test</code> completan la cobertura.</p>
+    <div class="nota"><strong>Interfaz.</strong> La SPA recupera textos de pantalla (códigos <code>UI###</code>) por <code>GET /<wbr>api/<wbr>v1/<wbr>public/<wbr>mensajes-<wbr>interfaz/<wbr>{codigo}</code>, una ruta pública con límite de peticiones por IP (<code>Mensajes<wbr>Interfaz<wbr>Rate<wbr>Limit<wbr>Filter</code>).</div>
+
+    <h3 id="proveedor-parametros">Proveedor del Catálogo de Parámetros (INT-004)</h3>
+    <p><strong>Por qué.</strong> Con <code>app.adapters.parameter-catalog.provider=catalogoparametros</code> el Catálogo de Parámetros externo es la fuente de verdad de los valores. El backend lo lee por M2M (sin sesión de usuario), se entera de los cambios por eventos y deja una copia vigente en <code>dbo.CatalogoParametro</code> para los procedimientos almacenados. Todo se cablea en <code>CatalogoParametrosAdapterConfiguration</code> y <code>CatalogoParametrosSincronizacionConfiguration</code> (<code>infrastructure/config/adapters/catalog/catalogoparametros/</code>), solo si el selector tiene ese valor.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  subgraph lectura["Lectura con cache"]
+    UC["Casos de uso"] --> PCP["ParameterCatalogPort"]
+    PCP --> AD["CatalogoParametrosHttpParameterCatalogAdapter"]
+    AD --> CL["CatalogoParametrosM2mClient"]
+    CL --> TK["CatalogoParametrosM2mTokenProvider"]
+  end
+  TK -->|"client_credentials"| KC["Keycloak de Security"]
+  CL -->|"GET parametros consulta m2m"| CAT["Catalogo de Parametros"]
+  subgraph eventos["Eventos"]
+    PUL["Pulsar del Catalogo"] --> LI["CatalogoParametrosEventListener"]
+    LI --> SYNC["SincronizarParametrosCatalogoUseCaseImpl"]
+  end
+  SYNC -->|"invalida cache"| AD
+  SYNC -->|"relee por nombre"| CL
+  SYNC --> REPO["ParametroCatalogoJpaRepository"]
+  REPO -->|"EXEC usp_sincronizar_parametro_catalogo_externo"| BD[("SQL Server")]
+      </pre>
+      <figcaption>Lectura y sincronización del proveedor <code>catalogoparametros</code>. El listener es un adaptador primario; el caso de uso solo conoce puertos.</figcaption>
+    </figure>
+    <h4>Lectura M2M y caché</h4>
+    <ul>
+      <li><strong>Token:</strong> <code>CatalogoParametrosM2mTokenProvider</code> pide <code>client_credentials</code> a Keycloak con <code>CATALOGO_PARAMETROS_M2M_CLIENT_ID</code> y el secreto. Lo guarda en memoria hasta <strong>30 segundos antes</strong> de que venza (<code>MARGEN_SEGUNDOS</code>) y hay una sola petición de token en vuelo. Ni el secreto ni el token se escriben en logs ni en mensajes de error.</li>
+      <li><strong>Consulta:</strong> <code>CatalogoParametrosM2mClient</code> hace <code>GET {base-url}/parametros/consulta/m2m</code> (con <code>?nombre=</code> para un parámetro). Un <strong>401</strong> descarta el token y la lectura síncrona reintenta una sola vez con uno nuevo.</li>
+      <li><strong>Caché:</strong> una sola respuesta trae todos los parámetros del alcance y se guarda <code>CATALOGO_PARAMETROS_CACHE_TTL</code> (5 minutos). Vencida, se sirve y se refresca en segundo plano. Tras un fallo de refresco hay una gracia máxima de 30 segundos sin reintentar, de modo que un Catálogo caído no llena el log ni degrada cada lectura.</li>
+      <li><strong>Invalidación:</strong> el adaptador implementa <code>InvalidableParameterCatalog</code>; invalidar un parámetro vacía toda la caché porque la respuesta es un solo bloque.</li>
+    </ul>
+    <h4>Listener de eventos</h4>
+    <p><code>CatalogoParametrosEventListener</code> (<code>infrastructure/adapter/primary/messaging/catalogoparametros/</code>) es un <code>SmartLifecycle</code> que se suscribe al topic <code>&lt;prefijo&gt;-&lt;client_id&gt;</code> con una suscripción <strong>durable de tipo <code>Shared</code></strong> (<code>asistencias-uco-backend-parametros</code> por defecto, posición inicial <code>Earliest</code>).</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Situación</th><th>Qué hace el listener</th></tr></thead>
+        <tbody>
+          <tr><td>Evento procesado</td><td>Confirma (<code>acknowledge</code>) <strong>después</strong> de procesar. Resultado <code>procesado</code>.</td></tr>
+          <tr><td>Evento ilegible, de otra fuente (<code>source</code> distinto de <code>catalogo-parametros</code>) o sin <code>eventType</code></td><td>Lo confirma y lo descarta: reintentarlo no lo arregla. Resultado <code>descartado</code>.</td></tr>
+          <tr><td>Falla el Catálogo o la BD</td><td><code>negativeAcknowledge</code> con espera creciente de <strong>1 a 60 segundos</strong> (multiplicador 2). Resultado <code>fallido</code>.</td></tr>
+          <tr><td>Pulsar no responde al arrancar</td><td>El backend arranca igual y reintenta la suscripción cada 15 s, duplicando hasta 5 minutos; mientras tanto lee con la caché.</td></tr>
+          <tr><td><code>schemaVersion</code> distinto de 3</td><td>Advierte en el log y procesa igual, porque el valor se relee por M2M.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>El caso de uso <code>SincronizarParametrosCatalogoUseCaseImpl</code> (<code>application/features/catalogo/sincronizarparametros/</code>) decide qué hacer con cada aviso:</p>
+    <ul>
+      <li><strong>Filtro:</strong> ignora los eventos de otra aplicación o ambiente (<code>applicationId</code> y <code>environmentId</code>) y los de un tipo que no sea <code>Parameter*</code>, <code>Metadata*</code> o <code>MetadataEnvironment*</code> con sufijo <code>Created</code>, <code>Updated</code> o <code>Deleted</code>.</li>
+      <li><strong>Idempotencia:</strong> recuerda los últimos 1000 <code>eventId</code> procesados <strong>sin error</strong>; un repetido se ignora. La BD también es idempotente por <code>eventId</code>.</li>
+      <li><strong>Relectura por nombre:</strong> en 0.1.17 el valor vive en el metadato, así que un cambio llega como <code>MetadataUpdated</code>. Estos eventos traen el valor (<code>resourceValue</code>), pero el backend <strong>no lo usa</strong>: invalida la caché, relee el parámetro por M2M con <code>?nombre=</code> y hace <code>UPSERT</code> con el valor del Catálogo. Un metadato sin nombre usable reconcilia el catálogo completo.</li>
+      <li><strong>Borrado:</strong> solo <code>ParameterDeleted</code> con el parámetro ausente del Catálogo hace <code>DELETE</code> (la fila vuelve a su valor por defecto). Si el Catálogo ya no devuelve un valor por otra causa (metadato borrado, valor vacío), la BD conserva el suyo.</li>
+    </ul>
+    <h4>Reconciliación de arranque</h4>
+    <p>Al iniciar, si <code>CATALOGO_PARAMETROS_RECONCILE_ON_STARTUP</code> es verdadero, un hilo virtual hace <strong>una sola lectura M2M</strong> y hace <code>UPSERT</code> de todos los parámetros (sin <code>eventId</code>). No es sondeo: cubre eventos emitidos con el backend apagado. <strong>Nunca borra</strong>: un parámetro ausente en el Catálogo no se toca. Si falla, el backend sigue con la caché y la BD. El resumen (<code>ResumenSincronizacion</code>) cuenta aplicados, sin cambios, desconocidos, obsoletos, rechazados y fallidos; ver el SP en <a href="base-datos.html#sincronizacion-parametros">Base de datos</a>.</p>
+    <h4>Métricas y salud</h4>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Señal</th><th>Etiquetas o estados</th><th>Qué mide</th></tr></thead>
+        <tbody>
+          <tr><td><code>catalogo_parametros_eventos_total</code></td><td><code>resultado</code>: <code>recibido</code>, <code>procesado</code>, <code>descartado</code>, <code>fallido</code></td><td>Eventos por su destino.</td></tr>
+          <tr><td><code>catalogo_parametros_valores_total</code></td><td><code>resultado</code>: <code>aplicado</code>, <code>sin_cambios</code>, <code>desconocido</code>, <code>obsoleto</code>, <code>rechazado</code>, <code>fallido</code></td><td>Lo que ocurrió en la BD por valor.</td></tr>
+          <tr><td><code>catalogo_parametros_ultima_sincronizacion_segundos</code></td><td>Gauge</td><td>Época del último evento o reconciliación exitosos (0 si aún no hubo).</td></tr>
+          <tr><td>Componente de salud <code>catalogoParametrosEventos</code></td><td><code>UP</code> si está suscrito; <code>UNKNOWN</code> si no</td><td>Detalles <code>suscrito</code> y <code>ultimaSincronizacionEpochSegundos</code>. Nunca es <code>DOWN</code>: sin Pulsar el backend sigue sirviendo con caché y BD, así que no debe salir del balanceador.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4>Propiedades (<code>app.providers.catalogo-parametros.events</code>)</h4>
+    <p><code>CATALOGO_PARAMETROS_EVENTS_ENABLED</code> (una sola bandera para suscripción y reconciliación), <code>CATALOGO_PARAMETROS_PULSAR_URL</code> (<code>pulsar://localhost:6652</code> desde el PC; <code>pulsar://pulsar-parametros:6650</code> desde <code>asis-red</code>), <code>CATALOGO_PARAMETROS_EVENTS_TOPIC</code> (vacío: prefijo más <code>client_id</code>), <code>CATALOGO_PARAMETROS_EVENTS_TOPIC_PREFIX</code>, <code>CATALOGO_PARAMETROS_EVENTS_SUBSCRIPTION</code> y <code>CATALOGO_PARAMETROS_RECONCILE_ON_STARTUP</code>. Fuente: <code>GestioAsistenciaBackend/src/main/resources/application.yml</code> y <code>CatalogoParametrosEventsProperties</code>.</p>
+    <div class="nota alerta"><strong>Límite conocido</strong> Una lectura M2M fría del Catálogo puede tardar varios segundos, por eso el tiempo máximo es de 10 s (<code>CATALOGO_PARAMETROS_TIMEOUT</code>). El esquema del evento es del equipo de Parámetros: una falla del esquema se reporta a ellos, no se parcha aquí.</div>
+
+    <h2 id="realtime">Tiempo real con SSE</h2>
+    <p><strong>Por qué.</strong> La interfaz debe enterarse de los cambios sin preguntar cada pocos segundos. Está <strong>prohibido el polling</strong>: el servidor empuja eventos por Server-Sent Events y el cliente los convierte en señales de Angular.</p>
+    <ul>
+      <li><strong>Endpoint:</strong> <code>GET /<wbr>api/<wbr>v1/<wbr>realtime/<wbr>stream?grupo<wbr>Id={UUID}</code> (<code>RealtimeEventsController</code>), con Bearer. Hay también <code>GET /realtime/status</code> y <code>POST /realtime/emit</code> de diagnóstico para el administrador.</li>
+      <li><strong>Publicación:</strong> los casos de uso llaman al puerto <code>Realtime<wbr>Publisher<wbr>Port.<wbr>publish(Realtime<wbr>Event)</code>, sin Reactor. El adaptador <code>ReactorRealtimeAdapter</code> usa <code>Sinks.<wbr>many().<wbr>multicast().<wbr>direct<wbr>Best<wbr>Effort()</code>.</li>
+      <li><strong>Audiencia:</strong> <code>RealtimeAudienciaPolicy</code> mapea cada tipo a sus audiencias con igualdad exacta (nunca por prefijo). El ámbito del suscriptor se resuelve en la BD al conectar (<code>Resolver<wbr>Audiencia<wbr>Realtime<wbr>Use<wbr>Case<wbr>Impl</code>).</li>
+      <li><strong>Forma en el cable:</strong> <code>id</code> = eventId, <code>event</code> = tipo, <code>data</code> = <code>RealtimeEventResponse</code> (eventId, type, occurredAt, correlationId, payload). Un comentario SSE de latido cada 25 s mantiene viva la conexión.</li>
+      <li><strong>Garantías:</strong> proveedor <code>local-sse</code>, best-effort, en memoria y de una sola JVM, sin reenvío. El estado verdadero siempre se recupera por la API.</li>
+    </ul>
+    <figure class="diagrama">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant D as "Docente (SPA)"
+  participant E as "Estudiante (SPA)"
+  participant SSE as "RealtimeEventsController"
+  participant GW as "LocalSseRealtimeStreamGateway"
+  participant UC as "RegistrarAsistenciasSesionUseCaseImpl"
+  participant PUB as "ReactorRealtimeAdapter"
+  E->>SSE: GET /realtime/stream?grupoId (Bearer)
+  SSE->>SSE: ResolverAudienciaRealtime (BD)
+  SSE->>GW: suscribir con audiencia
+  D->>UC: POST /asistencias/lote
+  UC->>UC: persistir con SP y confirmar
+  UC->>PUB: publish(ASISTENCIAS_SESION_ACTUALIZADAS)
+  PUB->>GW: Sinks.tryEmitNext
+  GW->>GW: RealtimeAudienciaPolicy filtra por tipo y audiencia
+  GW-->>E: event ASISTENCIAS_SESION_ACTUALIZADAS
+  Note over GW,E: Latido cada 25 s. Sin suscriptores el evento se descarta. Al reconectar se consulta el estado por API.
+      </pre>
+      <figcaption>Un evento nace después del COMMIT, se filtra por audiencia y se entrega solo a quienes están conectados.</figcaption>
+    </figure>
+    <h3>Tipos de evento</h3>
+    <p>Hay 20 tipos en <code>RealtimeAudienciaPolicy</code>; el contrato está en <code>AsistenciasUCO-<wbr>Infra/<wbr>docs/<wbr>contracts/<wbr>events/<wbr>REALTIME_<wbr>EVENT_<wbr>CONTRACT.<wbr>md</code>.</p>
+    <details class="acordeon">
+      <summary>Ver los 20 tipos y su familia</summary>
+      <div class="tabla-contenedor">
+        <table>
+          <thead><tr><th>Familia</th><th>Tipos</th></tr></thead>
+          <tbody>
+            <tr><td>Asistencia y sesión</td><td><code>ASISTENCIAS_<wbr>SESION_<wbr>ACTUALIZADAS</code>, <code>ASISTENCIAS_<wbr>TOMA_<wbr>ACTUALIZADAS</code>, <code>SESION_CANCELADA</code>, <code>ASISTENCIA_REGISTRADA</code></td></tr>
+            <tr><td>Sesiones manuales y solicitudes</td><td><code>SESION_MANUAL_CREADA</code>, <code>SESION_<wbr>SOLICITUD_<wbr>CREADA</code>, <code>SESION_<wbr>SOLICITUD_<wbr>RECHAZADA</code></td></tr>
+            <tr><td>Alertas y revisiones</td><td><code>ALERTA_INASISTENCIA</code>, <code>REVISION_<wbr>CANCELACION_<wbr>CREADA</code>, <code>REVISION_<wbr>CANCELACION_<wbr>DECIDIDA</code>, <code>REVISION_<wbr>CANCELACION_<wbr>RESUELTA</code>, <code>REVISION_<wbr>CANCELACION_<wbr>REASIGNADA</code>, <code>FALTA_SESION_AVISADA</code></td></tr>
+            <tr><td>Tomas y QR</td><td><code>TOMA_ABIERTA</code>, <code>TOMA_CERRADA</code>, <code>ASISTENCIA_QR_ROTADO</code>, <code>ASISTENCIA_<wbr>QR_<wbr>REGISTRADA</code></td></tr>
+            <tr><td>Matrícula QR</td><td><code>MATRICULA_QR_ROTADO</code>, <code>ESTUDIANTE_<wbr>MATRICULADO</code></td></tr>
+            <tr><td>Administración</td><td><code>PARAMETER_UPDATED</code> (solo administrador; sin valores anterior ni nuevo)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Nota del contrato: <code>ASISTENCIA_REGISTRADA</code> existe como tipo, pero el registro individual fue retirado y el flujo vigente es el lote.</p>
+    </details>
+
+    <h2 id="adjuntos">Adjuntos: MinIO y ClamAV</h2>
+    <p><strong>Reglas.</strong> El backend no guarda archivos en disco ni en columnas BLOB. Toda subida y descarga pasa por la API (el frontend nunca recibe URLs de MinIO ni presignadas). Cada archivo se analiza con ClamAV antes de guardarse, y el fallo de cualquier dependencia deja la operación en estado seguro (fail-closed).</p>
+    <div class="flujo" data-flujo data-titulo="Subir un soporte (POST /api/v1/archivos/subir)">
+      <div class="paso" data-actor="Filtros" data-detalle="OperacionAutenticadaRateLimitFilter limita las subidas por usuario y por IP con el parámetro ARCHIVOS/LIMITE_SUBIDAS_POR_MINUTO. El multipart llega limitado a 5 MB (spring.servlet.multipart) y se mantiene en memoria. Al superar el límite responde 429.">Límite de intentos y tamaño</div>
+      <div class="paso" data-actor="ContentSecurityValidator" data-detalle="SubirArchivoUseCaseImpl valida nombre, tipo declarado y contenido real contra tamaño máximo (parámetro ARCHIVO/TAMANIO_MAXIMO_BYTES con respaldo técnico) y sanea el nombre. Devuelve el tipo verificado.">Valida contenido y tipo</div>
+      <div class="paso" data-actor="MalwareScanPort" data-detalle="ClamAvMalwareScanAdapter habla el protocolo clamd con zINSTREAM por el puerto 3310. Solo acepta la respuesta exacta stream: OK (limpio) o stream: firma FOUND (infectado); cualquier otra respuesta es error. Un virus o un fallo del escáner cancela la subida (fail-closed). CircuitBreakerMalwareScanAdapter lo protege con el breaker malwareScan.">Escanea con ClamAV (INSTREAM)</div>
+      <div class="paso" data-actor="CompressionPolicy" data-detalle="Decide si comprimir el contenido y calcula el SHA-256 del original con ChecksumCalculator. Se genera un fileId aleatorio.">Comprime y calcula SHA-256</div>
+      <div class="paso" data-actor="FileStoragePort" data-detalle="MinioFileStorageAdapter guarda el objeto con la clave soportes/{fileId} en el bucket asistencias-soportes, con metadatos (propietario, nombre saneado, tamaños, checksum). Si MinIO no responde, la subida falla. CircuitBreakerFileStorageAdapter aplica el breaker de almacenamiento.">Guarda en MinIO</div>
+      <div class="paso" data-actor="SoporteArchivoMetadataPort" data-detalle="Registra el borrador del soporte en la BD (SoporteArchivo, por SP) con propietario, nombre, tipo, tamaño y checksum. Si falla se reintenta una vez; si persiste, se borra el objeto de MinIO y se responde error para no dejar huérfanos.">Registra el borrador en la BD</div>
+      <div class="paso" data-actor="ArchivoController" data-detalle="Responde 201 con ApiDataResponse: fileId, nombre, url relativa /api/v1/archivos/{fileId} y tamaño. Nunca expone bucket, clave de objeto ni credenciales.">Responde 201 con la URL de la API</div>
+      <div class="paso" data-actor="ClamAV" data-tipo="error" data-detalle="Camino de error: archivo infectado, escáner caído o MinIO caído. Se responde con un error controlado (por ejemplo ArchivoErrorCode) y no se persiste nada; el estado de readiness informa el breaker abierto sin tumbar la instancia.">Infectado o dependencia caída</div>
+    </div>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  SPA["Frontend"] -->|"multipart, Bearer"| API["ArchivoController"]
+  API --> UC["SubirArchivoUseCaseImpl"]
+  UC --> CS["ContentSecurityValidator"]
+  UC -->|"zINSTREAM puerto 3310"| AV["ClamAV clamd"]
+  UC -->|"soportes/{fileId}"| S3[("MinIO bucket asistencias-soportes")]
+  UC -->|"usp_ borrador"| DB[("SQL Server: SoporteArchivo")]
+  SPA -.->|"nunca directo"| S3
+      </pre>
+      <figcaption>El frontend solo habla con la API. MinIO y ClamAV son internos; la consola web de MinIO está deshabilitada.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Mínimo privilegio:</strong> el backend usa credenciales técnicas de aplicación (<code>MINIO_ACCESS_KEY</code>, <code>MINIO_SECRET_KEY</code>) acotadas al prefijo <code>soportes/</code> del bucket; no crea ni borra buckets en ejecución.</li>
+      <li><strong>Descarga:</strong> <code>GET /<wbr>api/<wbr>v1/<wbr>archivos/<wbr>{file<wbr>Id}</code> verifica propiedad o ámbito en Application; un no autorizado recibe 404.</li>
+      <li><strong>Tiempos:</strong> conexión 5 s, lectura y escritura 30 s para MinIO; 5 s y 15 s para ClamAV (variables <code>MINIO_*_<wbr>TIMEOUT_<wbr>MILLIS</code> y <code>CLAMAV_*_<wbr>TIMEOUT_<wbr>MILLIS</code>).</li>
+    </ul>
+
+    <h2 id="notificaciones">Notificaciones</h2>
+    <p><strong>Decisión.</strong> El correo deja de enviarse desde Asistencias y pasa a un servicio propio e independiente (<code>Complementos/<wbr>Notificaciones</code>). El backend conserva únicamente la <strong>outbox</strong> (cola durable en SQL Server) y entrega cada aviso por HTTP con una <code>idempotencyKey</code>. Las plantillas, el SMTP y el tope de envíos viven en el servicio. Referencias: <code>docs/<wbr>PLAN_<wbr>COMPONENTE_<wbr>NOTIFICACIONES.<wbr>md</code> y <code>Complementos/<wbr>Notificaciones/<wbr>README.<wbr>md</code>.</p>
+    <div class="nota exito"><strong>Separación cerrada (F1 a F7).</strong> El backend entrega por el canal <code>servicio</code> (<code>infrastructure/<wbr>adapter/<wbr>secondary/<wbr>notification/<wbr>service</code>: <code>Servicio<wbr>Notificacion<wbr>Channel<wbr>Sender</code>, <code>NotificacionesServiceClient</code>, <code>Administracion<wbr>Notificacion<wbr>Servicio<wbr>Adapter</code> y el indicador de salud <code>Notificaciones<wbr>Service<wbr>Health<wbr>Indicator</code>). Las plantillas, el SMTP y el tope de envíos ya no están en el backend, y la migración 71 retiró <code>PlantillaNotificacion*</code> de la BD. La validación de extremo a extremo dio 78 de 78 avisos entregados, sin duplicados, y con el servicio caído se reintentó y se entregó una sola vez.</div>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  UC["Casos de uso (21 usan el puerto)"] -->|"notificar"| NP["NotificacionPort"]
+  NP --> OB["OutboxNotificacionAdapter"]
+  OB -->|"usp_registrar_notificacion_saliente"| TB[("NotificacionSaliente (outbox)")]
+  DS["NotificacionOutboxDispatcher (SmartLifecycle)"] -->|"usp_reservar_notificaciones_salientes con lease"| TB
+  DS --> CH["ServicioNotificacionChannelSender"]
+  CH --> CT["ContactoDestinatarioResolver"]
+  CH -->|"POST /api/v1/notificaciones, X-Api-Key, idempotencyKey"| SV["Servicio de Notificaciones: plantillas, cola, SMTP, tope"]
+  ADM["Admin: AdministracionNotificacionPort"] -->|"HTTP /api/v1/plantillas, /estado-canal"| SV
+      </pre>
+      <figcaption>La outbox es la frontera de confiabilidad. La administración de plantillas del frontend sigue usando los mismos endpoints del backend, que reenvía al servicio.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Puerto:</strong> <code>Notificacion<wbr>Port.<wbr>notificar(Notificacion)</code> es de mejor esfuerzo: un fallo del aviso no revierte la operación de negocio. Selección con <code>app.<wbr>adapters.<wbr>notification.<wbr>provider</code>: <code>log</code> (por defecto), <code>outbox</code> o <code>composite</code> (<code>targets</code> <code>log,outbox</code>).</li>
+      <li><strong>Outbox:</strong> <code>OutboxNotificacionAdapter</code> guarda tipo, destinatarios (rol e id de usuario), datos (máximo 8000 caracteres) y correlación, traza y span, mediante el SP <code>usp_<wbr>registrar_<wbr>notificacion_<wbr>saliente</code> (<code>Notificacion<wbr>Saliente<wbr>Jpa<wbr>Repository</code>). Estados: <code>PENDIENTE</code>, <code>RESERVADA</code>, <code>ENTREGADA</code>, <code>FALLIDA_REINTENTABLE</code>, <code>FALLIDA_DEFINITIVA</code>.</li>
+      <li><strong>Despachador:</strong> <code>NotificacionOutboxDispatcher</code> reserva lotes con un <em>lease</em> (<code>OUTBOX_<wbr>NOTIFICATION_<wbr>LEASE</code>, 60 s por defecto), descarta lo que no alcanza a enviar antes de que venza y purga lo viejo (<code>OUTBOX_<wbr>NOTIFICATION_<wbr>RETENTION_<wbr>DAYS</code>, 30). Funciona con varias instancias porque cada una identifica su reserva.</li>
+      <li><strong>Contrato HTTP:</strong> <code>POST /<wbr>api/<wbr>v1/<wbr>notificaciones</code> con <code>aplicacion</code>, <code>idempotencyKey</code>, <code>tipo</code>, <code>idioma</code>, <code>destinatarios[{correo}]</code>, <code>datos{}</code> e <code>idCorrelacion</code>; cabeceras <code>X-Api-Key</code>, <code>X-Correlation-Id</code> y <code>traceparent</code>. El servicio responde 202 o 200 si ya lo tenía.</li>
+      <li><strong>Resiliencia:</strong> timeouts 2 s de conexión y 10 s de lectura, circuit breaker <code>notificaciones</code>, y health del servicio.</li>
+      <li><strong>Detalles de cierre:</strong> los instantes que vienen del servicio se truncan a microsegundos; el token de verificación de correo se emite una sola vez por aviso (residual TD-126: vive en memoria y un reinicio entre intentos lo reemite); los avisos agrupados usan un saludo genérico por diseño (BCC).</li>
+    </ul>
+    <div class="nota"><strong>Transacción.</strong> El caso de uso persiste la operación con su SP y luego llama a <code>NotificacionPort</code>, que registra el aviso en la outbox con su propio SP (<code>usp_registrar_notificacion_saliente</code>); no comparten transacción. Desde que el aviso está en la outbox no se pierde: el despachador lo entrega con reserva (lease) y lo reintenta con la misma <code>idempotencyKey</code> si el servicio no responde.</div>
+
+    <div class="flujo" data-flujo data-titulo="Entrega de un aviso con reintento y protección contra duplicados">
+      <div class="paso" data-actor="Caso de uso" data-detalle="Tras confirmar su operación de negocio (por ejemplo un reclamo resuelto o un aviso de falta), llama a NotificacionPort.notificar con tipo, destinatarios (rol e idUsuario) y datos. Si no hay destinatarios, se omite y se cuenta como skipped.">Pide notificar</div>
+      <div class="paso" data-actor="OutboxNotificacionAdapter" data-detalle="Serializa destinatarios y datos a JSON y ejecuta usp_registrar_notificacion_saliente con la correlación y los ids de traza. La fila queda PENDIENTE. Es durable: sobrevive a una caída del backend o del servicio de correo. Incrementa la métrica notification.publish.total.">Registra en la outbox (PENDIENTE)</div>
+      <div class="paso" data-actor="NotificacionOutboxDispatcher" data-detalle="Un hilo propio ejecuta usp_reservar_notificaciones_salientes con tamaño de lote (50) y lease (60 s). Las filas pasan a RESERVADA con el identificador de la instancia. Otra instancia no las toma mientras el lease esté vigente. Si el lease casi venció, reenvía en el siguiente ciclo sin gastar un intento.">Reserva un lote con lease</div>
+      <div class="paso" data-actor="ServicioNotificacionChannelSender" data-detalle="Resuelve el correo de cada destinatario contra la BD (ContactoDestinatarioResolver), completa los marcadores dinámicos (enlaces de verificación o activación), y arma el cuerpo con idempotencyKey = id de la NotificacionSaliente (si hay más de 200 correos, se divide en bloques con sufijo). Nunca registra correos ni cuerpos en logs.">Arma el POST con idempotencyKey</div>
+      <div class="paso" data-actor="Servicio de Notificaciones" data-detalle="Valida la X-Api-Key, aplica el tope de envíos, renderiza la plantilla y encola el SMTP. Responde 202 si lo aceptó o 200 si ya conocía esa idempotencyKey (duplicado detectado: no reenvía el correo).">Acepta (202) o reconoce duplicado (200)</div>
+      <div class="paso" data-actor="NotificacionOutboxDispatcher" data-detalle="Con 202 o 200 llama a usp_marcar_notificacion_entregada y la fila queda ENTREGADA. Si el lease se perdió en medio, no marca y el siguiente ciclo la reintenta; como la clave es la misma, el servicio no duplica.">Marca ENTREGADA</div>
+      <div class="paso" data-actor="Servicio de Notificaciones" data-tipo="error" data-detalle="Reintento: un 5xx, un timeout, 408, 429, 401 o 403 (clave API mal configurada, que se registra como ERROR) dejan la fila FALLIDA_REINTENTABLE con backoff exponencial (base 30 s, tope 15 min) hasta max-attempts (5). Un 4xx definitivo guarda el código del servicio y queda FALLIDA_DEFINITIVA sin reintento.">Fallo: reintentar o descartar</div>
+    </div>
+
+    <h2 id="observabilidad">Observabilidad</h2>
+    <p><strong>Por qué.</strong> Con tres capas (SPA, API, SQL Server) un error solo se entiende si todos los registros comparten un identificador. OpenTelemetry es el estándar para trazas, métricas y logs.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  REQ["Petición HTTP"] --> CF["CorrelationIdFilter (prioridad máxima)"]
+  CF --> CTX["CorrelationIdContext + MDC"]
+  CF --> HT["HttpRequestTraceFilter"]
+  CTX --> LOG["Logs JSON logstash: correlationId, traceId, spanId"]
+  CTX --> SP["Parámetro idCorrelacion de cada SP"]
+  CTX --> HDR["Cabeceras X-Correlation-Id al PEP, al servicio de notificaciones"]
+  HT --> TR["Trazas OTLP http 4318"]
+  LOG --> LK["Alloy a Loki a Grafana"]
+  TR --> TP["Tempo"]
+  MET["Micrometer: /actuator/prometheus"] --> PR["Prometheus a Grafana"]
+      </pre>
+      <figcaption>Un mismo UUID viaja del navegador a los logs, al SP y al servicio de correo.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Correlación:</strong> <code>CorrelationIdFilter</code> (<code>X-Correlation-Id</code>) guarda el UUID en <code>CorrelationIdContext</code> y en el MDC; lo devuelve en la respuesta. <code>application</code> no lo conoce (lo exige <code>Application<wbr>Should<wbr>Not<wbr>Carry<wbr>Technical<wbr>Correlation<wbr>Test</code>); lo lee solo la infraestructura.</li>
+      <li><strong>Logs:</strong> en consola salen JSON estructurado (<code>logstash</code>) con <code>correlationId</code>, <code>traceId</code> y <code>spanId</code>. En local y dev se activa además un archivo JSONL que lee Alloy (<code>infra/<wbr>observability/<wbr>logs</code>).</li>
+      <li><strong>Métricas:</strong> Micrometer con Prometheus en un puerto de gestión propio (<code>MANAGEMENT_<wbr>SERVER_<wbr>PORT</code>, 8090) ligado a loopback. Expone <code>health</code> y <code>prometheus</code>; histograma de <code>http.server.requests</code>; contadores propios como <code>notification.<wbr>publish.<wbr>total</code>.</li>
+      <li><strong>Trazas:</strong> exportación OTLP por HTTP a <code>http://<wbr>localhost:4318/<wbr>v1/<wbr>traces</code> con muestreo del 10 % (<code>MANAGEMENT_<wbr>TRACING_<wbr>SAMPLING_<wbr>PROBABILITY</code>).</li>
+      <li><strong>Sondas:</strong> liveness solo mira la JVM; readiness agrega la BD y el estado de los circuit breakers (un breaker abierto no tumba la instancia).</li>
+      <li><strong>Auditoría:</strong> <code>@AuditableOperation</code> y <code>AuditInterceptor</code> publican eventos de auditoría; <code>PurgaAuditoriaScheduler</code> aplica retención.</li>
+    </ul>
+
+    <h2 id="limites-red">Límites de uso y validación de red del campus</h2>
+    <p><strong>Por qué.</strong> La marcación autónoma por QR o PIN solo es válida si el dispositivo está en la red Wi-Fi institucional, y los endpoints públicos deben resistir abuso.</p>
+    <div class="flujo" data-flujo data-titulo="Marcación por QR: red del campus y límites">
+      <div class="paso" data-actor="AsistenciaQrRateLimitFilter" data-detalle="Antes del caso de uso, aplica el límite por IP sobre POST /api/v1/estudiante/asistencia-qr y solo cuenta los intentos rechazados (un intento aceptado no extiende el bloqueo). Al excederlo responde 429 con Retry-After.">Límite por IP</div>
+      <div class="paso" data-actor="NetworkClientIpResolver" data-detalle="Resuelve la IP real del cliente. Solo confía en X-Forwarded-For si remoteAddr pertenece a RED/PROXIES_CONFIABLES; recorre la cabecera de derecha a izquierda saltando proxies confiables y toma el primer salto no confiable. Un valor inválido o ausente cae a remoteAddr: una cabecera falsificada nunca se hace pasar por IP del campus.">Resuelve la IP con proxies confiables</div>
+      <div class="paso" data-actor="RedInstitucionalPort" data-detalle="CidrRedInstitucionalAdapter lee RED/CIDRS_CAMPUS del catálogo de parámetros en cada consulta (cambia sin reiniciar). Sin rangos válidos niega siempre (fail-closed) y nunca resuelve nombres de host.">Compara con los CIDR del campus</div>
+      <div class="paso" data-actor="Caso de uso" data-detalle="Con IP del campus, se valida el token del QR, la matrícula activa del estudiante en el grupo y los límites por token y por estudiante. La BD vuelve a validar y registra la asistencia.">Valida token y matrícula</div>
+      <div class="paso" data-actor="GlobalExceptionHandler" data-tipo="error" data-detalle="Fuera de la red del campus la marcación se rechaza con un error de negocio del catálogo; al exceder cualquier límite, 429 TooManyRequestsException con Retry-After de un minuto.">Rechazo: fuera de campus o 429</div>
+    </div>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Filtro o pieza</th><th>Protege</th></tr></thead>
+        <tbody>
+          <tr><td><code>Operacion<wbr>Autenticada<wbr>Rate<wbr>Limit<wbr>Filter</code></td><td><code>POST /<wbr>api/<wbr>v1/<wbr>archivos/<wbr>subir</code>: por usuario y por IP (<code>ARCHIVOS/<wbr>LIMITE_<wbr>SUBIDAS_<wbr>POR_<wbr>MINUTO</code>).</td></tr>
+          <tr><td><code>AsistenciaQrRateLimitFilter</code></td><td>Marcación por QR: IP, token y estudiante.</td></tr>
+          <tr><td><code>MatriculaQrRateLimitFilter</code></td><td>Rutas públicas de matrícula por QR (validar y registro).</td></tr>
+          <tr><td><code>Verificacion<wbr>Correo<wbr>Rate<wbr>Limit<wbr>Filter</code></td><td>Verificación pública de correo (<code>VERIFICACION_<wbr>CORREO_<wbr>LIMITE_<wbr>POR_<wbr>MINUTO</code>, 20).</td></tr>
+          <tr><td><code>Mensajes<wbr>Interfaz<wbr>Rate<wbr>Limit<wbr>Filter</code></td><td>Textos de interfaz públicos.</td></tr>
+          <tr><td><code>SlidingWindowRateLimiter</code> (<code>infrastructure/<wbr>ratelimit</code>)</td><td>Ventana deslizante en memoria con desalojo de claves; el límite llega por llamada y puede venir de un parámetro editable. Por instancia, no distribuido.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Los daemons de <code>adapter/<wbr>primary/<wbr>scheduler</code> (<code>Rotacion<wbr>Token<wbr>Asistencia<wbr>Scheduler</code>, <code>Rotacion<wbr>Token<wbr>Matricula<wbr>Scheduler</code>, <code>Evaluacion<wbr>Alertas<wbr>Inasistencia<wbr>Scheduler</code>, <code>CargaFestivosScheduler</code>, <code>PurgaAuditoriaScheduler</code>) son trabajo del servidor, no sondeo del cliente; cada uno abre su propia correlación y es idempotente entre instancias.</p>
+
+    <h2 id="configuracion">Configuración y perfiles</h2>
+    <p>La configuración está en <code>src/<wbr>main/<wbr>resources/<wbr>application.<wbr>yml</code> (153 variables de entorno distintas, con valores por defecto seguros) y en dos perfiles: <code>application-local.yml</code> y <code>application-dev.yml</code>.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Perfil</th><th>Qué cambia</th></tr></thead>
+        <tbody>
+          <tr><td>Sin perfil (contenedor o producción)</td><td>Baúl de secretos <code>azure_keyvault</code>, catálogos de Azure, logs solo a stdout, Swagger apagado.</td></tr>
+          <tr><td><code>local</code> y <code>dev</code></td><td>Swagger UI activo; baúl <code>local_env</code>; catálogos de mensajes y parámetros desde SQL Server; archivo JSONL de logs para el stack local de Alloy y Loki.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Selectores de adaptadores</h3>
+    <ul>
+      <li><code>app.<wbr>adapters.<wbr>security.<wbr>provider</code> / <code>identity.provider</code>: <code>baseline</code> (por defecto) o <code>legacy</code>.</li>
+      <li><code>vault</code>: <code>azure_keyvault</code> o <code>local_env</code>. <code>parameter-catalog</code>: <code>azure_appconfig</code>, <code>sqlserver</code> o <code>catalogoparametros</code>. <code>message-catalog</code>: <code>azure</code>, <code>messageucolab</code> o <code>sqlserver</code>.</li>
+      <li><code>storage</code>: <code>minio</code> (único soportado). <code>realtime</code>: <code>local-sse</code>. <code>audit</code>: <code>logging</code>. <code>notification</code>: <code>log</code>, <code>outbox</code> o <code>composite</code>.</li>
+    </ul>
+    <h3>Variables de entorno (solo nombres)</h3>
+    <details class="acordeon">
+      <summary>Ver las variables por grupo</summary>
+      <div class="tabla-contenedor">
+        <table>
+          <thead><tr><th>Grupo</th><th>Variables</th></tr></thead>
+          <tbody>
+            <tr><td>Base de datos</td><td><code>SPRING_DATASOURCE_URL</code>, <code>SPRING_<wbr>DATASOURCE_<wbr>USERNAME</code>, <code>SPRING_<wbr>DATASOURCE_<wbr>PASSWORD</code>, <code>SPRING_<wbr>DATASOURCE_<wbr>HIKARI_<wbr>MAXIMUM_<wbr>POOL_<wbr>SIZE</code>, <code>SPRING_<wbr>DATASOURCE_<wbr>HIKARI_<wbr>MINIMUM_<wbr>IDLE</code>, <code>SPRING_<wbr>DATASOURCE_<wbr>HIKARI_<wbr>CONNECTION_<wbr>TIMEOUT</code>, <code>SPRING_<wbr>DATASOURCE_<wbr>LOGIN_<wbr>TIMEOUT_<wbr>SECONDS</code></td></tr>
+            <tr><td>Servidor y gestión</td><td><code>SERVER_PORT</code>, <code>MANAGEMENT_<wbr>SERVER_<wbr>PORT</code>, <code>MANAGEMENT_<wbr>SERVER_<wbr>ADDRESS</code>, <code>SPRING_<wbr>LIFECYCLE_<wbr>TIMEOUT_<wbr>PER_<wbr>SHUTDOWN_<wbr>PHASE</code>, <code>ASISTENCIAS_<wbr>SWAGGER_<wbr>UI_<wbr>ENABLED</code>, <code>APP_<wbr>SECURITY_<wbr>CORS_<wbr>ALLOWED_<wbr>ORIGINS</code>, <code>APP_<wbr>SECURITY_<wbr>HSTS_<wbr>ENABLED</code></td></tr>
+            <tr><td>Selectores</td><td><code>APP_<wbr>ADAPTERS_<wbr>SECURITY_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>IDENTITY_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>VAULT_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>PARAMETER_<wbr>CATALOG_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>MESSAGE_<wbr>CATALOG_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>STORAGE_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>REALTIME_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>AUDIT_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>NOTIFICATION_<wbr>PROVIDER</code>, <code>APP_<wbr>ADAPTERS_<wbr>NOTIFICATION_<wbr>COMPOSITE_<wbr>TARGETS</code></td></tr>
+            <tr><td>Security Baseline</td><td><code>SECURITY_<wbr>BASELINE_<wbr>ISSUER_<wbr>URI</code>, <code>SECURITY_<wbr>BASELINE_<wbr>JWK_<wbr>SET_<wbr>URI</code>, <code>SECURITY_<wbr>BASELINE_<wbr>API_<wbr>CLIENT_<wbr>ID</code>, <code>SECURITY_<wbr>BASELINE_<wbr>EXPECTED_<wbr>AUDIENCE</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PEP_<wbr>URL</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PEP_<wbr>APPLICATION_<wbr>NAME</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PEP_<wbr>ENVIRONMENT</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PEP_<wbr>APPLICATION_<wbr>CREDENTIAL</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PEP_<wbr>CONNECT_<wbr>TIMEOUT</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PEP_<wbr>REQUEST_<wbr>TIMEOUT</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PDP_<wbr>URL</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PDP_<wbr>PROFILE_<wbr>SYNC_<wbr>ENABLED</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PDP_<wbr>ADMIN_<wbr>CLIENT_<wbr>ID</code>, <code>SECURITY_<wbr>BASELINE_<wbr>PDP_<wbr>ADMIN_<wbr>CLIENT_<wbr>SECRET</code>, <code>SECURITY_<wbr>BASELINE_<wbr>IDENTITY_<wbr>SERVER_<wbr>URL</code>, <code>SECURITY_<wbr>BASELINE_<wbr>IDENTITY_<wbr>REALM</code></td></tr>
+            <tr><td>Eventos de asignación (RabbitMQ)</td><td><code>APP_<wbr>ADAPTERS_<wbr>ASSIGNMENT_<wbr>EVENTS_<wbr>ENABLED</code>, <code>RABBITMQ_HOST</code>, <code>RABBITMQ_PORT</code>, <code>RABBITMQ_VIRTUAL_HOST</code>, <code>RABBITMQ_USERNAME</code>, <code>RABBITMQ_PASSWORD</code>, <code>SECURITY_<wbr>BASELINE_<wbr>ASSIGNMENT_<wbr>EVENTS_<wbr>APPLICATION_<wbr>ID</code>, <code>SECURITY_<wbr>BASELINE_<wbr>ASSIGNMENT_<wbr>EVENTS_<wbr>EXCHANGE</code></td></tr>
+            <tr><td>Legacy Keycloak (contingencia)</td><td><code>KEYCLOAK_ISSUER_URI</code>, <code>KEYCLOAK_SERVER_URL</code>, <code>KEYCLOAK_REALM</code>, <code>KEYCLOAK_<wbr>API_<wbr>CLIENT_<wbr>ID</code>, <code>KEYCLOAK_<wbr>EXPECTED_<wbr>AUDIENCE</code>, <code>KEYCLOAK_<wbr>ADMIN_<wbr>CLIENT_<wbr>ID</code>, <code>KEYCLOAK_<wbr>ADMIN_<wbr>CLIENT_<wbr>SECRET</code>, <code>KEYCLOAK_<wbr>USER_<wbr>ID_<wbr>CLAIM</code></td></tr>
+            <tr><td>Azure</td><td><code>AZURE_<wbr>KEYVAULT_<wbr>ENDPOINT</code>, <code>AZURE_<wbr>APPCONFIG_<wbr>ENDPOINT</code>, <code>AZURE_<wbr>EVENTGRID_<wbr>WEBHOOK_<wbr>TOKEN</code>, <code>APP_<wbr>SECRETS_<wbr>RUNTIME_<wbr>FROM_<wbr>VAULT_<wbr>ENABLED</code></td></tr>
+            <tr><td>Catálogos</td><td><code>MESSAGEUCOLAB_URL</code>, <code>MESSAGEUCOLAB_<wbr>CLIENT_<wbr>ID</code>, <code>MESSAGEUCOLAB_<wbr>CLIENT_<wbr>SECRET</code>, <code>MESSAGEUCOLAB_<wbr>TOKEN_<wbr>URI</code>, <code>MESSAGEUCOLAB_<wbr>CACHE_<wbr>TTL</code>, <code>MESSAGEUCOLAB_<wbr>FALLBACK</code>, <code>MESSAGEUCOLAB_<wbr>EVENTS_<wbr>ENABLED</code>, <code>MESSAGEUCOLAB_<wbr>PULSAR_<wbr>URL</code>, <code>CATALOGO_<wbr>PARAMETROS_<wbr>BASE_<wbr>URL</code>, <code>CATALOGO_<wbr>PARAMETROS_<wbr>TOKEN_<wbr>ID</code>, <code>CATALOGO_<wbr>PARAMETROS_<wbr>SECRETO</code>, <code>CATALOGO_<wbr>PARAMETROS_<wbr>CACHE_<wbr>TTL</code>, <code>ASISTENCIAS_<wbr>CATALOGO_<wbr>SQL_<wbr>CACHE_<wbr>TTL</code></td></tr>
+            <tr><td>Soportes</td><td><code>MINIO_ENDPOINT</code>, <code>MINIO_ACCESS_KEY</code>, <code>MINIO_SECRET_KEY</code>, <code>MINIO_BUCKET</code>, <code>CLAMAV_HOST</code>, <code>CLAMAV_PORT</code></td></tr>
+            <tr><td>Notificaciones y outbox</td><td><code>NOTIFICACIONES_<wbr>SERVICE_<wbr>URL</code>, <code>NOTIFICACIONES_<wbr>API_<wbr>KEY</code>, <code>NOTIFICACIONES_<wbr>APLICACION</code>, <code>NOTIFICACIONES_<wbr>PLATFORM_<wbr>URL</code>, <code>NOTIFICACIONES_<wbr>REQUIRE_<wbr>CONFIRMED_<wbr>EMAIL</code>, <code>OUTBOX_<wbr>NOTIFICATION_<wbr>SENDER</code>, <code>OUTBOX_<wbr>NOTIFICATION_<wbr>DISPATCHER_<wbr>ENABLED</code>, <code>OUTBOX_<wbr>NOTIFICATION_<wbr>BATCH_<wbr>SIZE</code>, <code>OUTBOX_<wbr>NOTIFICATION_<wbr>LEASE</code>, <code>OUTBOX_<wbr>NOTIFICATION_<wbr>MAX_<wbr>ATTEMPTS</code>, <code>OUTBOX_<wbr>NOTIFICATION_<wbr>BACKOFF_<wbr>BASE</code>, <code>OUTBOX_<wbr>NOTIFICATION_<wbr>BACKOFF_<wbr>MAX</code>, <code>OUTBOX_<wbr>NOTIFICATION_<wbr>RETENTION_<wbr>DAYS</code></td></tr>
+            <tr><td>Observabilidad</td><td><code>MANAGEMENT_<wbr>TRACING_<wbr>SAMPLING_<wbr>PROBABILITY</code>, <code>MANAGEMENT_<wbr>OPENTELEMETRY_<wbr>TRACING_<wbr>EXPORT_<wbr>OTLP_<wbr>ENDPOINT</code>, <code>ASISTENCIAS_<wbr>UCO_<wbr>LOG_<wbr>FILE</code>, <code>ASISTENCIAS_<wbr>UCO_<wbr>LOG_<wbr>CONSOLE_<wbr>FORMAT</code></td></tr>
+            <tr><td>Resiliencia y límites</td><td><code>RESILIENCE_CB_*</code> (umbrales de los circuit breakers), <code>VERIFICACION_<wbr>CORREO_<wbr>LIMITE_<wbr>POR_<wbr>MINUTO</code>, <code>AUDITORIA_<wbr>PURGA_<wbr>RETENCION</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <div class="nota peligro"><strong>Secretos.</strong> Nunca van al repositorio: se leen del baúl o del <code>.env</code> local (<code>Gestio<wbr>Asistencia<wbr>Backend/.<wbr>env</code>, ignorado por git). Inventario y rotación: <code>Gestio<wbr>Asistencia<wbr>Backend/<wbr>docs/<wbr>security/<wbr>SECRETS_<wbr>INVENTORY.<wbr>md</code> y <code>SECRETS_<wbr>ROTATION_<wbr>RUNBOOK.<wbr>md</code>.</div>
+
+    <h2 id="pruebas">Pruebas</h2>
+    <p>La regla del proyecto: <strong>no se acomoda una prueba para que pase</strong>. Si falla, se corrige el código de producción; solo se toca la prueba si ella misma tiene un error genuino o cambió el contrato.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Tipo</th><th>Dónde y para qué</th></tr></thead>
+        <tbody>
+          <tr><td>Unitarias de casos de uso</td><td><code>src/<wbr>test/.../<wbr>application</code>: 1523 métodos de prueba. Interactores, validadores y reglas puras sin base de datos.</td></tr>
+          <tr><td>De controlador (WebMvc)</td><td><code>src/<wbr>test/.../<wbr>infrastructure/<wbr>adapter/<wbr>primary/<wbr>controller</code>: validan códigos HTTP, forma de respuesta y límites de seguridad (13 clases con <code>@WebMvcTest</code>, más pruebas de <code>MockMvc</code> directas).</td></tr>
+          <tr><td>De arquitectura (ArchUnit)</td><td><code>src/<wbr>test/.../<wbr>architecture</code>: 34 clases, 118 métodos.</td></tr>
+          <tr><td>Contrato y paridad</td><td><code>openapi/<wbr>Open<wbr>Api<wbr>Golden<wbr>Path<wbr>Conformance<wbr>Test</code>, <code>Open<wbr>Api<wbr>Estudiantes<wbr>Directory<wbr>Conformance<wbr>Test</code>, <code>AccessCatalogConsistencyTest</code>, <code>AltaRequestLengthParityTest</code> y los <code>*ParityIT</code> de persistencia (JPA contra el SP real).</td></tr>
+          <tr><td>De integración (<code>*IT</code>)</td><td>51 clases (273 métodos) con el perfil <code>integration</code> y Failsafe; requieren SQL Server real.</td></tr>
+          <tr><td>Gate de cobertura</td><td>JaCoCo en <code>pom.xml</code>, ejecución <code>check</code> en <code>verify</code>: líneas al menos 0,80 y ramas al menos 0,70 sobre todo el bundle.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="dos-columnas">
+      <figure class="grafica">
+        <div class="lienzo"><canvas aria-label="Pruebas por capa medidas el 2026-11-22: base de datos 1118, backend 5215, frontend 3903, servicio de notificaciones 146" role="img" data-grafica='{"type":"bar","data":{"labels":["BD (casos)","Backend","Frontend","Notificaciones"],"datasets":[{"label":"Pruebas","data":[1118,5215,3903,146]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+        <figcaption>Pruebas por capa, medidas el 2026-11-22. El backend cuenta casos parametrizados; hay 4936 métodos anotados con <code>@Test</code> o <code>@ParameterizedTest</code>.</figcaption>
+      </figure>
+      <figure class="grafica">
+        <div class="lienzo"><canvas aria-label="Cobertura en líneas y ramas: backend 95,9 y 87,1; frontend realtime ≈95 y ≈87; notificaciones 98,5 y 92,4; mínimo del gate del backend 80 y 70" role="img" data-grafica='{"type":"bar","data":{"labels":["Backend","Frontend realtime","Notificaciones","Mínimo del gate backend"],"datasets":[{"label":"Líneas %","data":[95.9,95,98.5,80]},{"label":"Ramas %","data":[87.1,87,92.4,70]}]},"options":{"scales":{"y":{"min":0,"max":100}}}}'></canvas></div>
+        <figcaption>Cobertura medida el 2026-11-22 frente al umbral de JaCoCo (80 % líneas, 70 % ramas).</figcaption>
+      </figure>
+    </div>
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Métodos de prueba del backend por carpeta: infrastructure 3183, application 1523, architecture 118, crosscutting 84, openapi 27" role="img" data-grafica='{"type":"bar","data":{"labels":["infrastructure","application","architecture","crosscutting","openapi"],"datasets":[{"label":"Métodos de prueba","data":[3183,1523,118,84,27]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Métodos <code>@Test</code> y <code>@ParameterizedTest</code> por carpeta de <code>src/<wbr>test/<wbr>java/<wbr>co/<wbr>edu/<wbr>uco/<wbr>asistenciasuco</code> (845 archivos de prueba; <code>grep -rho</code> el 2026-11-22).</figcaption>
+    </figure>
+    <h3>Comandos</h3>
+    <pre><code>cd GestioAsistenciaBackend
+.\mvnw.cmd test                  # unitarias, WebMvc y ArchUnit
+.\mvnw.cmd verify                # añade JaCoCo y su gate
+.\mvnw.cmd verify -Pintegration  # pruebas *IT contra SQL Server real
+.\AsistenciasUCO-Infra\infra.ps1 verify   # secretos y paridad de contratos WORM</code></pre>
+    <div class="nota"><strong>Windows.</strong> Para <code>mvnw test</code> en Windows se necesita el ajuste <code>jdk.<wbr>net.<wbr>unixdomain.<wbr>tmpdir=C:\jtmp</code>. Si arrancas una rama, usa <code>mvnw clean package</code> para no ejecutar un jar con clases viejas.</div>
+
+    <h2 id="fuentes">Dónde seguir leyendo</h2>
+    <div class="tarjetas">
+      <div class="tarjeta"><div class="icono">📐</div><h4>Arquitectura</h4><p><code>Gestio<wbr>Asistencia<wbr>Backend/<wbr>docs/<wbr>architecture/</code>: estructura de paquetes, composición de adaptadores, degradación por dependencia, realtime.</p></div>
+      <div class="tarjeta"><div class="icono">📜</div><h4>Contratos</h4><p><code>AsistenciasUCO-<wbr>Infra/<wbr>docs/<wbr>contracts/</code>: OpenAPI golden path, eventos realtime y contrato de BD, con su <code>.sha256</code>.</p></div>
+      <div class="tarjeta"><div class="icono">🧭</div><h4>Skills del backend</h4><p><code>Gestio<wbr>Asistencia<wbr>Backend/.<wbr>claude/<wbr>skills/</code>: uco-arquitectura, uco-persistencia, uco-seguridad, uco-catalogos, uco-files, uco-realtime, uco-observabilidad, uco-testing.</p></div>
+      <div class="tarjeta"><div class="icono">🗂️</div><h4>Decisiones (ADR)</h4><p><code>Gestio<wbr>Asistencia<wbr>Backend/<wbr>docs/<wbr>adr/</code>: JPA incremental y solo JPA, proveedor de notificaciones y plantillas de correo.</p></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

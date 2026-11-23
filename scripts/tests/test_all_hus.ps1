@@ -28,7 +28,10 @@ param(
     [string]$PasswordDocente,
     [string]$PasswordCoordinador,
     [string]$PasswordDecano,
-    [string]$PasswordAdministrador
+    [string]$PasswordAdministrador,
+    # Escenario soportes (MinIO + ClamAV): si se indica, un antivirus no disponible (503 ERR_ANTIVIRUS_NO_DISPONIBLE) es FAIL.
+    # Sin el switch (escenario basico, sin ClamAV) esas pruebas se reportan como SKIP con el motivo explicito.
+    [switch]$RequiereSoportes
 )
 $ErrorActionPreference = "Continue"
 $BASE = $BaseUrl.TrimEnd('/')
@@ -57,6 +60,7 @@ $global:PassedTests = 0
 $global:FailedTests = 0
 $global:SkippedTests = 0
 $global:TestResults = @()
+$script:antivirusNoDisponible = $false
 
 function Get-Token($user, $pass) {
     try {
@@ -85,6 +89,19 @@ function Run-Test($huCode, $description, [scriptblock]$action) {
             Detalle = "$res"
         }
     } catch {
+        $msg = $_.Exception.Message
+        # Solo el codigo ERR_ANTIVIRUS_NO_DISPONIBLE (503) y sus dependientes directos (HU014/HU010) se omiten; cualquier otro error es FAIL.
+        $esAntivirus = ($msg -match '^HTTP 503 \[ERR_ANTIVIRUS_NO_DISPONIBLE\]')
+        $esDependiente = ($script:antivirusNoDisponible -and ($msg -match '\(falla (la prueba )?HU01[04]\)'))
+        if (-not $RequiereSoportes -and ($esAntivirus -or $esDependiente)) {
+            $script:antivirusNoDisponible = $true
+            $global:SkippedTests++
+            $motivo = if ($esAntivirus) { "Antivirus no disponible (503 ERR_ANTIVIRUS_NO_DISPONIBLE): requiere escenario soportes / ClamAV. Use -RequiereSoportes para exigirlo." } else { "Depende de un soporte que no pudo subirse: requiere escenario soportes / ClamAV." }
+            Write-Host "SKIP" -ForegroundColor Yellow
+            Write-Host "        -> $motivo" -ForegroundColor DarkYellow
+            $global:TestResults += [PSCustomObject]@{ HU = $huCode; Descripcion = $description; Estado = "SKIP"; Detalle = $motivo }
+            return
+        }
         $global:FailedTests++
         Write-Host "FAIL" -ForegroundColor Red
         Write-Host "        -> Error: $($_.Exception.Message)" -ForegroundColor DarkYellow
@@ -402,6 +419,7 @@ Run-Test "HU003,HU032,HU052" "Consultar padron de estudiantes matriculados en gr
     $otro = @($padron | Where-Object { $_.codigoEstado -eq "A" -and $_.idEstudiante -ine $script:carlosId })
     if ($otro.Count -lt 1) { throw "El padron no tiene otro estudiante activo para pruebas de matricula" }
     $script:anaId = [string]$otro[0].idEstudiante
+    $script:candidatosMatriculaIds = @($otro | ForEach-Object { [string]$_.idEstudiante })
     return "Estudiantes en el grupo: $($padron.Count)"
 }
 
@@ -680,8 +698,9 @@ Run-Test "HU043" "Crear nuevo grupo academico validando cupos y aforo (usp_crear
     # DEC-065 (4): el coordinador crea el grupo de una asignatura de su programa y asigna al docente titular; se retiro la
     # oferta de creacion del docente. El titular es el docente de prueba (vinculado al programa) para que HU050/HU051 operen.
     $yo = Invoke-Api GET "/auth/me" $hDoc
-    $docentes = Invoke-Api GET "/coordinador/docentes" $hCoord
-    $script:docenteId = [string]@($docentes.datos | Where-Object { $_.idUsuario -ieq [string]$yo.datos.idUsuario })[0].idDocente
+    # El listado es paginado (10 por defecto) y cada corrida agrega un docente E2E (HU091): se pide una pagina amplia.
+    $docentes = Invoke-Api GET "/coordinador/docentes?pagina=1&tamano=100" $hCoord
+    $script:docenteId =[string]@($docentes.datos | Where-Object { $_.idUsuario -ieq [string]$yo.datos.idUsuario })[0].idDocente
     if (-not $script:docenteId) { throw "El docente de prueba no esta vinculado a un programa del coordinador" }
     # Ojo: no llamar a una variable $base aqui; PowerShell no distingue mayusculas y taparia la URL $BASE de Invoke-Api.
     $grupoDelDocente = @((Invoke-Api GET "/docente/asignaturas" $hDoc).datos | Where-Object { $_.idGrupo -ieq $script:grupoBaseId })[0]
@@ -694,7 +713,8 @@ Run-Test "HU043" "Crear nuevo grupo academico validando cupos y aforo (usp_crear
     $ultimo = ""
     for ($i = 0; $i -lt 12; $i++) {
         $codigo = Get-Random -Minimum 1000 -Maximum 9999
-        $hora = Get-Random -Minimum 5 -Maximum 20
+        # HOR_008: la franja debe quedar dentro del horario permitido 06:00-22:00 (inicio 06..19, fin = inicio + 2).
+        $hora = Get-Random -Minimum 6 -Maximum 20
         $body = @{
             idAsignatura = $script:asignaturaOfertaId
             idPeriodoAcademico = $script:periodoVigenteId
@@ -729,10 +749,29 @@ Run-Test "HU044" "Modificar nombre y aforo de grupo academico (coordinador/admin
 
 Run-Test "HU050" "Inscribir / matricular manualmente a estudiante en el grupo academico" {
     if (-not $script:grupoNuevoId) { throw "No hay grupo (falla HU043)" }
-    $body = @{ estudianteId = $script:anaId }
-    $res = Invoke-Api POST "/grupos/$($script:grupoNuevoId)/estudiantes" $hDoc $body
-    if (-not $res.exitoso) { throw "Respuesta no exitosa al matricular" }
-    return "Estudiante matriculado con exito en el grupo: $($res.mensajeUsuario)"
+    # El grupo E2E queda en una franja aleatoria: un estudiante con clase en esa franja responde 409 ERR_CRUCE_HORARIO_ESTUDIANTE
+    # (regla vigente, no se relaja). Se prueba a los candidatos del padron, luego a los del directorio del coordinador (incluye
+    # estudiantes sin grupos), y se usa el primero sin cruce; cualquier otro error es FAIL.
+    $candidatos = New-Object System.Collections.Generic.List[string]
+    foreach ($c in @($script:candidatosMatriculaIds)) { if ($c -and -not $candidatos.Contains($c)) { $candidatos.Add($c) } }
+    $dir = Invoke-Api GET "/coordinador/estudiantes?pagina=1&tamano=100" $hCoord
+    foreach ($e in @($dir.elementos)) {
+        $eid = [string]$(if ($e.idEstudiante) { $e.idEstudiante } else { $e.id })
+        if ($eid -and $eid -ine $script:carlosId -and -not $candidatos.Contains($eid)) { $candidatos.Add($eid) }
+    }
+    $ultimo = ""
+    foreach ($cid in $candidatos) {
+        try {
+            $res = Invoke-Api POST "/grupos/$($script:grupoNuevoId)/estudiantes" $hDoc @{ estudianteId = $cid }
+            if (-not $res.exitoso) { throw "Respuesta no exitosa al matricular" }
+            $script:anaId = $cid
+            return "Estudiante matriculado con exito en el grupo (tras $($candidatos.IndexOf($cid)) cruces de horario descartados): $($res.mensajeUsuario)"
+        } catch {
+            $ultimo = $_.Exception.Message
+            if ($ultimo -notmatch 'ERR_CRUCE_HORARIO_ESTUDIANTE') { throw }
+        }
+    }
+    throw "Ningun estudiante candidato (de $($candidatos.Count)) esta libre en la franja del grupo E2E. Ultimo error: $ultimo"
 }
 
 Run-Test "F-COO-004" "El coordinador no puede matricular manualmente (solo el docente titular)" {
@@ -828,22 +867,20 @@ Run-Test "HU062,HU063,HU089,HU090,HU094,HU095" "Consultar directorio consolidado
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
     $resumen = Invoke-Api GET "/coordinador/docentes/resumen" $hCoord
     if (-not $resumen.exitoso) { throw "Respuesta no exitosa en el resumen" }
-    $tipos = Invoke-Api GET "/tipos-vinculacion" $hCoord
-    return "Docentes adscritos al programa: $(@($res.datos).Count). Tipos de vinculacion: $(@($tipos).Count)"
+    # El tipo de vinculacion se retiro (frontend 8649af6): el directorio ya no expone ni exige /tipos-vinculacion.
+    return "Docentes adscritos al programa: $(@($res.datos).Count). Resumen consultado."
 }
 
-Run-Test "HU091" "Agregar nuevo profesor al programa academico con vinculacion atomica" {
+Run-Test "HU091" "Agregar nuevo profesor al programa academico (vinculacion atomica al programa del coordinador)" {
     $doc = Get-Random -Minimum 1070000000 -Maximum 1079999999
     $tiposId = Invoke-Api GET "/tipos-identificacion" $hCoord
     $cc = @($tiposId | Where-Object { $_.tipoIdentificacion -eq "CC" })[0].id
-    $vinc = Invoke-Api GET "/tipos-vinculacion" $hCoord
     $body = @{
         idTipoIdentificacion = $cc
         numeroIdentificacion = "$doc"
         primerNombre = "CULME"
         primerApellido = "DOCENTE"
         correo = "culm1-e2e-doc-$doc@uco.edu.co"
-        idTipoVinculacion = @($vinc)[0].id
     }
     $res = Invoke-Api POST "/coordinador/docentes" $hCoord $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa al crear docente" }
@@ -853,14 +890,11 @@ Run-Test "HU091" "Agregar nuevo profesor al programa academico con vinculacion a
 
 Run-Test "HU092" "Actualizar datos y vinculacion de profesor del programa" {
     if (-not $script:tempDocenteId) { throw "No hay docente (falla HU091)" }
-    $vinc = @(Invoke-Api GET "/tipos-vinculacion" $hCoord)
-    $actual = (Invoke-Api GET "/coordinador/docentes" $hCoord).datos | Where-Object { $_.idDocente -ieq $script:tempDocenteId }
-    $otra = @($vinc | Where-Object { $_.id -ine $actual.idTipoVinculacion })[0]
-    $body = @{ primerNombre = "CULME"; primerApellido = "DOCENTE ACTUALIZADO"; idTipoVinculacion = $otra.id }
+    $body = @{ primerNombre = "CULME"; primerApellido = "DOCENTE ACTUALIZADO" }
     $res = Invoke-Api PUT "/coordinador/docentes/$($script:tempDocenteId)" $hCoord $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
     if ($res.datos.primerApellido -ne "DOCENTE ACTUALIZADO") { throw "El apellido no se actualizo" }
-    return "Profesor actualizado: $($res.datos.nombreCompleto), vinculacion $($res.datos.nombreTipoVinculacion)"
+    return "Profesor actualizado: $($res.datos.nombreCompleto)"
 }
 
 Run-Test "HU093" "Alternar estado activo/inactivo de profesor del programa" {
@@ -996,7 +1030,9 @@ Run-Test "HU096,HU142" "Consultar y registrar nuevo periodo academico institucio
     if (-not $resGet.exitoso) { throw "Respuesta no exitosa al consultar periodos" }
     $anio = Get-Random -Minimum 2040 -Maximum 2090
     $nombre = "CULM1-E2E-$anio"
-    $body = @{ nombre = $nombre; fechaInicio = "$anio-02-01"; fechaFin = "$anio-06-30" }
+    # SES-GEN-01 B2: el semestre dura 16 semanas (112 dias): fechaFin = fechaInicio + 111 dias (usp_crear_periodo_academico).
+    $ini = [datetime]::new($anio, 2, 1)
+    $body = @{ nombre = $nombre; fechaInicio = $ini.ToString("yyyy-MM-dd"); fechaFin = $ini.AddDays(111).ToString("yyyy-MM-dd") }
     $res = Invoke-Api POST "/admin/periodos-academicos" $hAdmin $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
     $lista = Invoke-Api GET "/coordinador/periodos-academicos" $hAdmin
@@ -1008,7 +1044,8 @@ Run-Test "HU096,HU142" "Consultar y registrar nuevo periodo academico institucio
 
 Run-Test "HU097" "Modificar fechas y nombre de periodo academico institucional (administrador)" {
     if (-not $script:tempPeriodoId) { throw "No hay periodo (falla HU096)" }
-    $body = @{ nombre = "CULM1-E2E-Actualizado"; fechaInicio = "2091-02-05"; fechaFin = "2091-07-01" }
+    $ini2 = [datetime]::new(2091, 2, 5)
+    $body = @{ nombre = "CULM1-E2E-Actualizado"; fechaInicio = $ini2.ToString("yyyy-MM-dd"); fechaFin = $ini2.AddDays(111).ToString("yyyy-MM-dd") }
     $res = Invoke-Api PUT "/admin/periodos-academicos/$($script:tempPeriodoId)" $hAdmin $body
     if (-not $res.exitoso) { throw "Respuesta no exitosa" }
     $lista = Invoke-Api GET "/coordinador/periodos-academicos" $hAdmin

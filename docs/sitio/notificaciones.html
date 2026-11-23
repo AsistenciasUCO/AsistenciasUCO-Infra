@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notificaciones por correo · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>Servicio de Notificaciones por correo</h1>
+      <p>El correo institucional sale por un componente independiente, no por el backend. Esta página explica por qué, cómo funciona, qué plantillas existen, cómo se reemplaza y cómo quedó cerrada la migración (fases F1 a F7, corte final del 2026-11-22).</p>
+      <div class="etiquetas">
+        <span class="etiqueta">Servicio 0.1.1</span>
+        <span class="etiqueta">Migración F1 a F7 cerrada</span>
+        <span class="etiqueta">Outbox + HTTP idempotente</span>
+        <span class="etiqueta">22 plantillas</span>
+        <span class="etiqueta">Reemplazable por contrato</span>
+      </div>
+    </header>
+
+    <div class="nota exito"><strong>Migración cerrada</strong> Esta página describe el servicio propio de <code>Complementos/Notificaciones</code> (versión 0.1.1), que ya tiene las plantillas, el SMTP y el tope de envíos. Las fases F1 a F7 están terminadas: el backend entrega por su canal HTTP, la base de datos ya no tiene plantillas (migración 71), el frontend administra el servicio y la validación de extremo a extremo (F7) pasó. La tabla de <a href="#fases">fases</a> y la sección <a href="#validacion">Validación F7</a> dan el detalle.</div>
+
+    <h2 id="por-que">Por qué es un componente aparte</h2>
+    <ul>
+      <li><strong>Reemplazable.</strong> Otro equipo puede entregar su propio componente de notificaciones. Mientras cumpla el contrato OpenAPI, solo cambian la URL y la clave del backend y la sección del stack.</li>
+      <li><strong>Autónomo.</strong> Tiene su base de datos (<code>notificacionesdb</code>), sus plantillas versionadas, su cola y su SMTP. No comparte tablas ni procedimientos con la BD de Asistencias.</li>
+      <li><strong>Pensado para el monorepo.</strong> Vive en <code>Complementos/Notificaciones/</code> junto a Seguridad, CatalogoMensajes y CatalogoParametros, sin repositorio git propio, por decisión del responsable del 2026-11-22.</li>
+      <li><strong>Sin pérdida de avisos.</strong> El backend conserva una cola de salida (outbox) escrita con su propio procedimiento (<code>usp_registrar_notificacion_saliente</code>) justo después del procedimiento de negocio. Una vez en la outbox, el aviso no se pierde: el despachador reserva con lease y reintenta con la misma <code>idempotencyKey</code>. Si el servicio está caído, lo pendiente se entrega cuando vuelva.</li>
+    </ul>
+    <div class="tarjetas">
+      <div class="tarjeta"><div class="icono">🏠</div><h4>Se queda en Asistencias</h4><p>La outbox, la resolución de destinatarios (solo Asistencias conoce a sus usuarios) y el enlace de verificación de correo.</p></div>
+      <div class="tarjeta"><div class="icono">📮</div><h4>Se va al servicio</h4><p>Plantillas y su versionado, marcadores permitidos, renderizado, cola SMTP, reintentos, tope de envíos y correo de prueba.</p></div>
+    </div>
+
+    <h2 id="arquitectura">Arquitectura</h2>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  subgraph asis["GestioAsistenciaBackend"]
+    UC["Casos de uso: NotificacionPort"]
+    OB[("Outbox: NotificacionSaliente")]
+    DI["NotificacionOutboxDispatcher"]
+    CL["Cliente HTTP del servicio"]
+    AD["AdministracionNotificacionPort"]
+  end
+  subgraph srv["Servicio de Notificaciones UCO"]
+    API["API REST v1 con X-Api-Key"]
+    CO[("notificacionesdb: cola y plantillas")]
+    DS["Despachador con lease"]
+    RE["Renderizador y layout"]
+    EN["Enviador: tope, BCC, modo de pruebas"]
+  end
+  SM["Servidor SMTP"]
+  UC -->|"registra en la outbox con SP propio"| OB
+  OB --> DI --> CL
+  CL -->|"POST con idempotencyKey"| API
+  AD -->|"plantillas, cola, reintento, prueba"| API
+  API --> CO
+  CO --> DS --> RE --> EN --> SM
+      </pre>
+      <figcaption>El backend entrega el aviso ya resuelto (tipo, destinatarios y datos). El servicio decide cómo se ve el correo y cuándo se envía.</figcaption>
+    </figure>
+    <p>En el backend, los archivos relevantes están en <code>GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/infrastructure/adapter/secondary/notification/</code>: <code>outbox/OutboxNotificacionAdapter</code> y <code>NotificacionOutboxDispatcher</code>, <code>service/NotificacionesServiceClient</code>, <code>service/ServicioNotificacionChannelSender</code>, <code>service/AdministracionNotificacionServicioAdapter</code> y <code>contact/ContactoDestinatarioResolver</code>. Los puertos de la aplicación (<code>NotificacionPort</code> y <code>AdministracionNotificacionPort</code>) no cambiaron.</p>
+    <p>Dentro del servicio (<code>Complementos/Notificaciones/notificaciones-uco</code>, Spring Boot 4.0.8 y Java 25, hexagonal) hay 72 archivos de producción y 28 de pruebas. El dominio y la aplicación no usan Spring ni JPA; el Composition Root es <code>infrastructure.config.AplicacionConfig</code>.</p>
+
+    <h2 id="entrega">Cómo se entrega un correo</h2>
+    <div class="flujo" data-flujo data-titulo="Del caso de uso al buzón">
+      <div class="paso" data-actor="Caso de uso" data-detalle="Un caso de uso del backend (por ejemplo cancelar una sesión) llama a NotificacionPort.notificar con el tipo y los datos. Se llama después del procedimiento de negocio; la escritura en la outbox usa su propio procedimiento, no la transacción del negocio.">Notifica</div>
+      <div class="paso" data-actor="Backend" data-detalle="OutboxNotificacionAdapter guarda una fila NotificacionSaliente con tipo, destinatarios resueltos contra la BD de Asistencias y datos para la plantilla.">Escribe en la outbox</div>
+      <div class="paso" data-actor="Backend" data-detalle="El despachador reserva lotes de la outbox y llama al servicio por HTTP con idempotencyKey igual al id de la fila. Un reintento nunca duplica el envío.">Entrega por HTTP</div>
+      <div class="paso" data-actor="Servicio" data-detalle="POST /api/v1/notificaciones responde 202 si es nuevo o 200 si la clave ya existía. Guarda la fila en su cola con estado PENDIENTE.">Registra el aviso</div>
+      <div class="paso" data-actor="Servicio" data-detalle="El despachador reserva con lease para que dos instancias no envíen el mismo aviso. Corta el ciclo si al lote reservado le queda poco margen y libera las reservas sin contar el intento.">Reserva con lease</div>
+      <div class="paso" data-actor="Servicio" data-detalle="Renderiza la versión activa de la plantilla (o la versión 1 de fábrica si faltan datos), aplica el layout, respeta el tope de envíos y agrupa destinatarios en BCC.">Renderiza y envía</div>
+      <div class="paso" data-actor="Servicio" data-tipo="error" data-detalle="Si el SMTP falla de forma transitoria, queda FALLIDA_REINTENTABLE y se reintenta con espera creciente hasta 5 veces. Un rechazo permanente queda FALLIDA_DEFINITIVA.">Falla y reintenta</div>
+      <div class="paso" data-actor="Servicio" data-detalle="Con SMTP_NOTIFICATION_TEST_MODE_ENABLED todo se redirige al buzón de pruebas y el asunto lleva el aviso [PRUEBA para ...]. Al entregar, el aviso queda ENTREGADA.">Entrega o redirige</div>
+    </div>
+
+    <h3 id="estados">Estados de un aviso</h3>
+    <figure class="diagrama">
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> PENDIENTE
+  PENDIENTE --> RESERVADA: despachador reserva
+  RESERVADA --> ENTREGADA: SMTP acepta
+  RESERVADA --> FALLIDA_REINTENTABLE: fallo transitorio
+  FALLIDA_REINTENTABLE --> RESERVADA: vence la espera
+  RESERVADA --> FALLIDA_DEFINITIVA: rechazo permanente o sin intentos
+  FALLIDA_DEFINITIVA --> PENDIENTE: reintento manual
+  ENTREGADA --> [*]
+      </pre>
+      <figcaption>Los estados terminales son <code>ENTREGADA</code> y <code>FALLIDA_DEFINITIVA</code> (tabla <code>EstadoNotificacion</code>). Las entregas terminales se conservan 30 días.</figcaption>
+    </figure>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Parámetro</th><th>Valor por defecto</th><th>Variable</th></tr></thead>
+        <tbody>
+          <tr><td>Destinatarios por aviso</td><td>200</td><td>Límite del contrato</td></tr>
+          <tr><td>Destinatarios por mensaje SMTP (BCC)</td><td>50</td><td><code>SMTP_NOTIFICATION_MAX_BCC</code></td></tr>
+          <tr><td>Tope de envíos</td><td>60 por minuto y 500 por día</td><td><code>SMTP_NOTIFICATION_RATE_PER_MINUTE</code>, <code>SMTP_NOTIFICATION_RATE_PER_DAY</code></td></tr>
+          <tr><td>Lote del despachador y lease</td><td>50 avisos y 60 s</td><td><code>DISPATCHER_BATCH_SIZE</code>, <code>DISPATCHER_LEASE</code></td></tr>
+          <tr><td>Barrido de la cola</td><td>30 s, o al instante al llegar un aviso</td><td><code>DISPATCHER_SWEEPER_INTERVAL</code></td></tr>
+          <tr><td>Intentos y espera</td><td>5 intentos, <code>min(30 s × 2<sup>intento-1</sup>, 15 min)</code></td><td><code>DISPATCHER_MAX_ATTEMPTS</code>, <code>DISPATCHER_BACKOFF_BASE</code>, <code>DISPATCHER_BACKOFF_MAX</code></td></tr>
+          <tr><td>Retención de entregas terminales</td><td>30 días</td><td><code>DISPATCHER_RETENTION_DAYS</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="api">Resumen de la API</h2>
+    <p>Contrato congelado: <code>Complementos/Notificaciones/contrato/openapi-notificaciones.yaml</code>, con copia y firma en <code>AsistenciasUCO-Infra/docs/contracts/notificaciones/</code>. Todo <code>/api/v1/**</code> exige la cabecera <code>X-Api-Key</code>. <code>X-Correlation-Id</code> y <code>traceparent</code> son opcionales y se propagan.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Operación</th><th>Método y ruta</th><th>Qué hace</th></tr></thead>
+        <tbody>
+          <tr><td><code>registrarNotificacion</code></td><td>POST <code>/api/v1/notificaciones</code></td><td>Recibe un aviso (idempotente). 202 si es nuevo, 200 si la clave ya existía, 400 o 401 si es inválido.</td></tr>
+          <tr><td><code>consultarNotificaciones</code></td><td>GET <code>/api/v1/notificaciones</code></td><td>Cola administrativa paginada con resumen por estado. No devuelve correos ni datos, solo la cantidad de destinatarios.</td></tr>
+          <tr><td><code>reintentarNotificacion</code></td><td>POST <code>/api/v1/notificaciones/{id}/reintento</code></td><td>Reencola un aviso fallido. 404 si no existe; 409 <code>ESTADO_NO_REINTENTABLE</code> si no está fallido.</td></tr>
+          <tr><td><code>consultarPlantillas</code></td><td>GET <code>/api/v1/plantillas</code></td><td>Tipos con descripción, marcadores permitidos y versiones.</td></tr>
+          <tr><td><code>crearVersionPlantilla</code></td><td>POST <code>/api/v1/plantillas/{tipo}/versiones</code></td><td>Crea la versión siguiente y la deja activa.</td></tr>
+          <tr><td><code>activarVersionPlantilla</code></td><td>POST <code>/api/v1/plantillas/{tipo}/versiones/{version}/activacion</code></td><td>Vuelve a una versión anterior.</td></tr>
+          <tr><td><code>vistaPreviaPlantilla</code></td><td>POST <code>/api/v1/plantillas/vista-previa</code></td><td>Renderiza un borrador con ejemplos de los marcadores.</td></tr>
+          <tr><td><code>enviarCorreoPrueba</code></td><td>POST <code>/api/v1/correos-prueba</code></td><td>Encola un correo de prueba del tipo indicado o el genérico del canal.</td></tr>
+          <tr><td><code>consultarEstadoCanal</code></td><td>GET <code>/api/v1/estado-canal</code></td><td>Estado operativo del canal. Nunca incluye la clave del SMTP.</td></tr>
+          <tr><td><code>salud</code></td><td>GET <code>/actuator/health</code></td><td>Salud abierta, con <code>liveness</code> y <code>readiness</code>.</td></tr>
+          <tr><td><code>metricas</code></td><td>GET <code>/actuator/prometheus</code></td><td>Métricas Prometheus; exige <code>X-Api-Key</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3 id="respuestas">Qué debe hacer el cliente con cada respuesta</h3>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Respuesta</th><th>Significado</th><th>Acción del cliente</th></tr></thead>
+        <tbody>
+          <tr><td>202 y 200</td><td>Aviso aceptado (nuevo o ya conocido)</td><td>Darlo por entregado a la cola; el envío es asíncrono.</td></tr>
+          <tr><td>4xx</td><td>Aviso inválido o clave API incorrecta (<code>TIPO_NO_SOPORTADO</code>, <code>DESTINATARIO_INVALIDO</code>, <code>VALIDACION_FALLIDA</code>, <code>NO_AUTORIZADO</code>)</td><td>No reintentar; marcarlo fallido con el <code>code</code> recibido.</td></tr>
+          <tr><td>5xx o tiempo agotado</td><td>El servicio no pudo registrarlo</td><td>Reintentar con la misma <code>idempotencyKey</code> y espera creciente. Nunca duplica.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>El cuerpo de error es uniforme: <code>{"code": "...", "message": "...", "correlationId": "..."}</code>.</p>
+    <pre><code>POST /api/v1/notificaciones
+X-Api-Key: &lt;clave&gt;
+Content-Type: application/json
+
+{ "aplicacion": "asistencias",
+  "idempotencyKey": "&lt;id de NotificacionSaliente&gt;",
+  "tipo": "SESION_CANCELADA", "idioma": "es",
+  "destinatarios": [ { "correo": "estudiante@dominio", "nombre": "Nombre" } ],
+  "datos": { "asignatura": "Bases de Datos", "grupo": "G01", "fecha": "2026-11-06" } }</code></pre>
+    <p class="nota"><strong>Fuente</strong> Fragmento resumido de <code>Complementos/Notificaciones/Guia-integracion-Notificaciones.md</code>, sección 3. No lleva datos reales.</p>
+
+    <h2 id="plantillas">Plantillas y marcadores</h2>
+    <p>Cada tipo tiene una plantilla versionada por idioma. La versión 1 es la de fábrica y sirve de respaldo si la versión activa no se puede renderizar con los datos recibidos. Los marcadores se escriben <code>{nombre}</code>. Reglas al crear una versión: el asunto tiene hasta 200 caracteres y el cuerpo hasta 4000; deben aparecer todos los marcadores obligatorios; solo se permiten los marcadores del tipo; las llaves deben estar balanceadas. El HTML siempre se escapa y el marcador <code>enlace</code> solo se vuelve vínculo si su valor es una URL <code>http</code> o <code>https</code>.</p>
+    <p>Hay 22 tipos entregables, más un tipo interno (<code>PRUEBA_CANAL_NOTIFICACION</code>, el correo de prueba genérico que emite el propio servicio). El asterisco indica marcador obligatorio.</p>
+    <details class="acordeon">
+      <summary>Ver los 22 tipos y sus marcadores</summary>
+      <div class="tabla-contenedor">
+        <table>
+          <thead><tr><th>Tipo</th><th>Para qué sirve</th><th>Marcadores</th></tr></thead>
+          <tbody>
+            <tr><td><code>ACTIVACION_CUENTA</code></td><td>Aviso a una persona registrada por otra para definir su contraseña con un enlace de un solo uso.</td><td>nombre*, enlace*, rol*</td></tr>
+            <tr><td><code>ALERTA_PERDIDA_INASISTENCIA</code></td><td>El estudiante superó el límite institucional de inasistencia.</td><td>estudiante*, grupo*, porcentaje*, limite</td></tr>
+            <tr><td><code>ALERTA_RIESGO_INASISTENCIA</code></td><td>El estudiante se acerca al límite.</td><td>estudiante*, grupo*, porcentaje*, umbral, limite</td></tr>
+            <tr><td><code>CANCELACION_APROBADA</code></td><td>Cancelación aprobada: aviso al estudiante y al docente.</td><td>destinatario*, estudiante*, grupo*, porcentaje*, motivo*, resolutor*</td></tr>
+            <tr><td><code>CANCELACION_RECHAZADA</code></td><td>Propuesta rechazada: aviso al docente.</td><td>docente*, estudiante*, grupo*, motivo*, resolutor*</td></tr>
+            <tr><td><code>CIERRE_MASIVO_PERIODO_EJECUTADO</code></td><td>Cierre masivo del período ejecutado.</td><td>periodo*, totalEstudiantes, totalAprobados, totalReprobados</td></tr>
+            <tr><td><code>FALTA_ASISTENCIA_SESION_ESTUDIANTE</code></td><td>Aviso de las tomas en falta de una sesión, con el plazo para reclamar.</td><td>estudiante*, asignatura*, grupo*, fecha*, horaInicio*, horaFin*, detalleFaltas*, fechaLimiteReclamo*, enlaceReclamo*</td></tr>
+            <tr><td><code>PROPUESTA_CANCELACION</code></td><td>Propuesta de cancelación: aviso al coordinador.</td><td>resolutor*, estudiante*, grupo*, docente*, porcentaje*, motivo*, limite, escalamiento</td></tr>
+            <tr><td><code>RECESO_CLASES_CANCELADAS_DOCENTE</code></td><td>Receso: resumen al docente de sus clases canceladas.</td><td>docente*, fecha*, motivo*, clases*</td></tr>
+            <tr><td><code>RECESO_CLASES_CANCELADAS_ESTUDIANTE</code></td><td>Receso: resumen al estudiante.</td><td>estudiante*, fecha*, motivo*, clases*</td></tr>
+            <tr><td><code>RECLAMO_ASISTENCIA_RADICADO</code></td><td>Reclamo radicado: aviso al docente.</td><td>grupo*, estudiante*, fecha*, motivo</td></tr>
+            <tr><td><code>RECLAMO_ASISTENCIA_RESUELTO</code></td><td>Reclamo resuelto: aviso al estudiante.</td><td>grupo*, fecha*, estado*, observacion</td></tr>
+            <tr><td><code>RETIRO_ESTUDIANTE_GRUPO</code></td><td>Retiro de un estudiante del grupo.</td><td>grupo*, estudiante*, motivo</td></tr>
+            <tr><td><code>REVISION_CANCELACION_PENDIENTE</code></td><td>Revisión pendiente: aviso al docente.</td><td>docente*, estudiante*, grupo*, porcentaje*, limite</td></tr>
+            <tr><td><code>SESION_CANCELADA</code></td><td>Clase cancelada por el docente: aviso a cada estudiante.</td><td>estudiante*, asignatura*, grupo*, fecha*, horaInicio*, horaFin*, motivo*, docente*</td></tr>
+            <tr><td><code>SESION_MANUAL_CREADA_COORDINADOR</code></td><td>Sesión creada a mano: aviso al coordinador.</td><td>coordinador*, asignatura*, grupo*, fecha*, horaInicio*, horaFin*, docente*</td></tr>
+            <tr><td><code>SESION_MANUAL_CREADA_ESTUDIANTE</code></td><td>Sesión creada a mano: aviso a cada estudiante.</td><td>estudiante*, asignatura*, grupo*, fecha*, horaInicio*, horaFin*, docente*</td></tr>
+            <tr><td><code>SESION_SIN_TOMA_COORDINADOR</code></td><td>Sesión terminada sin toma: aviso al coordinador.</td><td>coordinador*, docente*, asignatura*, grupo*, fecha*, horaInicio*, horaFin*, enlaceSesiones*</td></tr>
+            <tr><td><code>SESION_SOLICITUD_APROBADA_DOCENTE</code></td><td>Solicitud extraordinaria aprobada: aviso al docente.</td><td>docente*, asignatura*, grupo*, fecha*, horaInicio*, horaFin*, coordinador*</td></tr>
+            <tr><td><code>SESION_SOLICITUD_CREADA_COORDINADOR</code></td><td>Solicitud extraordinaria: aviso a los coordinadores.</td><td>coordinador*, asignatura*, grupo*, fecha*, horaInicio*, horaFin*, docente*</td></tr>
+            <tr><td><code>SESION_SOLICITUD_RECHAZADA_DOCENTE</code></td><td>Solicitud rechazada: aviso al docente con motivo y observación.</td><td>docente*, asignatura*, grupo*, fecha*, horaInicio*, horaFin*, coordinador*, motivo*, observacion*</td></tr>
+            <tr><td><code>VERIFICACION_CORREO</code></td><td>Verificación de correo del estudiante registrado por el docente.</td><td>nombre*, enlace*, grupo</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <p>Las plantillas se siembran en <code>V2__siembra_plantillas.sql</code> a partir de los recursos del backend y de las versiones activas de la BD de Asistencias, y <code>V3__descripciones_con_tildes.sql</code> corrige las tildes de las descripciones. La pantalla de administración del frontend (<code>admin-email-management</code>) habla con el backend, que reenvía al servicio (ver la fila de F6 en las <a href="#fases">fases</a>).</p>
+    <div class="nota"><strong>Saludo genérico en avisos agrupados</strong> Cuando un aviso lleva varios destinatarios en un mismo mensaje (copia oculta, BCC), el saludo es genérico a propósito: no se puede personalizar un correo que llega a varias personas sin revelar sus nombres.</div>
+
+    <h2 id="datos">Modelo de datos</h2>
+    <p>Migraciones Flyway <code>V1__esquema_inicial.sql</code>, <code>V2__siembra_plantillas.sql</code> y <code>V3__descripciones_con_tildes.sql</code> en <code>Complementos/Notificaciones/notificaciones-uco/src/main/resources/db/migration/</code>. La unicidad <code>(aplicacion, idempotencyKey)</code> es la que impide duplicar un envío.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+erDiagram
+  EstadoNotificacion ||--o{ Notificacion : "estado"
+  TipoNotificacion ||--o{ Notificacion : "tipo"
+  TipoNotificacion ||--o{ TipoNotificacionMarcador : "marcadores"
+  TipoNotificacion ||--o{ PlantillaNotificacion : "versiones"
+  EstadoNotificacion {
+    varchar codigo PK
+    nvarchar nombre
+    bit esTerminal
+  }
+  TipoNotificacion {
+    varchar tipo PK
+    nvarchar descripcion
+    bit interno
+  }
+  TipoNotificacionMarcador {
+    guid id PK
+    varchar tipo FK
+    varchar marcador
+    bit obligatorio
+  }
+  PlantillaNotificacion {
+    guid id PK
+    varchar tipo FK
+    char idioma
+    int version
+    bit activa
+  }
+  Notificacion {
+    guid id PK
+    varchar aplicacion
+    varchar idempotencyKey
+    varchar tipo FK
+    varchar estado FK
+    int intentos
+    datetimeoffset proximoIntentoEn
+    datetimeoffset reservadoHasta
+    varchar idCorrelacion
+  }
+      </pre>
+      <figcaption>Cinco tablas. Solo una plantilla activa por tipo e idioma (índice único filtrado <code>UX_PlantillaNotificacion_activa</code>).</figcaption>
+    </figure>
+
+    <h2 id="seguridad">Seguridad entre servicios</h2>
+    <ul>
+      <li><strong>Hoy:</strong> cabecera <code>X-Api-Key</code> con un secreto compartido, comparado en tiempo constante. El secreto (<code>NOTIFICACIONES_API_KEY</code>) vive en el <code>.env</code> de Infra, fuera de Git. <code>stack up</code> lo genera una sola vez y nunca lo imprime. Sin clave o con una incorrecta la respuesta es 401 <code>NO_AUTORIZADO</code>.</li>
+      <li><strong>Deuda técnica TD-124:</strong> pasar a OAuth2 con credenciales de cliente cuando Seguridad ofrezca esa opción para servicios. Es un requisito de producción, no bloquea la demostración.</li>
+      <li>El puerto del servicio solo se publica en loopback (<code>127.0.0.1:18090</code>); entre contenedores se usa <code>http://ext-notificaciones-servicio:8080</code>.</li>
+      <li>Los logs nunca incluyen correos, asuntos ni cuerpos.</li>
+    </ul>
+
+    <h2 id="observabilidad">Observabilidad</h2>
+    <ul>
+      <li>Logs JSON por la salida estándar con <code>correlationId</code>, <code>traceId</code>, <code>spanId</code> y <code>service</code>.</li>
+      <li>Métricas en <code>/actuator/prometheus</code>: <code>notification_dispatch_total</code>, <code>notification_email_send_total</code>, <code>notification_email_throttled_total</code>, <code>notification_template_render_total</code> y <code>notificaciones_recibidas_total</code>.</li>
+      <li>Trazas por OTLP, apagadas por defecto (<code>MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=true</code> las activa).</li>
+      <li>Pruebas del servicio, medidas al cierre del 2026-11-22: 146 pruebas, 98,5 % de líneas y 92,4 % de ramas. El umbral de JaCoCo es 80 % de líneas y 70 % de ramas, y una prueba verifica que las rutas coincidan con el contrato y que su hash corresponda.</li>
+    </ul>
+
+    <h2 id="reemplazo">Cómo reemplazarlo por otro componente</h2>
+    <p>El contrato manda. Si otro equipo entrega un servicio que cumple <code>openapi-notificaciones.yaml</code>:</p>
+    <ol>
+      <li>Verifica que el nuevo servicio acepta <code>POST /api/v1/notificaciones</code> con <code>idempotencyKey</code> y responde 202, 200, 4xx o 5xx según la tabla de respuestas.</li>
+      <li>Confirma que expone (o que la pantalla de administración deja de usar) las rutas de plantillas, cola, correo de prueba y estado del canal.</li>
+      <li>Cambia en el backend <code>NOTIFICACIONES_SERVICE_URL</code> y <code>NOTIFICACIONES_API_KEY</code>. No hay cambios de código mientras el contrato se cumpla.</li>
+      <li>Cambia la sección <code>ext-notificaciones</code> de <code>AsistenciasUCO-Infra/stack/secciones.json</code> (directorio, compose, imagen y salud).</li>
+      <li>Migra las plantillas: exporta las versiones activas del servicio actual y cárgalas en el nuevo.</li>
+      <li>Ejecuta la prueba de extremo a extremo (como la de la fase F7): cada tipo llega al buzón de prueba, con el servicio caído no se pierde nada y no hay duplicados.</li>
+      <li>Si el contrato cambia, publica un addendum con su hash nuevo y ejecuta <code>infra.ps1 verify</code>.</li>
+    </ol>
+
+    <h2 id="fases">Fases de la migración (todas cerradas)</h2>
+    <p>Plan completo en <code>docs/PLAN_COMPONENTE_NOTIFICACIONES.md</code> (raíz del workspace).</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Fase</th><th>Qué</th><th>Estado</th></tr></thead>
+        <tbody>
+          <tr><td>F1 Contrato</td><td>OpenAPI, guía de integración y addendum en Infra, con <code>.sha256</code></td><td>Cerrada</td></tr>
+          <tr><td>F2 Servicio</td><td>Código, Flyway, plantillas de fábrica, despachador SMTP, API de administración e imagen Docker</td><td>Cerrada</td></tr>
+          <tr><td>F3 Infra</td><td>Sección <code>ext-notificaciones</code> en el stack y secretos en <code>.env</code></td><td>Cerrada</td></tr>
+          <tr><td>F4 Backend</td><td>Canal de entrega por HTTP (<code>ServicioNotificacionChannelSender</code>, <code>NotificacionesServiceClient</code>), administración por HTTP (<code>AdministracionNotificacionServicioAdapter</code>), retiro de plantillas, SMTP y tope de envíos del backend</td><td>Cerrada</td></tr>
+          <tr><td>F5 BD de Asistencias</td><td>Migración 71: retira <code>PlantillaNotificacion*</code>, sus procedimientos y la vista administrativa, y siembra los mensajes <code>OK_*</code> y <code>RPT_*</code> (se conservan <code>NotificacionSaliente</code> y <code>TokenVerificacionCorreo</code>). La migración 72 agrega <code>RPT_ASISTENCIA_ESTADO_CANCELADA</code></td><td>Cerrada</td></tr>
+          <tr><td>F6 Frontend</td><td>La administración sigue con los mismos endpoints; se quitan los metadatos y umbrales quemados. Si el servicio no responde, cada pestaña muestra «Servicio no disponible» con el botón «Reintentar», y la pestaña del canal muestra «Último envío»</td><td>Cerrada</td></tr>
+          <tr><td>F7 Validación E2E</td><td>Cada tipo de correo llega; sin pérdidas ni duplicados; administración desde el frontend (resultado en <a href="#validacion">Validación F7</a>)</td><td>Cerrada</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota exito"><strong>Canal de entrega</strong> <code>OUTBOX_NOTIFICATION_SENDER</code> elige el canal: vacío usa el servicio si hay <code>NOTIFICACIONES_SERVICE_URL</code> y, si no, solo registra en el log.</div>
+    <div class="nota alerta"><strong>Riesgo abierto</strong> <code>Complementos/</code> no es un repositorio git, así que el código del servicio no tiene respaldo versionado hasta que exista el monorepo. Mitigación: respaldos <code>.zip</code> fechados al cerrar cada fase y antes de cambios grandes (el último, antes de F7 y de la correlación).</div>
+    <div class="nota alerta"><strong>TD-126, residual</strong> El backend emite el token de verificación de correo una sola vez por aviso y lo guarda en memoria (<code>VerificacionCorreoMarcadorProvider</code>). Si el backend se reinicia entre dos intentos de entrega, se emite un token nuevo y el enlace anterior queda revocado. No bloquea la demostración.</div>
+
+
+    <h2 id="validacion">Validación F7 (extremo a extremo)</h2>
+    <p>La fase F7 comprobó, con el laboratorio levantado y el SMTP en modo de pruebas, que el aviso llega sin perderse y sin duplicarse, también cuando el servicio está caído.</p>
+    <div class="kpis">
+      <div class="kpi"><div class="valor">78/78</div><div class="rotulo">avisos de la outbox en ENTREGADA</div></div>
+      <div class="kpi"><div class="valor">0</div><div class="rotulo">duplicados</div></div>
+      <div class="kpi"><div class="valor">146</div><div class="rotulo">pruebas del servicio</div></div>
+      <div class="kpi"><div class="valor">98,5 %</div><div class="rotulo">líneas del servicio (ramas 92,4 %)</div></div>
+    </div>
+    <div class="flujo" data-flujo data-titulo="Prueba con el servicio caído">
+      <div class="paso" data-actor="Prueba" data-detalle="Se detiene el contenedor del Servicio de Notificaciones y se ejecutan operaciones de negocio que generan avisos.">Detiene el servicio</div>
+      <div class="paso" data-actor="Backend" data-detalle="Cada aviso queda guardado en la outbox con estado PENDIENTE. La operación de negocio no falla.">Encola en la outbox</div>
+      <div class="paso" data-actor="Backend" data-tipo="error" data-detalle="El despachador intenta entregar, recibe error de conexión y deja la fila FALLIDA_REINTENTABLE con espera creciente.">Reintenta</div>
+      <div class="paso" data-actor="Prueba" data-detalle="Se vuelve a levantar el servicio.">Levanta el servicio</div>
+      <div class="paso" data-actor="Servicio" data-detalle="El despachador reenvía con la misma idempotencyKey; el servicio registra el aviso una sola vez y lo envía.">Entrega una sola vez</div>
+      <div class="paso" data-actor="Prueba" data-detalle="Se cuentan las filas de la outbox: 78 de 78 en ENTREGADA y ninguna clave repetida en la cola del servicio.">Cuenta y verifica</div>
+    </div>
+    <h3 id="ajustes">Ajustes que dejó la validación</h3>
+    <ul>
+      <li>Los instantes que viajan entre el backend y el servicio se truncan a microsegundos, para que SQL Server y el servicio comparen los mismos valores (<code>AdministracionNotificacionServicioAdapter</code>).</li>
+      <li>Los avisos agrupados usan un saludo genérico por diseño (copia oculta).</li>
+      <li>El token de verificación de correo se emite una vez por aviso; queda como deuda residual TD-126 (véase el aviso de <a href="#fases">fases</a>).</li>
+      <li>La pantalla de administración muestra «Servicio no disponible» con «Reintentar» y, en la pestaña del canal, «Último envío».</li>
+    </ul>
+
+    <h2 id="operar">Cómo levantarlo</h2>
+    <pre><code>.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones   # una vez: imagen notificaciones-uco:0.1.1
+.\AsistenciasUCO-Infra\infra.ps1 stack up basico              # incluye ext-notificaciones</code></pre>
+    <p>Fuente: <code>AsistenciasUCO-Infra/stack/README.md</code>. Con la sección arriba, <code>GET http://localhost:18090/actuator/health</code> responde sin clave. Más comandos en <a href="operacion.html">Operación</a>.</p>
+  </main>
+</div>
+</body>
+</html>

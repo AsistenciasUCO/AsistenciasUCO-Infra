@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reglas y flujos de negocio · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>Reglas y flujos de negocio</h1>
+      <p>Cómo funciona la asistencia en la UCO: quién puede hacer qué, cómo se generan las sesiones, cómo se toma y se reclama la asistencia, cuándo se pierde una asignatura y dónde se hace cumplir cada regla.</p>
+      <div class="etiquetas">
+        <span class="etiqueta">5 roles</span>
+        <span class="etiqueta">Regla del 20 %</span>
+        <span class="etiqueta">Tomas como puntos de control</span>
+        <span class="etiqueta">Receso académico</span>
+        <span class="etiqueta">Cierre masivo</span>
+      </div>
+    </header>
+
+    <p>Las reglas salen de decisiones del responsable del producto (<code>AsistenciasUCO-Infra/docs/work-items/CULM-001-culminacion/DECISIONES.md</code>) y de los planes <code>docs/PLAN_ASISTENCIA_TOMAS_AVISOS.md</code> y <code>docs/PLAN_RECESO_ACADEMICO.md</code>. La verdad final está en los procedimientos almacenados de <code>GestioAsistenciaDB/schema/stored-procedures</code>.</p>
+
+    <h2 id="roles">Roles, jerarquía y ámbito</h2>
+    <p>Cada rol crea y custodia al de abajo dentro de su propio ámbito. Nadie tiene un acceso total: el principio es mínimo privilegio.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart TD
+  ADM["Administrador: toda la institucion"] -->|"registra"| DEC["Decano: su facultad"]
+  DEC -->|"crea programas y designa"| COO["Coordinador: sus programas"]
+  COO -->|"vincula y abre grupos"| DOC["Docente: sus grupos como titular"]
+  DOC -->|"matricula y toma asistencia"| EST["Estudiante: sus matriculas"]
+  ADM -.->|"periodos, recesos, cierre masivo, parametros"| ADM
+      </pre>
+      <figcaption>Jerarquía de custodia. El administrador gobierna períodos y catálogos; el docente es el único que registra asistencia.</figcaption>
+    </figure>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Rol</th><th>Ve y opera</th><th>Asistencia</th></tr></thead>
+        <tbody>
+          <tr><td>Estudiante</td><td>Sus asignaturas, faltas, reclamos y horario con fechas.</td><td>Marca por QR o PIN. No edita nada.</td></tr>
+          <tr><td>Docente</td><td>Solo los grupos donde es titular.</td><td>Único que registra, corrige y resuelve reclamos.</td></tr>
+          <tr><td>Coordinador</td><td>Grupos, materias, docentes y alumnos de los programas que coordina; solicitudes de sesión; decisión final de cancelación por inasistencia.</td><td>Solo lectura y auditoría.</td></tr>
+          <tr><td>Decano</td><td>Entidades de su facultad: consolidados, comparativas, aforo.</td><td>Solo lectura y auditoría.</td></tr>
+          <tr><td>Administrador</td><td>Facultades, decanos, períodos, recesos, cierre masivo, parámetros, plantillas de correo y catálogos de consulta.</td><td>No toma ni edita asistencia.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota"><strong>Dónde se valida el ámbito</strong> Dentro de cada procedimiento almacenado (por ejemplo con <code>ufn_programas_ambito_ejecutor</code>), no solo en la pantalla. Un grupo compartido entre programas lo puede gestionar quien coordine al menos uno de ellos (DEC-077); a los demás coordinadores se les muestra «Lo gestiona &lt;programa&gt;».</div>
+
+    <h2 id="grupo-sesiones">Creación de un grupo y sus sesiones automáticas</h2>
+    <p>Al crear un grupo, el sistema no pide cargar cada clase: las genera a partir del horario y del período, y descuenta festivos y recesos. Así la cuenta de horas (la base de la regla del 20 %) es correcta desde el primer día.</p>
+    <div class="flujo" data-flujo data-titulo="Crear un grupo y generar sus sesiones">
+      <div class="paso" data-actor="Coordinador" data-detalle="Elige asignatura, período en curso, docente titular, programa responsable y las franjas del horario. La previsualización (usp_previsualizar_horario_grupo) muestra cuántas sesiones saldrán y cuáles caen en festivo o receso.">Define el grupo</div>
+      <div class="paso" data-actor="Backend" data-detalle="Antes de generar, asegura los festivos de los años del período mediante el puerto de calendario (proveedor principal, respaldo y cálculo local).">Asegura festivos</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="usp_generar_sesiones_grupo_v2 crea una sesión por cada franja del horario entre las fechas del período, dentro de una transacción.">Genera las sesiones</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="usp_internal_aplicar_festivos_grupo cancela las sesiones que caen en un día festivo con el tipo FESTIVO del catálogo TipoCancelacionSesion, dejando el día festivo y el motivo en SesionCancelacion.">Cancela festivos</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="usp_internal_cancelar_sesiones_receso cancela las sesiones de los días de receso académico del período con el motivo «Receso académico: ...». Las sesiones canceladas no cuentan para las horas.">Cancela recesos</div>
+      <div class="paso" data-actor="SQL Server" data-tipo="error" data-detalle="Si las fechas no caben en el período, el período está cerrado o hay solape de sesiones del docente (SES_017), el SP revierte y devuelve un código estable con mensaje de usuario.">Rechazo</div>
+      <div class="paso" data-actor="Backend" data-detalle="Responde con el grupo creado. Los estudiantes se matriculan después por QR o de forma manual.">Grupo listo</div>
+    </div>
+
+    <h2 id="tomas">Toma de asistencia: manual, QR, PIN y varias tomas</h2>
+    <p>Cada <strong>toma</strong> es un punto de control en el tiempo y parte la clase en tramos (DEC-066). Con <em>n</em> tomas hay <em>n</em>+1 tramos. Un tramo en el borde cuenta como presente si el estudiante marcó la toma de ese borde. Un tramo entre dos tomas cuenta como presente solo si marcó las dos. Las horas asistidas son la suma de los minutos de los tramos presentes. Es el cálculo del peor caso: si el estudiante se salta una toma intermedia, se asume ausente desde la última que marcó hasta la siguiente.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Modalidad</th><th>Quién marca</th><th>Cómo funciona</th></tr></thead>
+        <tbody>
+          <tr><td>Manual</td><td>El docente</td><td>Registra la lista de la toma (procedimiento <code>usp_registrar_asistencias_toma</code>). Puede editar cualquier toma mientras dure la ventana de la sesión.</td></tr>
+          <tr><td>QR</td><td>El estudiante autenticado</td><td>El docente abre la toma con QR (<code>usp_abrir_qr_toma</code>). El token rota por tarea de fondo y se guarda como hash SHA-256. El estudiante lo escanea.</td></tr>
+          <tr><td>PIN</td><td>El estudiante autenticado</td><td>Mismo mecanismo con un PIN de 6 dígitos que el docente proyecta. Sirve cuando el QR no se puede leer.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="flujo" data-flujo data-titulo="Marcar asistencia por QR o PIN">
+      <div class="paso" data-actor="Docente" data-detalle="Abre la toma en modo QR. El sistema crea el token (TokenAsistenciaToma) y publica TOMA_ABIERTA solo al titular.">Abre la toma QR</div>
+      <div class="paso" data-actor="Backend" data-detalle="Una tarea de fondo rota el token cada ROTACION_SEGUNDOS y publica ASISTENCIA_QR_ROTADO solo al docente titular, que lo muestra en el aula.">Rota el token</div>
+      <div class="paso" data-actor="Estudiante" data-detalle="Escanea el QR o escribe el PIN. La petición llega autenticada por su sesión; no hay identidad en el QR.">Marca</div>
+      <div class="paso" data-actor="Backend" data-detalle="Aplica límites de frecuencia por IP, por token y por estudiante, y valida que la IP pertenezca a la red del campus (ver siguiente flujo).">Valida red y límites</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="usp_registrar_asistencia_por_token verifica matrícula activa, toma abierta y ventana con tolerancia; es idempotente por estudiante y toma.">Registra</div>
+      <div class="paso" data-actor="SQL Server" data-tipo="error" data-detalle="Token vencido, toma cerrada, estudiante sin matrícula activa o IP fuera del campus: no se registra y el usuario recibe un mensaje claro.">Rechazo</div>
+      <div class="paso" data-actor="Backend" data-detalle="Publica ASISTENCIA_QR_REGISTRADA al titular para que vea el conteo en vivo.">Notifica al titular</div>
+    </div>
+
+    <h3 id="wifi">Validación de la red Wi-Fi del campus</h3>
+    <p>La marcación autónoma (QR o PIN) solo se acepta desde la red institucional. El backend toma la IP del cliente y la compara con los rangos CIDR del parámetro <code>RED/CIDRS_CAMPUS</code> (adaptador <code>CidrRedInstitucionalAdapter</code> en <code>GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/infrastructure/adapter/secondary/network/</code>). La cabecera <code>X-Forwarded-For</code> solo se acepta de los proxies listados en <code>RED/PROXIES_CONFIABLES</code>, para que nadie falsifique su IP.</p>
+    <div class="flujo" data-flujo data-titulo="Verificación de la red del campus">
+      <div class="paso" data-actor="Backend" data-detalle="Recibe la petición de marcar asistencia y obtiene la dirección remota.">Lee la IP</div>
+      <div class="paso" data-actor="Backend" data-detalle="Si la conexión viene de un proxy confiable (RED/PROXIES_CONFIABLES), toma la IP original de X-Forwarded-For. Si no, ignora esa cabecera.">Resuelve la IP real</div>
+      <div class="paso" data-actor="Parámetros" data-detalle="Lee RED/CIDRS_CAMPUS del catálogo de parámetros (con caché).">Lee los rangos</div>
+      <div class="paso" data-actor="Backend" data-detalle="Comprueba que la IP pertenezca a algún rango del campus.">Compara CIDR</div>
+      <div class="paso" data-actor="Backend" data-tipo="error" data-detalle="IP fuera de los rangos: se rechaza con un mensaje de usuario del catálogo. En el laboratorio, los datos de prueba dejan los rangos privados de Docker para que funcione.">Fuera del campus</div>
+    </div>
+
+    <h2 id="aviso-falta">Cierre de tomas y aviso de falta</h2>
+    <p>Mientras la sesión esté abierta, el docente puede corregir cualquier toma. Al terminar la sesión, el sistema cierra solo las tomas abiertas y marca falta a quien no tenga registro; desde ahí nada se edita, solo cambia por reclamo. Después envía un único aviso por estudiante con las tomas en falta (addendum ATA D1, D4).</p>
+    <div class="flujo" data-flujo data-titulo="Aviso de falta por sesión">
+      <div class="paso" data-actor="SQL Server" data-detalle="Al vencer la ventana de la sesión, usp_cerrar_tomas_vencidas cierra las tomas abiertas y marca falta (SJC) a quien no marcó.">Cierra las tomas</div>
+      <div class="paso" data-actor="Backend" data-detalle="Una tarea de fondo (cada minuto) consulta usp_consultar_sesiones_pendientes_aviso_falta: sesiones terminadas, no canceladas, con tomas en falta y sin aviso previo.">Busca sesiones</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="usp_registrar_aviso_falta_sesion deja una marca por estudiante y sesión; así un reintento nunca duplica el aviso.">Marca el aviso</div>
+      <div class="paso" data-actor="Backend" data-detalle="Encola en la outbox el correo FALTA_ASISTENCIA_SESION_ESTUDIANTE con la lista de tomas en falta, la fecha límite de reclamo y el enlace a Mis reclamos.">Encola el correo</div>
+      <div class="paso" data-actor="Notificaciones" data-detalle="El servicio de correo entrega el aviso (ver la página de Notificaciones).">Entrega</div>
+      <div class="paso" data-actor="Estudiante" data-detalle="Recibe el correo y el evento FALTA_SESION_AVISADA. Puede reclamar hasta la fecha límite (parámetro ASISTENCIA/DIAS_LIMITE_JUSTIFICACION, 5 días calendario desde el fin de la sesión).">Recibe el aviso</div>
+    </div>
+    <p>Si una sesión termina sin ninguna toma, el sistema avisa al coordinador del programa (correo <code>SESION_SIN_TOMA_COORDINADOR</code>, <code>usp_registrar_aviso_sesion_sin_toma</code>).</p>
+
+    <h2 id="regla-20">La regla del 20 %: riesgo y pérdida</h2>
+    <p>El porcentaje de inasistencia es <strong>horas de falta de sesiones vencidas ÷ horas de todas las sesiones del grupo en el período</strong>. El denominador incluye las sesiones extraordinarias aprobadas y excluye las canceladas (por el docente, por festivo o por receso) y las solicitudes de sesión pendientes o rechazadas. Las excusas (EX) no cuentan como inasistencia. Los umbrales son parámetros: advertencia (riesgo) al 15 % y pérdida al 20 %.</p>
+    <div class="nota alerta"><strong>Por qué el denominador es el período completo</strong> Si solo se contaran las sesiones ya dictadas, la primera falta equivaldría al 100 %. Por eso se usa el total del período (addendum ATA D2, vista <code>uv_cumplimiento_sesion_grupo</code>).</div>
+    <div class="flujo" data-flujo data-titulo="Del riesgo a la cancelación por inasistencia">
+      <div class="paso" data-actor="Backend" data-detalle="La tarea de fondo EvaluacionAlertasInasistenciaScheduler recorre los grupos pendientes cada minuto y ejecuta usp_evaluar_alertas_inasistencia_grupo, que es idempotente.">Evalúa el grupo</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="Al cruzar el 15 % crea una alerta de riesgo (plantilla ALERTA_RIESGO_INASISTENCIA). Al cruzar el 20 % crea la alerta de pérdida y una revisión de cancelación.">Detecta el umbral</div>
+      <div class="paso" data-actor="Docente" data-detalle="Recibe el correo REVISION_CANCELACION_PENDIENTE y el evento en tiempo real. Decide con usp_decidir_revision_cancelacion: MANTENER al estudiante o PROPONER la cancelación con un motivo.">Decide el docente</div>
+      <div class="paso" data-actor="Coordinador" data-detalle="Si el docente propone, el coordinador del programa recibe PROPUESTA_CANCELACION y resuelve con usp_resolver_revision_cancelacion: cancela o mantiene, con justificación auditada.">Resuelve el coordinador</div>
+      <div class="paso" data-actor="SQL Server" data-tipo="error" data-detalle="Si no hay ningún coordinador competente, el SP responde RCN_013 sin cambios. El decano nunca resuelve: solo consulta el historial de su facultad.">Sin resolutor</div>
+      <div class="paso" data-actor="Backend" data-detalle="Notifica la decisión (CANCELACION_APROBADA a estudiante y docente, o CANCELACION_RECHAZADA al docente) y publica el evento. La matrícula pasa a cancelada por inasistencia solo si el coordinador aprueba.">Notifica</div>
+    </div>
+    <p>La cancelación nunca es automática: «CI» nace solo de una revisión aprobada (DEC-041, DEC-065). El cierre masivo de un período se bloquea mientras haya revisiones pendientes.</p>
+
+    <h2 id="reclamos">Reclamos y justificaciones</h2>
+    <p>El estudiante reclama por <strong>toma</strong> (o justifica con soportes). La decisión del docente es <strong>definitiva dentro de la plataforma</strong>: si rechaza, la apelación se tramita fuera del sistema por el conducto regular universitario.</p>
+    <div class="flujo" data-flujo data-titulo="Reclamo de una falta">
+      <div class="paso" data-actor="Estudiante" data-detalle="Desde Mis reclamos elige la toma en falta, explica el motivo y adjunta uno o varios soportes (por ejemplo una constancia médica).">Radica el reclamo</div>
+      <div class="paso" data-actor="Backend" data-detalle="Cada soporte se escanea con ClamAV antes de guardarse en MinIO. Si el almacenamiento o el antivirus no responden, el reclamo falla con un error claro y no se pierde nada.">Escanea soportes</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="usp_radicar_solicitud_revision_asistencia_v4 comprueba el plazo (borde exacto probado), el período abierto (PER_008 si está cerrado) y la titularidad.">Valida el plazo</div>
+      <div class="paso" data-actor="Docente" data-detalle="Recibe RECLAMO_ASISTENCIA_RADICADO. Resuelve cada toma por separado con usp_resolver_solicitud_revision_asistencia: «sí estuvo presente» (AN) o «ausencia justificada» (EX). Rechazar exige retroalimentación.">Resuelve el docente</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="Los tramos y el porcentaje se recalculan solos. Si el porcentaje baja del umbral, la alerta deja de aplicar.">Recalcula</div>
+      <div class="paso" data-actor="Estudiante" data-detalle="Recibe RECLAMO_ASISTENCIA_RESUELTO con el estado y la observación. Una decisión rechazada no se apela en el sistema.">Recibe la respuesta</div>
+    </div>
+
+    <h2 id="cancelar-sesion">Cancelación de una sesión por el docente</h2>
+    <div class="flujo" data-flujo data-titulo="Cancelar una clase">
+      <div class="paso" data-actor="Docente" data-detalle="Cancela una sesión futura de su grupo e indica el motivo (HU047).">Cancela la sesión</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="usp_cancelar_sesion exige ser el titular, escribe SesionCancelacion con tipo DOCENTE y el motivo, y excluye la sesión del cálculo de horas.">Registra la cancelación</div>
+      <div class="paso" data-actor="Backend" data-detalle="Encola el correo SESION_CANCELADA para cada estudiante activo del grupo y publica el evento SESION_CANCELADA.">Avisa a los estudiantes</div>
+      <div class="paso" data-actor="Estudiante" data-detalle="Ve la clase tachada en su horario con fechas.">Ve el cambio</div>
+    </div>
+    <p>El coordinador puede cancelar una sesión creada manualmente dentro de su ámbito (<code>usp_cancelar_sesion_coordinador</code>).</p>
+
+    <h2 id="sesion-extra">Solicitud de sesión extraordinaria al coordinador</h2>
+    <p>Una clase fuera del horario fijo no se crea sola: el docente la <strong>solicita</strong> y el coordinador la avala antes (DEC-065). Mientras no esté aprobada no cuenta en el denominador ni se muestra a los estudiantes.</p>
+    <div class="flujo" data-flujo data-titulo="Sesión extraordinaria">
+      <div class="paso" data-actor="Docente" data-detalle="Propone fecha y hora para una sesión adicional de su grupo. Queda pendiente de aprobación.">Solicita la sesión</div>
+      <div class="paso" data-actor="Backend" data-detalle="Correo SESION_SOLICITUD_CREADA_COORDINADOR a los coordinadores del programa y evento SESION_SOLICITUD_CREADA. El contador del menú del coordinador se actualiza por SSE.">Avisa al coordinador</div>
+      <div class="paso" data-actor="Coordinador" data-detalle="Aprueba con usp_aprobar_solicitud_sesion o rechaza con usp_rechazar_solicitud_sesion indicando motivo y observación.">Decide</div>
+      <div class="paso" data-actor="Backend" data-detalle="Si aprueba, avisa al docente (SESION_SOLICITUD_APROBADA_DOCENTE) y a los estudiantes (SESION_MANUAL_CREADA_ESTUDIANTE). La sesión aparece como «Extraordinaria» en el horario.">Aprobada</div>
+      <div class="paso" data-actor="Backend" data-tipo="error" data-detalle="Si rechaza, avisa solo al docente (SESION_SOLICITUD_RECHAZADA_DOCENTE) con motivo y observación. Las rechazadas se excluyen de los conteos y del cronograma.">Rechazada</div>
+    </div>
+
+    <h2 id="matricula">Matrícula por QR, por código y manual</h2>
+    <p>No hay sincronización externa: el estudiante entra al grupo por el QR o el código del docente, o el docente lo registra a mano. En ambos casos se exige un <strong>programa en común</strong> entre el estudiante y el grupo (decisión del 2026-11-22).</p>
+    <div class="pestanas">
+      <div role="tablist" aria-label="Formas de matrícula">
+        <button role="tab" type="button">QR o código</button>
+        <button role="tab" type="button">Manual por el docente</button>
+      </div>
+      <div role="tabpanel">
+        <div class="flujo" data-flujo data-titulo="Matrícula autónoma por QR o PIN">
+          <div class="paso" data-actor="Docente" data-detalle="Abre la ventana de matrícula del grupo (usp_abrir_ventana_matricula_grupo). El token rota solo y se muestra como QR y como código.">Abre la ventana</div>
+          <div class="paso" data-actor="Estudiante" data-detalle="Escanea el QR. Si no tiene cuenta, la página pública lo registra (usp_registrar_estudiante_por_token_publico) y le envía un correo de verificación con enlace de un solo uso.">Entra con el QR</div>
+          <div class="paso" data-actor="Backend" data-detalle="POST /api/v1/estudiante/matricula-qr/validar calcula los programas comunes entre el estudiante y el grupo.">Valida el programa</div>
+          <div class="paso" data-actor="Estudiante" data-detalle="Si hay un solo programa común, se asigna solo. Si hay varios, el sistema responde MQR_008 y la pantalla muestra un selector con únicamente los comunes.">Elige programa</div>
+          <div class="paso" data-actor="SQL Server" data-detalle="usp_matricular_estudiante_por_token matricula al estudiante en el grupo y crea el vínculo EstudiantePrograma.">Matricula</div>
+          <div class="paso" data-actor="Backend" data-detalle="Publica ESTUDIANTE_MATRICULADO al docente titular.">Notifica al titular</div>
+        </div>
+        <div class="nota alerta"><strong>Cuenta nueva</strong> Un estudiante recién creado recibe 403 del PDP hasta que Seguridad le asigne el rol en su primer inicio de sesión. Es la razón por la que la HU176B sigue abierta (ver <a href="calidad.html">Calidad</a>).</div>
+      </div>
+      <div role="tabpanel">
+        <p>El docente busca o crea al estudiante en <strong>su</strong> grupo. Reglas de la BD:</p>
+        <ul>
+          <li>El estudiante debe compartir un programa con el grupo (códigos <code>EST_006</code>, <code>EST_010</code> y <code>EST_011</code> rechazan los casos inválidos).</li>
+          <li>Un estudiante nuevo queda registrado en el programa del grupo.</li>
+          <li>Un estudiante registrado por otra persona recibe un correo de activación (<code>ACTIVACION_CUENTA</code>) o de verificación (<code>VERIFICACION_CORREO</code>) con un enlace de un solo uso.</li>
+          <li>Retirar a un estudiante del grupo (<code>usp_retirar_estudiante_grupo</code>) avisa por correo (<code>RETIRO_ESTUDIANTE_GRUPO</code>).</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 id="receso">Receso académico</h2>
+    <p>Un período puede tener días completos sin clase para toda la institución (Semana Santa, una jornada institucional). Lo gestiona solo el administrador, <strong>un día por registro</strong> (DEC-081). Una vez aplicado no se puede retirar ni mover.</p>
+    <div class="flujo" data-flujo data-titulo="Registrar un día de receso">
+      <div class="paso" data-actor="Administrador" data-detalle="En el formulario del período agrega una fecha y un motivo obligatorio.">Agrega el día</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="usp_crear_receso_academico valida: fecha dentro del período, futura (desde mañana, hora de Bogotá), que no sea festivo ni esté repetida y que el período esté abierto. Cada fallo tiene su código REC_*.">Valida</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="Cancela en la misma transacción las sesiones de ese día en todos los grupos del período (tipo RECESO). Las que ya tengan asistencia no se tocan y se informan.">Cancela sesiones</div>
+      <div class="paso" data-actor="Backend" data-detalle="Con el detalle devuelto arma un correo por persona (RECESO_CLASES_CANCELADAS_ESTUDIANTE y RECESO_CLASES_CANCELADAS_DOCENTE) con el resumen de sus clases canceladas.">Avisa</div>
+      <div class="paso" data-actor="SQL Server" data-tipo="error" data-detalle="Retirar un día que ya canceló sesiones se rechaza con un código REC_*. Para corregir, solo se puede retirar y crear otro mientras no haya cancelado nada.">Bloqueo posterior</div>
+    </div>
+    <p>Los grupos creados después también respetan el receso: su sesión de ese día nace cancelada. La previsualización del horario la marca como <code>CANCELADA_POR_RECESO</code>.</p>
+
+    <h2 id="cierre-masivo">Cierre masivo del período</h2>
+    <p>Al terminar un período, el administrador lo cierra de forma manual con <code>usp_ejecutar_cierre_masivo_periodo</code>. Solo se cierra un período que ya terminó (si no, responde <code>PER_007</code>).</p>
+    <div class="flujo" data-flujo data-titulo="Cierre masivo de un período">
+      <div class="paso" data-actor="Administrador" data-detalle="Selecciona el período por su identificador; el diálogo muestra su nombre y la lista de lo que se hará.">Pide el cierre</div>
+      <div class="paso" data-actor="Backend" data-detalle="Ejecuta antes el motor de alertas para dejar las revisiones al día (decisión N-1 del contrato).">Evalúa alertas</div>
+      <div class="paso" data-actor="SQL Server" data-tipo="error" data-detalle="Con revisiones pendientes del docente o del coordinador, o pérdidas sin revisión, el SP se bloquea con RCN_012 y no cierra nada.">Bloqueo RCN_012</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="Las matrículas activas pasan a finalizadas, se actualizan los contadores del grupo, se audita CIERRE_MASIVO_PERIODO y se marca fechaCierreUtc del período.">Cierra</div>
+      <div class="paso" data-actor="Backend" data-detalle="Envía el correo CIERRE_MASIVO_PERIODO_EJECUTADO y registra el cierre exitoso en el historial.">Notifica</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="Desde ahí, tomas, lotes y reclamos del período responden PER_008 y un segundo cierre del mismo período se rechaza.">Período cerrado</div>
+    </div>
+
+    <h2 id="reglas">Reglas de negocio y dónde se hacen cumplir</h2>
+    <p>La columna «dónde» indica la capa que garantiza la regla. Las demás capas solo la reflejan.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Regla</th><th>BD (SP)</th><th>Backend</th><th>Frontend</th></tr></thead>
+        <tbody>
+          <tr><td>La asistencia es solo del docente titular</td><td>Valida titularidad en cada SP de toma</td><td>PEP bloquea la ruta a otros roles</td><td>Oculta los botones</td></tr>
+          <tr><td>Ámbito jerárquico (docente, coordinador, decano)</td><td>Filtra en el SP (<code>ufn_programas_ambito_ejecutor</code>)</td><td>Solo reenvía al ejecutor</td><td>Menús por rol</td></tr>
+          <tr><td>Umbrales 15 % y 20 %</td><td>Parámetros <code>ASISTENCIA/UMBRAL_*</code> y <code>usp_evaluar_alertas_inasistencia_grupo</code></td><td>Tarea de fondo que dispara el motor</td><td>Muestra el estado y el aviso</td></tr>
+          <tr><td>Denominador: horas de todo el período</td><td>Vista <code>uv_cumplimiento_sesion_grupo</code></td><td>Sin cálculo propio</td><td>Muestra «% Por dictar» y el consolidado</td></tr>
+          <tr><td>Tramos por tomas (peor caso)</td><td><code>uv_asistencia_tramo</code> y <code>uv_asistencia_sesion_horas</code></td><td>Sin cálculo propio</td><td>Resumen estudiante por toma</td></tr>
+          <tr><td>Ventana de la sesión y cierre automático</td><td><code>usp_registrar_asistencias_toma</code> (SES_007 a SES_010) y <code>usp_cerrar_tomas_vencidas</code></td><td>Tarea de fondo del cierre</td><td>Aviso en los últimos minutos de la toma</td></tr>
+          <tr><td>Marcar solo desde la red del campus</td><td>Parámetro <code>RED/CIDRS_CAMPUS</code></td><td><code>CidrRedInstitucionalAdapter</code></td><td>Muestra el mensaje del backend</td></tr>
+          <tr><td>Rotación y límites del QR</td><td><code>usp_rotar_token_asistencia_automatico</code>, hash SHA-256</td><td>Límites por IP, token y estudiante; <code>RotacionTokenAsistenciaScheduler</code></td><td>Proyecta el QR y el PIN</td></tr>
+          <tr><td>Plazo de reclamo (5 días)</td><td><code>usp_radicar_solicitud_revision_asistencia_v4</code>, parámetro <code>ASISTENCIA/DIAS_LIMITE_JUSTIFICACION</code></td><td>Traduce el código a 409</td><td>Muestra la fecha límite</td></tr>
+          <tr><td>Decisión final del docente</td><td><code>usp_resolver_solicitud_revision_asistencia</code></td><td>Sin flujo de apelación</td><td>Exige retroalimentación al rechazar</td></tr>
+          <tr><td>Cancelación por inasistencia: la decide el coordinador</td><td><code>usp_decidir_revision_cancelacion</code> y <code>usp_resolver_revision_cancelacion</code></td><td>Notifica y publica eventos</td><td>Decano en solo lectura</td></tr>
+          <tr><td>Sesión extraordinaria con aval previo</td><td><code>usp_aprobar_solicitud_sesion</code> y <code>usp_rechazar_solicitud_sesion</code></td><td>Correos y SSE</td><td>Contador de solicitudes</td></tr>
+          <tr><td>Festivos y recesos cancelan sesiones</td><td><code>usp_generar_sesiones_grupo_v2</code> y <code>usp_internal_cancelar_sesiones_receso</code></td><td>Carga de festivos con puerto de calendario</td><td>Calendarios y previsualización</td></tr>
+          <tr><td>Matrícula con programa común</td><td><code>EST_006</code>, <code>EST_010</code>, <code>EST_011</code>, <code>MQR_008</code></td><td>Endpoint <code>matricula-qr/validar</code></td><td>Selector con programas comunes</td></tr>
+          <tr><td>Períodos sin solape</td><td><code>usp_validar_solape_periodo_academico_interno</code> (<code>PER_012</code>)</td><td>Traduce el código</td><td>Formulario del período</td></tr>
+          <tr><td>Período cerrado no admite tomas ni reclamos</td><td>Código <code>PER_008</code></td><td>Responde 409</td><td>Muestra el mensaje</td></tr>
+          <tr><td>Cierre masivo bloqueado con revisiones pendientes</td><td>Código <code>RCN_012</code></td><td>Ejecuta el motor antes del cierre</td><td>Diálogo con el nombre del período</td></tr>
+          <tr><td>Soportes con antivirus y sin acceso directo</td><td>Solo guarda metadatos</td><td>ClamAV y MinIO detrás de la API</td><td>Nunca recibe URLs de MinIO</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</body>
+</html>

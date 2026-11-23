@@ -11,6 +11,10 @@
                  Seguridad y Verificar salvo -SinSeguridad / -SinVerificar.
       Seguridad  Cuentas de Keycloak, contraseña común, roles, identidad y perfiles del PDP para los 73 usuarios (idempotente).
       Verificar  Solo lectura: inicia sesión con un usuario de cada caso y comprueba lo que cada rol puede ver.
+      Catalogo   Con el Catálogo de Parámetros arriba (escenario parametros), empuja al Catálogo los valores que los datos de
+                 prueba fijan solo en la BD (hoy RED.CIDRS_CAMPUS con los rangos de Docker); si no, el Backend, que toma el
+                 Catálogo como fuente de verdad, los revertiría al arrancar. Cargar lo hace solo al final (se omite si el
+                 Catálogo no está arriba).
     La contraseña común de laboratorio se toma de ASISTENCIAS_DATASET_PASSWORD o de AGENTS.md (sección 7); nunca se imprime.
     La clave de SQL Server sale de -Password, GestioAsistenciaDB/.env, MSSQL_SA_PASSWORD o AsistenciasUCO-Infra/stack/.env.
     Requiere el laboratorio de Seguridad aprovisionado (%USERPROFILE%\.asistencias-security-lab\lab.env) y Python 3 de
@@ -20,15 +24,17 @@
     .\infra.ps1 datos-prueba cargar -Yes
     .\infra.ps1 datos-prueba seguridad
     .\infra.ps1 datos-prueba verificar
+    .\infra.ps1 datos-prueba catalogo
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Cargar', 'Seguridad', 'Verificar')]
+    [ValidateSet('Cargar', 'Seguridad', 'Verificar', 'Catalogo')]
     [string]$Accion = 'Verificar',
     [switch]$Yes,
     [switch]$StopBackend,
     [switch]$SinSeguridad,
     [switch]$SinVerificar,
+    [switch]$SinPdp,
     [string]$Python,
     [string]$Password,
     [string]$ContainerName = 'sql_server_asistencias',
@@ -39,6 +45,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Database = 'gestionasistenciadb'
+. (Join-Path $PSScriptRoot '..\orchestration\pdp-lib.ps1')
 $infraRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $workspace = (Resolve-Path (Join-Path $infraRoot '..')).Path
 if (-not $DbRepo) { $DbRepo = Join-Path $workspace 'GestioAsistenciaDB' }
@@ -91,22 +98,7 @@ function Assert-Ok($Result, [string]$What) {
     }
 }
 
-function Resolve-Python {
-    if ($Python) { return $Python }
-    if ($env:ASISTENCIAS_PYTHON) { return $env:ASISTENCIAS_PYTHON }
-    $py = Get-Command py -ErrorAction SilentlyContinue
-    if ($py) {
-        $exe = (Invoke-Native -Exe $py.Source -Arguments @('-3', '-c', 'import sys; print(sys.executable)')).Text.Trim()
-        if ($exe -and (Test-Path $exe)) { return $exe }
-    }
-    foreach ($cmd in @('python', 'python3')) {
-        $c = Get-Command $cmd -ErrorAction SilentlyContinue
-        if ($c -and $c.Source -notmatch 'msys|cygwin|WindowsApps') { return $c.Source }
-    }
-    $local = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs\Python') -Filter python.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($local) { return $local.FullName }
-    throw 'No se encontro Python 3 de Windows: instale Python 3 o indique -Python <ruta a python.exe> (o ASISTENCIAS_PYTHON).'
-}
+function Resolve-Python { return Resolve-PythonWindows $Python }
 
 function Set-DatasetPassword {
     if ($env:ASISTENCIAS_DATASET_PASSWORD) { return }
@@ -126,6 +118,11 @@ function Invoke-Seguridad {
     Push-Location $BackendRepo
     try { & $py -X utf8 $provision dataset-users $usuariosJson; $code = $LASTEXITCODE } finally { Pop-Location }
     if ($code -ne 0) { throw "El aprovisionamiento de Seguridad termino con codigo $code." }
+    if (-not $SinPdp) {
+        if (-not (Invoke-PdpProvision -BackendRepo $BackendRepo -PythonExe $py)) {
+            Write-Host '    !!  PDP con diferencias (use -SinPdp para omitir este paso).' -ForegroundColor Yellow
+        }
+    }
 }
 
 function Invoke-Verificar {
@@ -134,6 +131,20 @@ function Invoke-Verificar {
     Write-Step 'Verificacion de acceso y visibilidad por rol (solo lectura).'
     & $py -X utf8 $verificador --backend-repo $BackendRepo
     if ($LASTEXITCODE -ne 0) { throw 'La verificacion por rol encontro diferencias (ver las lineas XX).' }
+}
+
+function Invoke-Catalogo {
+    # Alinea el Catalogo con los datos de prueba (solo si ext-parametros-app corre). Nunca imprime claves ni tokens.
+    $corre = (Invoke-Native -Exe 'docker' -Arguments @('inspect', '-f', '{{.State.Running}}', 'ext-parametros-app')).Text.Trim() -eq 'true'
+    if (-not $corre) {
+        Write-Step 'Catalogo de Parametros no esta arriba (escenario parametros): se omite el empuje de valores de prueba.'
+        return
+    }
+    $script = Join-Path $PSScriptRoot 'sincronizar_catalogo_parametros.py'
+    $py = Resolve-Python
+    Write-Step 'Catalogo de Parametros: empujando los valores de los datos de prueba (evento -> el Backend los aplica a la BD).'
+    & $py -X utf8 -I $script --backend-repo $BackendRepo --db-repo $DbRepo
+    if ($LASTEXITCODE -eq 1) { Write-Host '    !!  El empuje al Catalogo fallo; el Backend podria revertir RED.CIDRS_CAMPUS.' -ForegroundColor Yellow }
 }
 
 function Wait-Healthy([string]$Name, [int]$Seconds = 240) {
@@ -224,11 +235,15 @@ function Invoke-Cargar {
 
 switch ($Accion) {
     'Cargar' {
+        # Falla rapido (antes de tocar la base) si no hay Python utilizable para Seguridad.
+        if (-not $SinSeguridad) { [void](Resolve-Python) }
         Invoke-Cargar
         if (-not $SinSeguridad) { Invoke-Seguridad }
+        Invoke-Catalogo
         if (-not $SinSeguridad -and -not $SinVerificar) { Invoke-Verificar }
     }
     'Seguridad' { Invoke-Seguridad }
     'Verificar' { Invoke-Verificar }
+    'Catalogo' { Invoke-Catalogo }
 }
 Write-Step 'Listo. Usuarios por rol: GestioAsistenciaDB/scripts/datos-prueba/USUARIOS.md'

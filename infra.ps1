@@ -148,7 +148,7 @@ function Show-Help {
     Write-Host "5a. CONTENEDORES POR SECCIONES Y ESCENARIOS (stack/secciones.json):" -ForegroundColor Yellow
     Write-Host "  stack list                     Secciones (asis-*, ext-*) y escenarios de prueba." -ForegroundColor White
     Write-Host "  stack up <escenario|seccion>   Levanta solo lo necesario (basico, mensajes, parametros, completo, ...)." -ForegroundColor White
-    Write-Host "  stack plan <...> | status | down [secciones] | build [backend|frontend]" -ForegroundColor White
+    Write-Host "  stack plan <...> | status | down [secciones] | build [backend|frontend|notificaciones]" -ForegroundColor White
     Write-Host ""
     Write-Host "5b. CATALOGO DE MENSAJES (MESSAGEUCOLAB - EQUIPO DE MENSAJERIA):" -ForegroundColor Yellow
     Write-Host "  messages-up      Levanta MessageUcoLab (Docker + secretos por Doppler)." -ForegroundColor White

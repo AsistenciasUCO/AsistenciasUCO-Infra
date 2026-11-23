@@ -214,3 +214,15 @@ Al regenerar pase siempre `--previo <catalogo-mensajes-usuario.psv vigente>` (VA
 importado de cada mensaje y numera los códigos largos nuevos después del último de su prefijo, sin renumerar los existentes
 (por ejemplo `ERR021` quedó libre al retirar un mensaje y no se reutiliza). El catálogo del 2026-11-13 tiene 398 mensajes de usuario.
 Para comprobar que el fixture del Backend sigue al seed: `build-message-catalog.py --seed GestioAsistenciaDB\schema\seed --check <catalogo-mensajes-usuario.psv>` (termina con error si hay desfase).
+
+### 7.1 Textos de interfaz (UI###) del Frontend
+
+Los textos `UI001…UI144` salen de `GestioAsistenciaFrontend/docs/messages/mensajes-ui-messageucolab.psv` (lo regenera `npm run sync:mensajes-ui-catalogo`; la fuente es `src/app/core/messages/mensajes-ui.ts`). **No** salen de los seeds de BD, por eso `build-message-catalog.py` no los incluye. Cada vez que el Frontend agrega textos hay que importarlos en MessageUcoLab (la ruta `GET /api/v1/public/mensajes-interfaz/{codigo}` responde 404 mientras falten y la SPA usa su texto de respaldo). Excel solo con los faltantes, sobre una plantilla con solo encabezados de la aplicación del laboratorio:
+
+```powershell
+python AsistenciasUCO-Infra\components\messages\build-ui-messages-xlsx.py `
+  --psv GestioAsistenciaFrontend\docs\messages\mensajes-ui-messageucolab.psv `
+  --template <plantilla-solo-encabezados>.xlsx --xlsx ui-faltantes.xlsx --solo UI121,UI122
+```
+
+Luego importar con el mismo paso 3 de la sección 7 (validar y confirmar).

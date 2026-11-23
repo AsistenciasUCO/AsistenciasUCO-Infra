@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Base de datos (SQL Server) · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>Base de datos (SQL Server)</h1>
+      <p>Guía completa de <code>GestioAsistenciaDB</code> para quien llega nuevo: por qué las reglas de negocio viven en procedimientos almacenados, cómo está organizado el esquema, el modelo de datos por dominio, los patrones de transacción, consulta paginada y aislamiento por rol, los flujos de negocio clave, la seguridad, las migraciones y el gate de pruebas. Cifras medidas el 2026-11-22 sobre la rama <code>feat/p3-revision-final</code>.</p>
+      <div class="etiquetas">
+        <span class="etiqueta">SQL Server 2022</span>
+        <span class="etiqueta">Smart / Thick database</span>
+        <span class="etiqueta">315 procedimientos</span>
+        <span class="etiqueta">1118 casos de prueba</span>
+        <span class="etiqueta">Migraciones 01–73</span>
+      </div>
+    </header>
+
+    <div class="kpis">
+      <div class="kpi"><div class="valor">76</div><div class="rotulo">tablas físicas</div></div>
+      <div class="kpi"><div class="valor">107</div><div class="rotulo">vistas <code>uv_*</code></div></div>
+      <div class="kpi"><div class="valor">317</div><div class="rotulo">procedimientos <code>usp_*</code></div></div>
+      <div class="kpi"><div class="valor">28</div><div class="rotulo">funciones <code>ufn_*</code></div></div>
+      <div class="kpi"><div class="valor">524</div><div class="rotulo">códigos de mensaje</div></div>
+      <div class="kpi"><div class="valor">1118</div><div class="rotulo">casos del gate, 0 fallos</div></div>
+    </div>
+
+    <h2 id="rol-de-la-bd">El rol de la base de datos: Smart / Thick database</h2>
+    <p>Lo primero que hay que entender: en este proyecto la base de datos <strong>no es un almacén pasivo</strong>. SQL Server es la única fuente de verdad del estado (entidades, folios, catálogos) y además es quien <strong>decide</strong>: valida permisos, ventanas de tiempo, cupos, plazos y umbrales, y escribe con control transaccional explícito. El backend Spring Boot es una puerta delgada que autentica, orquesta y traduce; el frontend solo presenta.</p>
+
+    <div class="tarjetas">
+      <div class="tarjeta"><div class="icono">🧠</div><h4>Reglas en un solo lugar</h4><p>Una regla como «el docente titular es el único que registra asistencia» se aplica dentro del procedimiento, así ningún cliente (API, script, consola SQL) puede saltársela.</p></div>
+      <div class="tarjeta"><div class="icono">⚛️</div><h4>ACID donde importa</h4><p>Cada comando abre su transacción (o un savepoint si ya hay una), bloquea en un orden fijo y confirma o revierte todo junto.</p></div>
+      <div class="tarjeta"><div class="icono">🧾</div><h4>Contrato estable</h4><p>Todos los procedimientos públicos devuelven la misma tupla; el backend la mapea sin adivinar nada del texto.</p></div>
+      <div class="tarjeta"><div class="icono">🔎</div><h4>Trazabilidad</h4><p>Cada llamada recibe un <code>@idCorrelacion</code> que viaja desde la cabecera <code>X-Correlation-Id</code> hasta los mensajes técnicos y la auditoría.</p></div>
+    </div>
+
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  FE["Angular 22 - presentación pura"] -->|"HTTP/REST + SSE"| BE["Spring Boot - puertos y adaptadores"]
+  BE -->|"EXEC usp_* (escrituras y consultas)"| DB[("SQL Server: SP + vistas uv_* + catálogos")]
+  BE -->|"SELECT solo vistas uv_*"| DB
+  DB -->|"tupla canónica o THROW 51000"| BE
+  BE -->|"mensajeUsuario listo para mostrar"| FE
+      </pre>
+      <figcaption>La BD es el núcleo de reglas. El backend nunca consulta tablas: solo ejecuta procedimientos y lee vistas <code>uv_*</code> (regla de <code>AGENTS.md</code> sección 3.3 y de los GRANT del rol runtime).</figcaption>
+    </figure>
+
+    <h3 id="tupla-canonica">La tupla de resultado estándar</h3>
+    <p>El contrato congelado (<code>AsistenciasUCO-Infra/<wbr>docs/<wbr>contracts/<wbr>db/<wbr>DB_<wbr>BASELINE_<wbr>CONTRACT.md</code>, sección <em>Public SP Result</em>) obliga a que todo procedimiento público de negocio devuelva <strong>una sola fila con cuatro columnas, en este orden exacto</strong>. Antes de la corrección del 2026-11-22, la documentación general lo resumía como «idResultado, exitoso, mensajeUsuario, mensajeTecnico»; hoy <code>AGENTS.md</code> usa los nombres reales de las columnas en SQL, que son:</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>#</th><th>Columna real en SQL</th><th>Tipo</th><th>Equivale a</th><th>Qué contiene</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>idCorrelacion</code></td><td>UNIQUEIDENTIFIER</td><td>idResultado</td><td>El mismo identificador de correlación recibido, para unir logs de las tres capas.</td></tr>
+          <tr><td>2</td><td><code>mensajeUsuarioResultado</code></td><td>NVARCHAR</td><td>mensajeUsuario</td><td>Texto institucional listo para el usuario, tomado del catálogo <code>CatalogoMensajeUsuario</code>.</td></tr>
+          <tr><td>3</td><td><code>mensajeTecnicoResultado</code></td><td>NVARCHAR</td><td>mensajeTecnico</td><td>Detalle técnico con el prefijo legible por máquina <code>DBCODE=&lt;codigo&gt;|detalle</code>.</td></tr>
+          <tr><td>4</td><td><code>estadoResultado</code></td><td>BIT</td><td>exitoso</td><td><code>1</code> si el comando se aplicó; <code>0</code> si hubo un rechazo de negocio (sin escrituras).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Muchos comandos «extienden» la tupla agregando columnas <em>al final</em> (por ejemplo <code>idToma</code>, <code>idSesion</code>, <code>totalRegistros</code>), nunca en medio, y las dejan en <code>NULL</code> si <code>estadoResultado = 0</code>. Un ejemplo real está en el cierre de <code>usp_<wbr>registrar_<wbr>asistencias_<wbr>toma</code>:</p>
+    <pre><code>SELECT
+    idCorrelacion           = @idCorrelacionDefecto,
+    mensajeUsuarioResultado = @mensajeUsuarioResultado,
+    mensajeTecnicoResultado = @mensajeTecnicoResultado,
+    estadoResultado         = @estadoResultado,
+    idToma                  = IIF(@estadoResultado = 1, @idTomaDefecto, NULL),
+    totalRegistros          = IIF(@estadoResultado = 1, @totalEstudiantes, NULL);</code></pre>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/<wbr>schema/<wbr>stored-procedures/<wbr>usp_<wbr>registrar_<wbr>asistencias_<wbr>toma.sql</code>.</small></p>
+
+    <h3 id="dbcode-throw">DBCODE y THROW 51000: dos canales de error</h3>
+    <p>El texto de cada mensaje no vive en el código sino en el catálogo. Un procedimiento pide el mensaje con <code>usp_<wbr>obtener_<wbr>mensaje_<wbr>catalogo @p_<wbr>codigo = 'TOM_<wbr>001'</code> y recibe los dos textos ya formados. El mensaje técnico siempre empieza por <code>DBCODE=&lt;codigo&gt;|</code>:</p>
+    <pre><code>SET @mensajeTecnicoResultado = CONCAT('DBCODE=', @codigoResultado, '|', @detalleTecnico);</code></pre>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/<wbr>schema/<wbr>stored-procedures/<wbr>usp_<wbr>obtener_<wbr>mensaje_<wbr>catalogo.sql</code>.</small></p>
+    <p>Según el tipo de procedimiento, el rechazo sale por uno de dos canales:</p>
+    <div class="pestanas">
+      <div role="tablist" aria-label="Canales de error">
+        <button role="tab" type="button">Comandos (escrituras)</button>
+        <button role="tab" type="button">Consultas de lista</button>
+        <button role="tab" type="button">Fallo inesperado</button>
+      </div>
+      <div role="tabpanel">
+        <p>El rechazo de negocio es un <strong>resultado</strong>, no una excepción: la fila trae <code>estadoResultado = 0</code>, el texto de usuario y <code>DBCODE=...</code>. Ejemplo: <code>TOM_001</code> (toma inexistente) o <code>SEC_002</code> (sin titularidad). El backend lee el <code>DBCODE</code> y decide el código HTTP (400, 403, 404, 409) con una tabla de clasificación; nunca interpreta frases.</p>
+      </div>
+      <div role="tabpanel">
+        <p>Las consultas que devuelven un conjunto de filas no pueden mezclar una fila de error con datos; por eso, si la validación falla, hacen <code>THROW 51000, @mensajeTecnicoResultado, 1;</code>. El mensaje ya lleva <code>DBCODE=SEC_002|...</code> y el backend lo extrae de la excepción. Ejemplos: <code>usp_<wbr>buscar_<wbr>asignaturas_<wbr>paginado</code>, <code>usp_<wbr>buscar_<wbr>estudiante_<wbr>por_<wbr>documento_<wbr>grupo</code> (documento nulo: <code>VAL_001</code>; grupo ajeno: <code>SEC_002</code>).</p>
+      </div>
+      <div role="tabpanel">
+        <p>Un error no previsto (deadlock, restricción violada) cae en el <code>CATCH</code>: el SP revierte y devuelve el código genérico <code>SYS_001</code> con el detalle de <code>ufn_<wbr>obtener_<wbr>detalle_<wbr>error(@idCorrelacion)</code> en el mensaje técnico. Si la transacción pertenece a un llamador externo y está en estado <code>-1</code> (irrecuperable), el SP relanza con <code>THROW;</code> para que el dueño de la transacción la revierta.</p>
+      </div>
+    </div>
+
+    <h3 id="correlacion">El identificador de correlación</h3>
+    <p>Todo procedimiento público recibe <code>@idCorrelacion UNIQUEIDENTIFIER</code> y su primer paso es <code>usp_<wbr>validar_<wbr>id_<wbr>correlacion_<wbr>esta_<wbr>presente_<wbr>interno</code>: sin correlación no se hace nada. Se concatena a los mensajes técnicos (<code>' Correlacion: '</code>) y se guarda en las tablas de hechos (<code>idCorrelacionApertura</code>, <code>idCorrelacion</code> en <code>SesionSolicitud</code>, <code>SesionCancelacion</code>, <code>AuditoriaEvento.correlationId</code>…). Así un fallo en el frontend se rastrea con una sola búsqueda hasta la fila que lo causó.</p>
+
+    <figure class="diagrama">
+      <pre class="mermaid">
+sequenceDiagram
+  participant FE as Frontend
+  participant BE as Backend
+  participant SP as usp_* (fachada)
+  participant INT as usp_validar_*_interno
+  participant CAT as Catálogo de mensajes
+  FE->>BE: POST con X-Correlation-Id
+  BE->>SP: EXEC con idCorrelacion e idUsuarioEjecutor
+  SP->>INT: correlación, RBAC, titularidad, parámetros
+  INT-->>SP: estadoResultado y mensajes por OUTPUT
+  alt rechazo de negocio
+    SP->>CAT: usp_obtener_mensaje_catalogo(codigo)
+    CAT-->>SP: usuario y DBCODE|técnico
+    SP-->>BE: fila con estadoResultado 0
+  else éxito
+    SP->>SP: transacción, bloqueos, escritura
+    SP-->>BE: fila con estadoResultado 1 y columnas extra
+  end
+  BE-->>FE: ApiResponse con mensajeUsuario
+      </pre>
+      <figcaption>Anatomía de una llamada. La fachada orquesta; los validadores internos devuelven su veredicto por parámetros <code>OUTPUT</code>; el catálogo entrega los textos.</figcaption>
+    </figure>
+
+    <div class="flujo" data-flujo data-titulo="Qué pasa dentro de un comando típico">
+      <div class="paso" data-actor="Backend" data-detalle="El backend ejecuta EXEC dbo.usp_... pasando @idCorrelacion (de CorrelationIdContext) y @idUsuarioEjecutor (el Usuario.id resuelto del JWT). Solo tiene permiso de ejecución sobre los procedimientos públicos inventariados.">Llama al SP público</div>
+      <div class="paso" data-actor="Fachada" data-detalle="El SP normaliza parámetros con ufn_obtener_parametro_guid (nada de GUID vacío quemado) y declara las variables de resultado con valores neutros tomados de GENERAL/CADENA_VACIA.">Normaliza entradas</div>
+      <div class="paso" data-actor="Validadores internos" data-detalle="Cada paso solo se ejecuta si el anterior dejó estadoResultado = 1: correlación presente, ejecutor obligatorio (GEN_002), perfil activo (SEC_001), titularidad jerárquica (SEC_002), existencia del recurso y reglas propias.">Valida en cascada</div>
+      <div class="paso" data-actor="Fachada" data-detalle="Si todo es válido abre BEGIN TRANSACTION (o SAVE TRANSACTION si hay una externa), toma bloqueos UPDLOCK/HOLDLOCK en el orden documentado y escribe.">Transacción y bloqueos</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Si una regla falla, el SP pide el mensaje al catálogo, deja estadoResultado = 0 y revierte solo si hubo escritura; los rechazos previos a escribir apenas confirman la transacción vacía.">Rechazo de negocio</div>
+      <div class="paso" data-actor="Fachada" data-detalle="El SP confirma, y siempre termina con un único SELECT de la tupla canónica (más columnas extra al final).">Devuelve la tupla</div>
+    </div>
+
+    <h2 id="estructura">Estructura de carpetas y conteos</h2>
+    <p>El esquema se guarda <strong>un objeto por archivo</strong> y se despliega con <code>deploy_schema.ps1</code> en un orden fijo (tablas, triggers, funciones, vistas, procedimientos, seguridad y semillas). Raíz: <code>GestioAsistenciaDB/</code>.</p>
+
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Cantidad de archivos por carpeta del esquema de la base de datos" role="img" data-grafica='{"type":"bar","data":{"labels":["stored-procedures","views","seed","tables","security","migrations (versiones)","functions","triggers"],"datasets":[{"label":"Archivos","data":[305,106,81,75,54,72,28,1]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Archivos por carpeta (cierre del 2026-11-22). Las tablas son 75 archivos porque uno es <code>zz_foreign_keys.sql</code>, que agrupa las llaves foráneas: quedan 74 tablas, una de ellas <code>SincronizacionParametroExterno</code> (migración 73). Migraciones: 72 versiones distintas (la 35 no existe).</figcaption>
+    </figure>
+
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Carpeta</th><th>Contenido</th><th>Archivos</th></tr></thead>
+        <tbody>
+          <tr><td><code>schema/tables</code></td><td>DDL idempotente (<code>IF OBJECT_ID(...) IS NULL</code>), índices y restricciones. <code>zz_foreign_keys.sql</code> va al final del orden alfabético.</td><td>75</td></tr>
+          <tr><td><code>schema/views</code></td><td>Vistas de lectura <code>uv_*</code> (106), de las cuales 13 son <code>uv_auth_*</code> filtradas por rol.</td><td>106</td></tr>
+          <tr><td><code>schema/functions</code></td><td>Funciones <code>ufn_*</code>: parámetros, validaciones puras, cálculo de horas y porcentajes, ámbito de programas.</td><td>28</td></tr>
+          <tr><td><code>schema/stored-procedures</code></td><td>208 fachadas públicas y 97 núcleos internos (16 <code>usp_internal_*</code> y 81 <code>*_interno</code>).</td><td>305</td></tr>
+          <tr><td><code>schema/triggers</code></td><td><code>tr_<wbr>Sesion_<wbr>procedencia_<wbr>temporal</code>: defensa contra DML directo sobre <code>Sesion</code>.</td><td>1</td></tr>
+          <tr><td><code>schema/security</code></td><td>Roles y permisos del backend (<code>rol_asistencias_runtime*</code>), uno por paquete de trabajo.</td><td>54</td></tr>
+          <tr><td><code>schema/seed</code></td><td>Catálogos, mensajes y parámetros (<code>MERGE</code> idempotentes).</td><td>81</td></tr>
+          <tr><td><code>migrations</code></td><td>Cambios incrementales para bases existentes: <code>NN_nombre_up.sql</code> y <code>_down.sql</code>.</td><td>143</td></tr>
+          <tr><td><code>test</code> y <code>test_suite.sql</code></td><td>202 pruebas T-SQL y 40 scripts PowerShell; la suite incluye 174 archivos con <code>:r</code>.</td><td>242</td></tr>
+          <tr><td><code>scripts</code></td><td><code>migrar.ps1</code>, <code>freeze-manifest.ps1</code>, <code>check-test-summary-parity.ps1</code>, <code>generar-catalogo-mensajes.ps1</code>, datos de prueba.</td><td>—</td></tr>
+          <tr><td><code>docs</code></td><td>Catálogos generados (mensajes y parámetros), contratos y documentación de procedimientos.</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="nota"><strong>Sin tipos de tabla (TVP).</strong> <code>AGENTS.md</code> menciona una carpeta <code>types</code>, pero hoy no existe en el esquema: los lotes (asistencia, horarios, carga masiva) viajan como JSON en un <code>NVARCHAR(MAX)</code> y se leen con <code>OPENJSON</code>, validando primero con <code>ISJSON</code>.</div>
+
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Distribución de los 305 procedimientos almacenados por familia" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Consultas públicas (usp_consultar_*)","Comandos públicos (crear, actualizar, registrar, etc.)","Núcleos internos (usp_internal_* y *_interno)"],"datasets":[{"label":"Procedimientos","data":[102,106,97]}]}}'></canvas></div>
+      <figcaption>305 procedimientos: 102 consultas públicas, 106 comandos y utilidades públicas, y 97 núcleos internos sin permiso de ejecución para el backend.</figcaption>
+    </figure>
+
+    <h2 id="modelo-de-datos">Modelo de datos por dominio</h2>
+    <p>Los diagramas se leen como «una fila de A se relaciona con muchas de B». Las llaves son <code>UNIQUEIDENTIFIER</code> y los instantes se guardan en <strong>UTC</strong> (<code>DATETIME2</code>, sufijo <code>Utc</code>). Solo se muestran las columnas relevantes; la verdad completa está en <code>GestioAsistenciaDB/<wbr>schema/<wbr>tables/<wbr></code>.</p>
+
+    <h3 id="dominio-academico">Institución, facultad, programa, plan y asignatura</h3>
+    <figure class="diagrama">
+      <pre class="mermaid">
+erDiagram
+  Institucion ||--o{ Facultad : "tiene"
+  Facultad ||--o{ Programa : "agrupa"
+  Programa ||--o{ PlanEstudio : "define"
+  PlanEstudio ||--o{ SemestrePlanEstudio : "organiza"
+  Semestre ||--o{ SemestrePlanEstudio : "numera"
+  SemestrePlanEstudio ||--o{ AsignaturaPlanEstudio : "contiene"
+  Asignatura ||--o{ AsignaturaPlanEstudio : "se ofrece en"
+  Asignatura }o--|| Area : "pertenece"
+  Asignatura }o--|| Componente : "clasifica"
+  AsignaturaPlanEstudio }o--|| CaracterAsignaturaPlan : "caracter"
+  Programa }o--|| TipoPrograma : "tipo"
+  Programa }o--|| Modalidad : "modalidad"
+  Programa }o--|| Jornada : "jornada"
+  Institucion {
+    guid id PK
+    nvarchar nombre
+    bit estado
+  }
+  Facultad {
+    guid id PK
+    guid institucion FK
+    guid decano FK
+    nvarchar nombre
+  }
+  Programa {
+    guid id PK
+    guid facultad FK
+    guid coordinador FK
+    guid tipoDePrograma FK
+    nvarchar nombre
+  }
+  PlanEstudio {
+    guid id PK
+    guid programa FK
+    int inp
+    bit estado
+  }
+  Asignatura {
+    guid id PK
+    nvarchar codigo
+    int credito
+    int horasSemanales
+    guid area FK
+    guid componente FK
+  }
+  AsignaturaPlanEstudio {
+    guid id PK
+    guid asignatura FK
+    guid semestrePlanEstudio FK
+    guid caracter FK
+    bit estaActivo
+  }
+      </pre>
+      <figcaption>Una asignatura puede vivir en varios planes y programas a través de <code>AsignaturaPlanEstudio</code> (única por asignatura y semestre del plan). El decano cuelga de <code>Facultad</code> y el coordinador de <code>Programa</code>.</figcaption>
+    </figure>
+
+    <h3 id="dominio-usuarios">Usuarios y roles</h3>
+    <p>Una persona es un <code>Usuario</code>; cada rol es una tabla delgada que apunta al usuario. Un mismo usuario puede tener varios roles. La contraseña ya no se guarda aquí: la identidad la gestiona el proveedor externo y se vincula con <code>IdentidadExterna</code> (emisor + sujeto).</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+erDiagram
+  Usuario ||--o| Estudiante : "es"
+  Usuario ||--o| Docente : "es"
+  Usuario ||--o| Coordinador : "es"
+  Usuario ||--o| Decano : "es"
+  Usuario ||--o| Administrador : "es"
+  Usuario }o--|| TipoIdentificacion : "documento"
+  Usuario ||--o{ IdentidadExterna : "vincula"
+  Usuario ||--o{ TokenVerificacionCorreo : "verifica correo"
+  Institucion ||--o{ Administrador : "administra"
+  Estudiante ||--o{ EstudiantePrograma : "cursa"
+  Programa ||--o{ EstudiantePrograma : "tiene"
+  Docente ||--o{ DocentePrograma : "se vincula"
+  Programa ||--o{ DocentePrograma : "tiene"
+  Coordinador ||--o{ Programa : "coordina"
+  Decano ||--o{ Facultad : "dirige"
+  Usuario {
+    guid id PK
+    guid tipoIdIdentificacion FK
+    int numeroIdentificacion
+    nvarchar correo
+    bit correoConfirmado
+    bit estado
+  }
+  EstudiantePrograma {
+    guid id PK
+    guid estudiante FK
+    guid programa FK
+    tinyint semestreActual
+  }
+  DocentePrograma {
+    guid id PK
+    guid docente FK
+    guid programa FK
+    bit estado
+    datetime2 fechaVinculacionUtc
+  }
+  IdentidadExterna {
+    guid id PK
+    guid usuario FK
+    nvarchar emisor
+    nvarchar sujeto
+    bit estado
+  }
+      </pre>
+      <figcaption>Roles: <code>Estudiante</code>, <code>Docente</code>, <code>Coordinador</code>, <code>Decano</code> y <code>Administrador</code> (este último atado a una institución). <code>EstudiantePrograma</code> tiene índice único por estudiante y programa; <code>DocentePrograma</code> es única por docente y programa.</figcaption>
+    </figure>
+
+    <h3 id="dominio-periodo">Período académico, festivos y receso</h3>
+    <figure class="diagrama">
+      <pre class="mermaid">
+erDiagram
+  Institucion ||--o{ PeriodoAcademico : "abre"
+  PeriodoAcademico ||--o{ PeriodoRecesoAcademico : "declara"
+  Usuario ||--o{ PeriodoRecesoAcademico : "crea"
+  DiaFestivo ||--o{ SesionCancelacion : "origina"
+  PeriodoRecesoAcademico ||--o{ SesionCancelacion : "origina"
+  TipoCancelacionSesion ||--o{ SesionCancelacion : "clasifica"
+  Sesion ||--o| SesionCancelacion : "se cancela"
+  CargaDiaFestivo }o--|| Usuario : "ejecuta"
+  PeriodoAcademico {
+    guid id PK
+    guid institucion FK
+    nvarchar nombre
+    date fechaInicio
+    date fechaFin
+    datetime2 fechaCierreUtc
+  }
+  PeriodoRecesoAcademico {
+    guid id PK
+    guid periodoAcademico FK
+    date fecha
+    nvarchar motivo
+    bit estaActivo
+  }
+  DiaFestivo {
+    guid id PK
+    date fecha UK
+    nvarchar nombre
+    nvarchar fuente
+    bit estaActivo
+  }
+  SesionCancelacion {
+    guid sesion PK
+    guid tipoCancelacion FK
+    guid diaFestivo FK
+    guid recesoAcademico FK
+    nvarchar motivo
+    datetime2 fechaCancelacionUtc
+  }
+      </pre>
+      <figcaption>Una sesión cancelada tiene exactamente un origen: un festivo, un receso o un usuario ejecutor (restricción <code>CK_<wbr>SesionCancelacion_<wbr>origen</code>). El período marca su cierre masivo en <code>fechaCierreUtc</code>.</figcaption>
+    </figure>
+
+    <h3 id="dominio-grupos">Grupos, horarios y sesiones</h3>
+    <figure class="diagrama">
+      <pre class="mermaid">
+erDiagram
+  Asignatura ||--o{ Grupo : "se dicta en"
+  PeriodoAcademico ||--o{ Grupo : "contiene"
+  Docente ||--o{ Grupo : "es titular"
+  Programa |o--o{ Grupo : "responsable"
+  Grupo ||--o{ Horario : "programa"
+  Dia ||--o{ Horario : "dia"
+  Grupo ||--o{ Sesion : "genera"
+  Sesion ||--o| SesionSolicitud : "extraordinaria"
+  EstadoSolicitudSesion ||--o{ SesionSolicitud : "estado"
+  Grupo ||--o{ EstudianteGrupo : "matricula"
+  Estudiante ||--o{ EstudianteGrupo : "se inscribe"
+  EstadoEstudianteGrupo ||--o{ EstudianteGrupo : "estado"
+  Grupo ||--o{ TokenMatriculaGrupo : "ventana QR"
+  Grupo {
+    guid id PK
+    guid asignatura FK
+    guid periodoAcademico FK
+    guid docente FK
+    guid programaResponsable FK
+    int codigo
+    nvarchar nombre
+  }
+  Horario {
+    guid id PK
+    guid grupo FK
+    guid dia FK
+    time horaInicio
+    time horaFin
+  }
+  Sesion {
+    guid id PK
+    guid grupo FK
+    int numero
+    int numeroSemana
+    datetime2 fechaHoraInicio
+    datetime2 fechaHoraFin
+    nvarchar procedenciaTemporal
+  }
+  EstudianteGrupo {
+    guid id PK
+    guid estudiante FK
+    guid grupo FK
+    guid estado FK
+  }
+  TokenMatriculaGrupo {
+    guid id PK
+    guid grupo FK
+    varbinary tokenHash
+    nvarchar estado
+    guid programaPorDefecto FK
+  }
+      </pre>
+      <figcaption>La matrícula es <code>EstudianteGrupo</code>, con estados <code>A</code> (activo), <code>I</code> (inactivo), <code>CVP</code> (cancelado por voluntad propia), <code>CI</code> (cancelado por inasistencia) y <code>F</code> (finalizado). <code>Sesion.procedenciaTemporal</code> la protege el trigger <code>tr_<wbr>Sesion_<wbr>procedencia_<wbr>temporal</code>.</figcaption>
+    </figure>
+
+    <h3 id="dominio-asistencia">Toma de asistencia, asistencia y reclamos</h3>
+    <figure class="diagrama">
+      <pre class="mermaid">
+erDiagram
+  Sesion ||--o{ TomaAsistencia : "tiene tomas"
+  ModoTomaAsistencia ||--o{ TomaAsistencia : "modo"
+  EstadoTomaAsistencia ||--o{ TomaAsistencia : "estado"
+  TomaAsistencia ||--o{ TokenAsistenciaToma : "emite"
+  EstudianteGrupo ||--o{ Asistencia : "asiste"
+  Sesion ||--o{ Asistencia : "registra"
+  Asistencia ||--o{ DetalleAsistencia : "detalla"
+  TomaAsistencia ||--o{ DetalleAsistencia : "origina"
+  RazonCausa ||--o{ DetalleAsistencia : "razon"
+  Asistencia ||--o{ SolicitudRevisionAsistencia : "se reclama"
+  TomaAsistencia ||--o{ SolicitudRevisionAsistencia : "de la toma"
+  CategoriaJustificacion ||--o{ SolicitudRevisionAsistencia : "categoria"
+  SolicitudRevisionAsistencia ||--o{ ArchivoSoporte : "adjunta"
+  TomaAsistencia {
+    guid id PK
+    guid sesion FK
+    smallint numero
+    guid modo FK
+    guid estado FK
+    datetime2 fechaAperturaUtc
+    datetime2 fechaCierreUtc
+    int totalAusentesMarcados
+  }
+  TokenAsistenciaToma {
+    guid id PK
+    guid toma FK
+    varbinary tokenHash UK
+    datetime2 fechaRotacionUtc
+    datetime2 fechaExpiracionUtc
+  }
+  DetalleAsistencia {
+    guid id PK
+    guid asistencia FK
+    guid toma FK
+    guid razonCausa FK
+    bit asistio
+    bit registradoPorEstudiante
+  }
+  SolicitudRevisionAsistencia {
+    guid id PK
+    guid asistencia FK
+    guid toma FK
+    guid estado FK
+    guid categoriaJustificacion FK
+    guid razonCausaResolucion FK
+  }
+  ArchivoSoporte {
+    guid id PK
+    guid solicitudRevisionAsistencia FK
+    char checksumSha256
+    varchar estado
+  }
+      </pre>
+      <figcaption>Una sesión puede tener varias tomas (única por sesión y número); hay a lo sumo una abierta a la vez (índice único filtrado <code>UX_<wbr>TomaAsistencia_<wbr>Sesion_<wbr>Abierta</code>). Una asistencia tiene un detalle por toma (<code>UX_<wbr>DetalleAsistencia_<wbr>Asistencia_<wbr>Toma</code>). Razones: <code>AN</code> asistió, <code>SJC</code> sin justa causa, <code>EX</code> excusa, <code>CPVP</code> y <code>CPI</code> cancelaciones.</figcaption>
+    </figure>
+
+    <h3 id="dominio-alertas">Alertas de inasistencia y revisión de cancelación</h3>
+    <figure class="diagrama">
+      <pre class="mermaid">
+erDiagram
+  EstudianteGrupo ||--o{ AlertaInasistencia : "genera"
+  TipoAlertaInasistencia ||--o{ AlertaInasistencia : "tipo"
+  EstadoAlertaInasistencia ||--o{ AlertaInasistencia : "estado"
+  AlertaInasistencia ||--o| RevisionCancelacion : "origina"
+  EstudianteGrupo ||--o{ RevisionCancelacion : "se revisa"
+  EstadoRevisionCancelacion ||--o{ RevisionCancelacion : "estado"
+  EstadoRevisionCancelacion ||--o{ TransicionRevisionCancelacion : "origen y destino"
+  RevisionCancelacion ||--o{ RevisionCancelacionHistorial : "bitacora"
+  Grupo ||--o| EvaluacionAlertaGrupo : "marca de agua"
+  Sesion ||--o| AvisoFaltaSesion : "avisa faltas"
+  Sesion ||--o| AvisoSesionSinToma : "avisa sin toma"
+  AlertaInasistencia {
+    guid id PK
+    guid estudianteGrupo FK
+    guid tipo FK
+    decimal porcentajeCruce
+    decimal umbralCruce
+    datetime2 fechaCruceUtc
+  }
+  RevisionCancelacion {
+    guid id PK
+    guid estudianteGrupo FK
+    guid estado FK
+    nvarchar codigoDecisionDocente
+    nvarchar codigoDecisionResolucion
+    guid usuarioResolucion FK
+    decimal porcentajeResolucion
+  }
+      </pre>
+      <figcaption><code>TransicionRevisionCancelacion</code> es una tabla de datos que dice qué transiciones son legales; los SP la consultan en lugar de tener el grafo escrito en código. <code>EvaluacionAlertaGrupo</code> serializa el motor por grupo.</figcaption>
+    </figure>
+
+    <h3 id="dominio-transversal">Auditoría, catálogos, mensajes, parámetros y outbox</h3>
+    <figure class="diagrama">
+      <pre class="mermaid">
+erDiagram
+  CatalogoParametro ||--o| CatalogoParametroEdicion : "reglas de edicion"
+  CatalogoParametro ||--o{ CambioParametro : "historial"
+  CatalogoParametro ||--o{ SincronizacionParametroExterno : "sincroniza"
+  Usuario ||--o{ CambioParametro : "cambia"
+  EstadoNotificacion ||--o{ NotificacionSaliente : "estado"
+  AuditoriaEvento {
+    guid id PK
+    datetime occurredAt
+    nvarchar actorId
+    varchar action
+    varchar resourceType
+    guid correlationId
+    char traceId
+    varchar errorCode
+  }
+  CatalogoMensajeUsuario {
+    guid id PK
+    varchar codigo
+    varchar tipoMensaje
+    varchar severidad
+    nvarchar contenido
+  }
+  CatalogoMensajeTecnico {
+    guid id PK
+    varchar codigo
+    nvarchar contenido
+  }
+  SincronizacionParametroExterno {
+    guid id PK
+    varchar idEvento UK
+    guid parametro FK
+    varchar grupo
+    varchar clave
+    varchar operacion
+    varchar resultado
+    nvarchar valorAnterior
+    nvarchar valorNuevo
+    datetime2 ocurridoEnUtc
+    guid idCorrelacion
+  }
+  CatalogoParametro {
+    guid id PK
+    varchar grupo
+    varchar clave
+    nvarchar valor
+    varchar tipoDato
+    nvarchar valorDefecto
+  }
+  NotificacionSaliente {
+    guid id PK
+    varchar tipo
+    nvarchar destinatarios
+    nvarchar datos
+    guid idEstado FK
+    int intentos
+    datetime proximoIntentoEn
+    guid idCorrelacion
+  }
+  MigracionAplicada {
+    guid id PK
+    int version
+    varchar nombre
+    char checksumSha256
+    varchar modo
+  }
+      </pre>
+      <figcaption>Tablas transversales. <code>AuditoriaEvento</code> es la única tabla donde el backend inserta directamente. <code>MigracionAplicada</code> es el registro de migraciones con el checksum de cada archivo.</figcaption>
+    </figure>
+
+    <div class="nota exito"><strong>Notificaciones: separación cerrada.</strong> El servicio propio <code>Complementos/<wbr>Notificaciones</code> guarda las plantillas, el SMTP y el tope de envíos. La migración 71 retiró de esta BD <code>PlantillaNotificacion</code>, <code>PlantillaNotificacionMarcador</code>, los 6 SP públicos de plantillas y de cola administrativa (con sus núcleos internos) y la vista <code>uv_<wbr>notificacion_<wbr>saliente_<wbr>admin</code>, y sembró los mensajes <code>OK_*</code> y los rótulos <code>RPT_*</code>; la migración 72 agregó <code>RPT_<wbr>ASISTENCIA_<wbr>ESTADO_<wbr>CANCELADA</code>. La BD conserva la <strong>outbox</strong> (<code>NotificacionSaliente</code> y sus SP <code>usp_<wbr>registrar_<wbr>notificacion_<wbr>saliente</code>, <code>usp_<wbr>reservar_<wbr>notificaciones_<wbr>salientes</code>, <code>usp_<wbr>marcar_<wbr>notificacion_<wbr>entregada</code>, <code>usp_<wbr>registrar_<wbr>fallo_<wbr>notificacion</code> y <code>usp_<wbr>depurar_<wbr>notificaciones_<wbr>salientes</code>) y la verificación de correo (<code>TokenVerificacionCorreo</code>); el backend entrega por HTTP con una <code>idempotencyKey</code>. Ver <a href="notificaciones.html">Notificaciones</a>.</div>
+
+    <h3 id="catalogos-tablas">Catálogos de dominio</h3>
+    <p>Los estados, modos y tipos no están quemados en el T-SQL: viven en tablas pequeñas con identificadores fijos y se resuelven por <strong>banderas</strong> (<code>estaAbierta</code>, <code>usaCodigoQr</code>, <code>marcaAusentesAlCerrar</code>, <code>esAutomatica</code>…) o por <strong>parámetros</strong> (<code>MATRICULA/ESTADO_INSCRITA</code>). Las más importantes:</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Tabla</th><th>Valores sembrados (código)</th><th>Para qué sirve</th></tr></thead>
+        <tbody>
+          <tr><td><code>RazonCausa</code></td><td>AN, SJC, EX, CPVP, CPI</td><td>Motivo de cada detalle de asistencia.</td></tr>
+          <tr><td><code>EstadoEstudianteGrupo</code></td><td>A, I, CVP, CI, F</td><td>Estado de la matrícula.</td></tr>
+          <tr><td><code>ModoTomaAsistencia</code></td><td>MANUAL, QR</td><td>El modo QR emite token y PIN rotativos.</td></tr>
+          <tr><td><code>EstadoTomaAsistencia</code></td><td>ABIERTA, CERRADA</td><td>Se resuelven por la bandera <code>estaAbierta</code>.</td></tr>
+          <tr><td><code>TipoCancelacionSesion</code></td><td>FESTIVO, RECESO y manuales</td><td>Origen de una sesión cancelada.</td></tr>
+          <tr><td><code>TipoAlertaInasistencia</code></td><td>ADVERTENCIA, PERDIDA</td><td>Umbrales por parámetro (<code>UMBRAL_ALERTA_ADVERTENCIA</code> y <code>UMBRAL_ALERTA_PERDIDA</code>).</td></tr>
+          <tr><td><code>EstadoRevisionCancelacion</code></td><td>PENDIENTE_DOCENTE, MANTENIDA, PROPUESTA, APROBADA, RECHAZADA</td><td>Máquina de estados de la revisión.</td></tr>
+          <tr><td><code>Perfil</code></td><td>Estudiante, docente, coordinador, decano, administrador</td><td>Nivel de acceso por perfil.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota"><strong>Nombre de los catálogos.</strong> Las reglas generales hablan de tablas <code>cat_*</code>; en el esquema real los catálogos usan nombres en PascalCase (<code>RazonCausa</code>, <code>Estado</code>, <code>Area</code>…) y los de mensajes y parámetros llevan el prefijo <code>Catalogo*</code>. No hay ninguna tabla llamada <code>cat_*</code>.</div>
+
+    <h2 id="convenciones">Convenciones de nombres y patrón fachada + internos</h2>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Prefijo / sufijo</th><th>Significado</th><th>Ejemplo real</th></tr></thead>
+        <tbody>
+          <tr><td><code>usp_<wbr>&lt;acción&gt;_<wbr>&lt;entidad&gt;</code></td><td>Fachada pública: orquesta y es dueña de la transacción. El rol runtime tiene <code>EXECUTE</code>.</td><td><code>usp_abrir_toma_asistencia</code></td></tr>
+          <tr><td><code>usp_consultar_*</code></td><td>Consulta paginada o de detalle sobre vistas <code>uv_*</code>.</td><td><code>usp_<wbr>consultar_<wbr>sesiones_<wbr>grupo_<wbr>paginado</code></td></tr>
+          <tr><td><code>usp_internal_*</code> y <code>*_interno</code></td><td>Núcleo o validador reutilizable. <strong>Sin</strong> <code>EXECUTE</code> para el backend.</td><td><code>usp_internal_cerrar_toma</code>, <code>usp_<wbr>validar_<wbr>sesion_<wbr>ventana_<wbr>registro_<wbr>interno</code></td></tr>
+          <tr><td><code>usp_validar_*_interno</code></td><td>Validadores de una sola regla con triplete <code>OUTPUT</code> (<code>mensajeUsuario</code>, <code>mensajeTecnico</code>, <code>estadoResultado</code>).</td><td><code>usp_<wbr>validar_<wbr>titularidad_<wbr>jerarquica_<wbr>interno</code></td></tr>
+          <tr><td><code>usp_resolver_*_interno</code></td><td>Resuelve el contexto del ejecutor (institución, facultad, programa).</td><td><code>usp_<wbr>resolver_<wbr>facultad_<wbr>decano_<wbr>interno</code></td></tr>
+          <tr><td><code>_v2</code>, <code>_v3</code>, <code>_v4</code></td><td>Versiones nuevas que conservan la anterior congelada.</td><td><code>usp_<wbr>radicar_<wbr>solicitud_<wbr>revision_<wbr>asistencia_<wbr>v4</code></td></tr>
+          <tr><td><code>ufn_*</code></td><td>Función: valores de parámetros, cálculos puros y ámbitos.</td><td><code>ufn_<wbr>calcular_<wbr>porcentaje_<wbr>inasistencia_<wbr>horas</code></td></tr>
+          <tr><td><code>uv_*</code> / <code>uv_auth_*</code></td><td>Vista de lectura / vista filtrada por el usuario ejecutor (falla cerrada).</td><td><code>uv_auth_docente</code></td></tr>
+          <tr><td><code>seq_*</code></td><td>Secuencia.</td><td><code>seq_<wbr>detalle_<wbr>asistencia_<wbr>codigo</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart TD
+  F["usp_abrir_toma_asistencia (fachada, dueña de la transacción)"] --> V1["usp_validar_id_correlacion_esta_presente_interno"]
+  F --> V2["usp_validar_permiso_rbac_usuario_interno"]
+  F --> V3["usp_validar_titularidad_jerarquica_interno"]
+  F --> V4["usp_validar_sesion_ventana_registro_interno"]
+  F --> N1["usp_internal_cerrar_toma (núcleo)"]
+  N1 --> N2["usp_internal_marcar_ausentes_toma (núcleo)"]
+  F --> Q["usp_obtener_mensaje_catalogo"]
+  V1 --> Q
+  V2 --> Q
+  V3 --> Q
+  V4 --> Q
+      </pre>
+      <figcaption>Patrón fachada + internos: la fachada decide el orden y la transacción; los validadores aportan una regla cada uno; los núcleos no abren transacción propia (la controla el llamador). Esto evita procedimientos monolíticos «Dios».</figcaption>
+    </figure>
+
+    <h3 id="plantilla-transaccion">Plantilla de transacción</h3>
+    <p>Todos los comandos siguen la misma plantilla: <code>SET XACT_ABORT ON</code>, <code>TRY/CATCH</code>, transacción propia <em>o</em> savepoint si ya hay una abierta (así el SP se puede componer dentro de otro), y reversión que solo toca lo que el propio SP abrió. Fragmento real (recortado) de <code>usp_<wbr>registrar_<wbr>asistencias_<wbr>toma</code>:</p>
+    <pre><code>SET NOCOUNT ON;
+SET XACT_ABORT ON;
+BEGIN TRY
+    -- ...validaciones: cada una solo corre si @estadoResultado = 1...
+    IF @estadoResultado = 1
+    BEGIN
+        IF @@TRANCOUNT = 0
+        BEGIN
+            BEGIN TRANSACTION;
+            SET @transaccionPropia = 1;
+        END
+        ELSE
+        BEGIN
+            SAVE TRANSACTION sp_asistencias_toma;
+            SET @savepointCreado = 1;
+        END
+
+        -- ...escrituras con bloqueos...
+
+        IF @transaccionPropia = 1
+        BEGIN
+            IF XACT_STATE() = 1 AND (@estadoResultado = 1 OR @huboEscritura = 0)
+                COMMIT TRANSACTION;
+            ELSE IF XACT_STATE() &lt;&gt; 0
+                ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND XACT_STATE() = 1 AND @estadoResultado = 0 AND @huboEscritura = 1
+            ROLLBACK TRANSACTION sp_asistencias_toma;
+    END
+END TRY
+BEGIN CATCH
+    SET @estadoTransaccionCatch = XACT_STATE();
+    IF @transaccionPropia = 1 AND @estadoTransaccionCatch &lt;&gt; 0
+        ROLLBACK TRANSACTION;
+    ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+        ROLLBACK TRANSACTION sp_asistencias_toma;
+    IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+        THROW;
+    -- SYS_001 + ufn_obtener_detalle_error(@idCorrelacion)
+    SET @estadoResultado = 0;
+END CATCH</code></pre>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/<wbr>schema/<wbr>stored-procedures/<wbr>usp_<wbr>registrar_<wbr>asistencias_<wbr>toma.sql</code>. Los rechazos previos a escribir (<code>@huboEscritura = 0</code>) solo confirman la transacción vacía, lo que los hace compatibles con <code>INSERT ... EXEC</code>.</small></p>
+
+    <div class="nota alerta"><strong>Trampa conocida.</strong> Un SP que usa <code>INSERT ... EXEC</code> (como <code>usp_<wbr>generar_<wbr>sesiones_<wbr>grupo_<wbr>v2</code>) no puede anidarse dentro de otro <code>INSERT ... EXEC</code> (error 8164). Y con una transacción externa abierta, un error en el SP congelado deja <code>XACT_STATE() = -1</code>: solo el llamador puede revertir.</div>
+
+    <h3 id="bloqueos">Pistas de bloqueo y orden de bloqueos</h3>
+    <p>Para que dos operaciones concurrentes no se pisen, los comandos usan <code>WITH (UPDLOCK, HOLDLOCK)</code> al releer lo que van a modificar, siempre en el <strong>mismo orden</strong> para evitar interbloqueos: típicamente <code>Sesion</code> (ventana) → <code>TomaAsistencia</code> → <code>TokenAsistenciaToma</code>, y <code>RevisionCancelacion</code> → <code>EstudianteGrupo</code>.</p>
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Archivos de procedimientos que usan cada técnica transaccional" role="img" data-grafica='{"type":"bar","data":{"labels":["SET XACT_ABORT ON","SAVE TRANSACTION","UPDLOCK","HOLDLOCK","READPAST"],"datasets":[{"label":"Archivos de procedimientos","data":[154,85,77,73,2]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Archivos de <code>schema/stored-procedures</code> que contienen cada técnica (2026-11-22). <code>READPAST</code> es raro a propósito: solo se usa en jobs que pueden saltarse filas ajenas.</figcaption>
+    </figure>
+    <div class="dos-columnas">
+      <div>
+        <p><strong>UPDLOCK + HOLDLOCK</strong> evita que dos transacciones creen el mismo vínculo estudiante-programa:</p>
+        <pre><code>FROM dbo.EstudiantePrograma ep WITH (UPDLOCK, HOLDLOCK)</code></pre>
+        <p class="nota-fuente"><small><code>usp_<wbr>internal_<wbr>asegurar_<wbr>estudiante_<wbr>programa_<wbr>grupo.sql</code>; la unicidad queda además protegida por <code>UX_<wbr>EstudiantePrograma_<wbr>estudiante_<wbr>programa</code>.</small></p>
+      </div>
+      <div>
+        <p><strong>READPAST</strong> permite que dos instancias del job de cierre automático no cierren la misma toma:</p>
+        <pre><code>FROM dbo.TomaAsistencia t WITH (READPAST)
+WHERE t.fechaCierreUtc IS NULL ...</code></pre>
+        <p class="nota-fuente"><small><code>usp_<wbr>cerrar_<wbr>tomas_<wbr>vencidas.sql</code>; la outbox usa <code>UPDLOCK, READPAST, ROWLOCK</code> en <code>usp_<wbr>reservar_<wbr>notificaciones_<wbr>salientes_<wbr>interno</code>.</small></p>
+      </div>
+    </div>
+
+    <h2 id="paginacion">Consultas paginadas: usp_consultar_* sobre uv_*</h2>
+    <p>Toda consulta filtrada y paginada pasa por un <strong>procedimiento de consulta</strong> que lee una <strong>vista</strong>. Recibe <code>@numeroPagina</code>, <code>@tamanoPagina</code> y filtros, pagina con <code>OFFSET ... FETCH NEXT</code> y devuelve el total en cada fila con <code>COUNT(1) OVER() AS totalRegistros</code>, de donde el backend arma <code>ApiPageResponse&lt;T&gt;</code> (<code>elementos</code>, <code>numeroPagina</code>, <code>tamanoPagina</code>, <code>totalElementos</code>, <code>totalPaginas</code>).</p>
+    <pre><code>EXEC dbo.usp_establecer_contexto_usuario_ejecutor @p_idUsuario = @idUsuarioDefecto;
+
+SELECT  s.id, s.idGrupo, s.nombre, s.numero, s.fechaHoraInicio, s.fechaHoraFin,
+        COUNT(1) OVER() AS totalRegistros,
+        se.estaCancelada, se.codigoTipoCancelacion, se.motivoCancelacion
+FROM dbo.uv_auth_sesion s
+INNER JOIN dbo.uv_sesion_estado se ON se.idSesion = s.id
+WHERE s.idGrupo = @idGrupoDefecto
+  AND (@filtroFechaDesde IS NULL OR s.fechaHoraInicio &gt;= @filtroFechaDesde)
+  AND (@filtroSemana IS NULL OR s.numeroSemana = @filtroSemana)
+ORDER BY s.fechaHoraInicio ASC, s.numero ASC, s.id ASC
+OFFSET @offset ROWS
+FETCH NEXT @tamano ROWS ONLY;</code></pre>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/<wbr>schema/<wbr>stored-procedures/<wbr>usp_<wbr>consultar_<wbr>sesiones_<wbr>grupo_<wbr>paginado.sql</code>. El <code>ORDER BY</code> incluye <code>id</code> como desempate para que la paginación sea determinista.</small></p>
+    <ul>
+      <li><strong>Tamaño máximo:</strong> el parámetro <code>PAGINACION/TAMANO_MAXIMO</code> acota la página; fuera de rango responde <code>PAG_001</code>. La validación compartida está en <code>usp_<wbr>validar_<wbr>consulta_<wbr>paginada_<wbr>interno</code> (correlación, ejecutor, perfil y página en un solo lugar).</li>
+      <li><strong>Solo lectura:</strong> las consultas no abren transacción. El backend también puede leer directamente vistas <code>uv_*</code> por JPA, pero nunca tablas.</li>
+      <li><strong>Orden de filtros:</strong> un filtro <code>NULL</code> significa «sin filtro» (<code>@filtro IS NULL OR ...</code>); nunca se usa un GUID vacío como centinela.</li>
+    </ul>
+
+    <h2 id="aislamiento">Aislamiento jerárquico dentro de los SP</h2>
+    <p>La visibilidad por rol <strong>no la decide el backend ni el frontend</strong>: se fuerza dentro de la BD. Hay dos mecanismos que se combinan.</p>
+    <h3 id="session-context">1. SESSION_CONTEXT y vistas uv_auth_*</h3>
+    <p>La consulta establece <code>SESSION_<wbr>CONTEXT('idUsuarioEjecutor')</code> con <code>usp_<wbr>establecer_<wbr>contexto_<wbr>usuario_<wbr>ejecutor</code>; las 13 vistas <code>uv_auth_*</code> filtran con <code>ufn_<wbr>obtener_<wbr>usuario_<wbr>ejecutor_<wbr>contexto()</code> y <strong>fallan cerradas</strong>: sin contexto devuelven 0 filas (un <code>NULL</code> nunca equivale a acceso total). Fragmento real de <code>uv_auth_docente</code>:</p>
+    <pre><code>WHERE dbo.ufn_obtener_usuario_ejecutor_contexto() IS NOT NULL   -- fail closed
+  AND (  EXISTS (SELECT 1 FROM dbo.Administrador a
+                 WHERE a.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto()
+                   AND a.institucion = d.idInstitucion)
+      OR EXISTS (SELECT 1 FROM dbo.Decano dec INNER JOIN dbo.Facultad f ON dec.id = f.decano
+                 WHERE dec.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND f.id = d.idFacultad)
+      OR EXISTS (SELECT 1 FROM dbo.Coordinador c INNER JOIN dbo.Programa pr ON c.id = pr.coordinador
+                 WHERE c.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND pr.id = d.idPrograma)
+      OR d.idUsuario = dbo.ufn_obtener_usuario_ejecutor_contexto() );</code></pre>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/<wbr>schema/<wbr>views/<wbr>uv_<wbr>auth_<wbr>docente.sql</code>.</small></p>
+    <div class="nota alerta"><strong>El contexto es de la conexión, no de la petición.</strong> Con un pool de conexiones, un contexto que no se restaura se filtra a la siguiente petición. Por eso <code>usp_<wbr>consultar_<wbr>sesiones_<wbr>grupo_<wbr>paginado</code> captura el contexto previo, lo establece y <strong>siempre</strong> lo restaura (en éxito y en <code>CATCH</code>). Ver <code>GestioAsistenciaDB/<wbr>docs/<wbr>arquitectura/<wbr>DB_<wbr>SESSION_<wbr>CONTEXT_<wbr>Y_<wbr>VISTAS_<wbr>AUTORIZADAS.md</code>.</div>
+
+    <h3 id="titularidad">2. Titularidad jerárquica y ámbito de programas</h3>
+    <p>Los comandos validan con <code>usp_<wbr>validar_<wbr>titularidad_<wbr>jerarquica_<wbr>interno</code> (recibe usuario, entidad padre y su tipo, por ejemplo <code>'SESION'</code>) y con funciones de ámbito. Por ejemplo, los programas que coordina un usuario:</p>
+    <pre><code>CREATE OR ALTER FUNCTION [dbo].[ufn_programas_coordinador] (@idUsuario UNIQUEIDENTIFIER)
+RETURNS TABLE AS RETURN
+(
+    SELECT  idPrograma = p.id
+    FROM    dbo.Programa p
+    INNER JOIN dbo.Coordinador c ON c.id = p.coordinador
+    WHERE   c.usuario = @idUsuario
+);</code></pre>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/<wbr>schema/<wbr>functions/<wbr>ufn_<wbr>programas_<wbr>coordinador.sql</code>. Hermanas: <code>ufn_<wbr>programas_<wbr>ambito_<wbr>ejecutor</code> (coordinador → sus programas; decano → los de su facultad), <code>ufn_programas_grupo</code> y <code>ufn_<wbr>programas_<wbr>grupo_<wbr>responsable</code>.</small></p>
+
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart TD
+  U["Usuario ejecutor (idUsuarioEjecutor)"] --> R{"Perfil activo"}
+  R -->|"DOCENTE"| D["Solo los grupos donde es titular"]
+  R -->|"COORDINADOR"| C["Programas que coordina - ufn_programas_coordinador"]
+  R -->|"DECANO"| E["Programas de su facultad - ufn_programas_ambito_ejecutor"]
+  R -->|"ADMINISTRADOR"| A["Toda su institución"]
+  R -->|"ESTUDIANTE"| S["Sus matrículas y su propia fila"]
+  D --> V["uv_auth_grupo, uv_auth_sesion, uv_auth_asistencia"]
+  C --> V
+  E --> V
+  A --> V
+  S --> V
+  V --> X["Fila visible solo si pertenece al ámbito; sin contexto: 0 filas"]
+      </pre>
+      <figcaption>Ámbito por rol. Una entidad ajena es indistinguible de una inexistente en varios SP (por ejemplo <code>RCN_001</code> en revisiones), para no filtrar información entre ámbitos.</figcaption>
+    </figure>
+
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Rol</th><th>Ve y opera</th><th>Regla de negocio asociada</th></tr></thead>
+        <tbody>
+          <tr><td>Docente</td><td>Grupos donde es titular</td><td>Es el <strong>único</strong> que registra y modifica asistencia (<code>usp_<wbr>validar_<wbr>titularidad_<wbr>jerarquica_<wbr>interno</code>).</td></tr>
+          <tr><td>Coordinador</td><td>Grupos, asignaturas, docentes y alumnos de los programas que coordina</td><td>Lectura y auditoría; resuelve las propuestas de cancelación por inasistencia.</td></tr>
+          <tr><td>Decano</td><td>Entidades de su facultad</td><td>Solo consulta y audita; no resuelve revisiones (<code>RCN_016</code>).</td></tr>
+          <tr><td>Administrador</td><td>Su institución</td><td>Períodos, receso, festivos, parámetros, cierre masivo, notificaciones.</td></tr>
+          <tr><td>Estudiante</td><td>Sus matrículas, asistencias y reclamos</td><td>Auto-registro por QR/PIN y radicación de reclamos.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="catalogos">Catálogo de mensajes, parámetros y manejo del tiempo</h2>
+    <h3 id="mensajes">Mensajes por familia</h3>
+    <p>Los 524 códigos viven en <code>CatalogoMensajeUsuario</code> y <code>CatalogoMensajeTecnico</code> y se siembran con <code>MERGE</code> desde <code>schema/seed/</code>. El documento <code>GestioAsistenciaDB/<wbr>docs/<wbr>catalogos/<wbr>catalogo-mensajes.md</code> se <strong>genera</strong> con <code>scripts/<wbr>generar-catalogo-mensajes.ps1</code> (con <code>-Check</code> verifica que no haya deriva); no se edita a mano. El prefijo del código indica la familia: <code>TOM_</code> tomas, <code>AQR_</code> asistencia por QR, <code>MQR_</code> matrícula por QR, <code>RCN_</code> revisión de cancelación, <code>REV_</code> reclamos, <code>SES_</code> sesiones, <code>PER_</code> períodos, <code>REC_</code> receso, <code>SEC_</code> seguridad, <code>GEN_</code>/<code>VAL_</code> validaciones, <code>ERR_</code> errores de aplicación, <code>SYS_001</code> fallo inesperado.</p>
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Códigos de mensaje por familia: las doce familias más grandes y el resto" role="img" data-grafica='{"type":"bar","data":{"labels":["ERR","VAL","SES","REV","ACC","RCN","ASI","HOR","NOF","AQR","PER","PRM","Otras 37 familias"],"datasets":[{"label":"Códigos","data":[120,83,27,18,17,16,14,14,14,13,12,12,164]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>524 códigos en 49 familias (2026-11-22, <code>docs/<wbr>catalogos/<wbr>catalogo-mensajes.md</code>). El texto en enums de Java o del frontend es solo un respaldo si la BD no responde.</figcaption>
+    </figure>
+
+    <h3 id="parametros">Parámetros</h3>
+    <p><code>CatalogoParametro</code> guarda reglas de negocio ajustables como pares <code>grupo /<wbr> clave /<wbr> valor /<wbr> tipoDato /<wbr> valorDefecto</code>. La función <code>ufn_<wbr>obtener_<wbr>parametro(grupo, clave)</code> devuelve <code>valor</code> y, si es nulo, <code>valorDefecto</code>; hay variantes tipadas (<code>_int</code>, <code>_guid</code>, <code>_texto</code>). <code>CatalogoParametroEdicion</code> define cuáles son editables desde la pantalla de administración y su rango (<code>ufn_<wbr>validar_<wbr>valor_<wbr>parametro</code>, error <code>PRM_005</code> fuera de rango); cada cambio queda en <code>CambioParametro</code>.</p>
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Parámetros sembrados por grupo, los diez grupos más grandes" role="img" data-grafica='{"type":"bar","data":{"labels":["FESTIVOS","MATRICULA_QR","ASISTENCIA_QR","ASISTENCIA","SESION_SIN_TOMA_COORDINADOR","PERFIL","GENERAL","ARCHIVO(S)","IDENTIDAD","HORARIO","ALERTA_INASISTENCIA"],"datasets":[{"label":"Parámetros","data":[22,18,14,13,9,5,5,7,4,4,4]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Filas sembradas por grupo en los archivos <code>schema/seed/*param*</code> (20 archivos, 2026-11-22). Los grupos mayores son <code>FESTIVOS</code> (proveedores y URLs del calendario), <code>MATRICULA_QR</code> y <code>ASISTENCIA_QR</code> (rotación, límites por minuto, redes del campus). Las migraciones pueden agregar más.</figcaption>
+    </figure>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Grupo / clave</th><th>Valor por defecto</th><th>Qué controla</th></tr></thead>
+        <tbody>
+          <tr><td><code>ASISTENCIA/<wbr>TOLERANCIA_<wbr>MINUTOS</code></td><td>15</td><td>Minutos antes del inicio en que ya se puede registrar asistencia.</td></tr>
+          <tr><td><code>ASISTENCIA/<wbr>MARGEN_<wbr>RETARDO_<wbr>MINUTOS</code></td><td>0</td><td>Minutos después del fin en que aún se puede registrar.</td></tr>
+          <tr><td><code>ASISTENCIA/<wbr>DIAS_<wbr>LIMITE_<wbr>JUSTIFICACION</code></td><td>5</td><td>Plazo de un reclamo, contado en días calendario locales.</td></tr>
+          <tr><td><code>ASISTENCIA/<wbr>UMBRAL_<wbr>ALERTA_<wbr>ADVERTENCIA</code></td><td>15</td><td>Porcentaje de inasistencia que dispara la alerta de riesgo.</td></tr>
+          <tr><td><code>ASISTENCIA/<wbr>UMBRAL_<wbr>ALERTA_<wbr>PERDIDA</code></td><td>20</td><td>Porcentaje que dispara la alerta de pérdida (regla institucional del 20 %).</td></tr>
+          <tr><td><code>TOMA_<wbr>ASISTENCIA/<wbr>MAXIMO_<wbr>TOMAS_<wbr>POR_<wbr>SESION</code></td><td>20</td><td>Tope de tomas de una sesión (<code>TOM_004</code>).</td></tr>
+          <tr><td><code>ASISTENCIA_<wbr>QR/<wbr>ROTACION_<wbr>SEGUNDOS</code></td><td>60</td><td>Cada cuánto rota el token y el PIN.</td></tr>
+          <tr><td><code>PERIODO/SEMANAS_DURACION</code></td><td>16</td><td>Todo semestre dura 16 semanas (112 días).</td></tr>
+          <tr><td><code>HORARIO/VENTANA_INICIO</code> y <code>VENTANA_FIN</code></td><td>06:00 y 22:00</td><td>Franja local en que puede haber clase.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 id="sincronizacion-parametros">Sincronización con el Catálogo de Parámetros externo (INT-004)</h3>
+    <p><strong>Por qué.</strong> Cuando el backend usa el proveedor <code>catalogoparametros</code> (<a href="componentes-externos.html#parametros">componentes externos</a>), la fuente de verdad de los valores es el Catálogo de Parámetros. Pero los procedimientos almacenados leen <code>dbo.CatalogoParametro</code> con <code>ufn_obtener_parametro</code> y no pueden llamar a un servicio externo. La migración 73 deja un único camino de escritura para copiar en la BD los valores vigentes del Catálogo: <code>usp_sincronizar_parametro_catalogo_externo</code>.</p>
+    <h4>Entradas y reglas</h4>
+    <p>Recibe <code>@grupo</code> y <code>@clave</code> (el backend parte el nombre <code>GRUPO.CLAVE</code> con el separador configurado), <code>@valor</code>, <code>@operacion</code> (<code>UPSERT</code> o <code>DELETE</code>), <code>@idEvento</code> (el <code>eventId</code> del evento; <code>NULL</code> en la reconciliación de arranque), <code>@ocurridoEnUtc</code> (el <code>occurredAt</code> del evento) y <code>@idCorrelacion</code>. No hay usuario ejecutor, porque es un proceso del sistema, así que no valida RBAC. No crea filas: solo actualiza parámetros que ya existen y están activos.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Resultado</th><th>Mensaje</th><th>Cuándo ocurre</th><th>Escribe el valor</th></tr></thead>
+        <tbody>
+          <tr><td><code>APLICADO</code></td><td><code>PRM_013</code></td><td>El valor es distinto del actual y pasa la validación; se actualiza <code>valor</code> y <code>fechaModificacion</code>.</td><td>Sí</td></tr>
+          <tr><td><code>SIN_CAMBIOS</code></td><td><code>PRM_011</code></td><td>El valor ya es igual, en comparación binaria (<code>Latin1_General_BIN2</code>).</td><td>No</td></tr>
+          <tr><td><code>DUPLICADO</code></td><td><code>PRM_014</code></td><td>El <code>idEvento</code> ya está en <code>SincronizacionParametroExterno</code>: idempotencia.</td><td>No</td></tr>
+          <tr><td><code>OBSOLETO</code></td><td><code>PRM_015</code></td><td>El <code>ocurridoEnUtc</code> es menor que el del último valor aplicado: «el último evento gana»; un empate lo gana el que llega después.</td><td>No</td></tr>
+          <tr><td><code>DESCONOCIDO</code></td><td><code>PRM_016</code></td><td>No hay un parámetro activo con ese grupo y clave en esta BD.</td><td>No</td></tr>
+          <tr><td><code>RECHAZADO</code></td><td><code>PRM_004</code>, <code>PRM_005</code> o <code>PRM_006</code></td><td>El valor no cumple tipo, rango o lista permitida; <code>estadoResultado</code> es 0.</td><td>No</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li><strong>Validación:</strong> la hace <code>usp_validar_valor_parametro_externo_interno</code>, con las mismas reglas de tipo, rango y lista que la edición local. No aplica la lista blanca de edición ni la regla cruzada <code>PRM_007</code>, porque la fuente es el Catálogo y una regla entre dos parámetros rechazaría valores correctos según el orden de llegada de los eventos.</li>
+      <li><strong><code>DELETE</code>:</strong> si el parámetro se borró en el Catálogo, la fila <strong>nunca se borra</strong> (los SP la leen): el valor vuelve a <code>valorDefecto</code> de la propia fila. Es el estado «sin valor externo».</li>
+      <li><strong>Concurrencia:</strong> transacción propia (o <code>SAVE TRANSACTION</code> si ya hay una) y la fila del parámetro bloqueada con <code>UPDLOCK, HOLDLOCK</code>; <code>SET XACT_ABORT ON</code>.</li>
+    </ul>
+    <h4>La bitácora</h4>
+    <p><code>SincronizacionParametroExterno</code> guarda, por cada evento, el resultado, el valor anterior y el nuevo, el <code>occurredAt</code> y la correlación. Un índice único filtrado sobre <code>idEvento</code> (<code>UX_SincronizacionParametroExterno_Evento</code>) hace la idempotencia; el índice <code>IX_SincronizacionParametroExterno_Parametro_Ocurrido</code> sirve para hallar el último valor aplicado por parámetro. Con <code>@idEvento</code> se registra todo resultado (menos <code>DUPLICADO</code>); sin él, la reconciliación solo registra los <code>APLICADO</code>.</p>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/schema/stored-procedures/usp_sincronizar_parametro_catalogo_externo.sql</code>, <code>GestioAsistenciaDB/migrations/73_int004_sincronizar_parametros_up.sql</code> y <code>GestioAsistenciaDB/schema/security/rol_asistencias_runtime_int004.sql</code>.</small></p>
+    <div class="nota alerta"><strong>El Catálogo manda.</strong> Con el proveedor <code>catalogoparametros</code> activo, un valor cambiado solo en <code>dbo.CatalogoParametro</code> se sobrescribe en la siguiente reconciliación o evento. Los valores de datos de prueba del laboratorio que difieren de los sembrados (por ejemplo <code>RED.CIDRS_CAMPUS</code>) deben vivir en el Catálogo, no solo en la BD. La edición local de parámetros queda bloqueada con <code>PRM_010</code> cuando el catálogo activo no es <code>sqlserver</code>.</div>
+
+    <h3 id="tiempo">Manejo del tiempo y la zona horaria</h3>
+    <p>Regla de oro: <strong>todo instante se guarda en UTC</strong> (<code>TIEMPO/<wbr>ALMACENAMIENTO_<wbr>INSTANTES = UTC</code>, columnas <code>DATETIME2</code> con sufijo <code>Utc</code>). La zona de la institución sale de parámetros: <code>TIEMPO/<wbr>ZONA_<wbr>HORARIA_<wbr>IANA = America/<wbr>Bogota</code> (para el backend y el frontend) y <code>TIEMPO/<wbr>ZONA_<wbr>HORARIA_<wbr>SQLSERVER = SA Pacific Standard Time</code> (la que entiende <code>AT TIME ZONE</code>). Cuando una regla habla de «día» (festivo, receso, plazo de reclamo) se convierte primero el instante a fecha <strong>local</strong>:</p>
+    <pre><code>AND df.fecha = CAST((s.fechaHoraInicio AT TIME ZONE 'UTC') AT TIME ZONE @zonaHorariaSqlServer AS DATE)</code></pre>
+    <p class="nota-fuente"><small>Fuente: <code>GestioAsistenciaDB/<wbr>schema/<wbr>stored-procedures/<wbr>usp_<wbr>internal_<wbr>aplicar_<wbr>festivos_<wbr>grupo.sql</code>. El mismo patrón en <code>ufn_<wbr>calcular_<wbr>fecha_<wbr>limite_<wbr>justificacion</code>, que calcula el límite del reclamo en hora local y lo devuelve en UTC.</small></p>
+    <div class="nota"><strong>Procedencia temporal.</strong> <code>Sesion.procedenciaTemporal</code> marca si las horas de una sesión fueron confirmadas como UTC. Solo las sesiones con procedencia confirmada participan en festivos y recesos, y el trigger <code>tr_<wbr>Sesion_<wbr>procedencia_<wbr>temporal</code> más los <code>DENY</code> de DML al rol runtime impiden escribir horas por fuera de los SP.</div>
+
+    <h2 id="flujos">Procedimientos de negocio clave</h2>
+    <p>Siete flujos que conviene entender completos. Cada uno se puede recorrer paso a paso con los controles de la animación.</p>
+
+    <h3 id="flujo-sesiones">Generación automática de sesiones con festivos y recesos</h3>
+    <p>El docente titular (o, en la precarga, el coordinador) pide generar las sesiones de un grupo a partir de su horario. <code>usp_<wbr>generar_<wbr>sesiones_<wbr>grupo_<wbr>v2</code> envuelve al procedimiento congelado <code>usp_generar_sesiones_grupo</code> y luego cancela, en la misma transacción, las sesiones que caen en festivo o en receso. Ambas fases son idempotentes: repetir la llamada completa deja el estado correcto.</p>
+    <div class="flujo" data-flujo data-titulo="Generar sesiones del grupo con festivos y recesos">
+      <div class="paso" data-actor="Docente titular" data-detalle="Pide generar las sesiones del grupo. El backend llama usp_generar_sesiones_grupo_v2 con el idGrupo, el correlativo y el Usuario.id del ejecutor.">Solicita la generación</div>
+      <div class="paso" data-actor="Fase 1" data-detalle="El v2 ejecuta el SP congelado con INSERT ... EXEC: valida RBAC, titularidad, horarios y fechas, y crea las sesiones desde el inicio del período según los días y horas del Horario. Sus errores llegan intactos (paridad con la versión 1).">Crea las sesiones del horario</div>
+      <div class="paso" data-actor="Fase 2" data-detalle="Abre transacción propia o SAVE TRANSACTION sp_generar_sesiones_v2. Todo se hace dentro de la misma unidad atómica.">Abre la unidad atómica</div>
+      <div class="paso" data-actor="usp_internal_aplicar_festivos_grupo" data-detalle="Convierte la hora de cada sesión a fecha local (America/Bogota) y la cruza con DiaFestivo activo. Bloquea las candidatas con UPDLOCK, HOLDLOCK y escribe SesionCancelacion con el tipo FESTIVO. Con soloFuturas = 0, toda sesión nueva en festivo nace cancelada.">Cancela las sesiones en festivo</div>
+      <div class="paso" data-actor="usp_internal_cancelar_sesiones_receso" data-detalle="Hace lo mismo con los días de receso activos del período (PeriodoRecesoAcademico), con el tipo RECESO y el motivo del día. Un festivo ya aplicado gana sobre un receso.">Cancela las sesiones en receso</div>
+      <div class="paso" data-actor="BD" data-detalle="Una sesión candidata que ya tiene asistencia (o toma) no se toca: se cuenta y se reporta en sesionesFestivoConAsistencia / sesionesConAsistencia, y existe una consulta paginada para revisarlas.">Respeta lo ya registrado</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Si algo falla, el CATCH revierte según @@TRANCOUNT de entrada: con 0 hace ROLLBACK y devuelve SYS_001 con el detalle técnico; con una transacción externa hace THROW sin revertir porque la dueña es otra.">Fallo: reversión limpia</div>
+      <div class="paso" data-actor="BD" data-detalle="Devuelve la tupla con GEN_004 y los conteos de canceladas por festivo y por receso. El backend notifica a los afectados con los destinatarios que entregan usp_consultar_destinatarios_*.">Entrega conteos</div>
+    </div>
+    <p>La <strong>precarga</strong> (<code>usp_<wbr>precargar_<wbr>sesiones_<wbr>grupo</code>) es la variante que pueden usar coordinador y docente: genera solo sesiones futuras y retira las futuras generadas que ya no encajan con el horario. Los festivos los carga <code>usp_cargar_dias_festivos</code> desde un proveedor configurado en <code>FESTIVOS/<wbr>PROVEEDOR_<wbr>PRINCIPAL</code> con respaldos ordenados en <code>FESTIVOS/ORDEN_RESPALDO</code>.</p>
+
+    <h3 id="flujo-toma">Toma de asistencia: manual, QR o PIN, varias tomas y cierre</h3>
+    <p>Una sesión admite varias tomas (hasta 20 por parámetro); cada una vale una fracción de las horas de la sesión (<code>ufn_horas_toma</code> = horas de la sesión ÷ número de tomas). El modo <code>MANUAL</code> es del docente; el modo <code>QR</code> emite un token rotativo y un PIN de 6 dígitos que el estudiante usa desde su equipo. Todo ocurre dentro de la ventana <code>[inicio − TOLERANCIA_<wbr>MINUTOS, fin + MARGEN_<wbr>RETARDO_<wbr>MINUTOS)</code>.</p>
+    <div class="flujo" data-flujo data-titulo="Tomar asistencia con varias tomas (manual y QR/PIN)">
+      <div class="paso" data-actor="Docente titular" data-detalle="usp_abrir_toma_asistencia valida titularidad, resuelve el modo en ModoTomaAsistencia (TOM_002) y comprueba la ventana de la sesión y el máximo de tomas (TOM_004). Si la sesión ya tenía una toma abierta, la cierra en la misma transacción y abre la siguiente (ATA D9).">Abre una toma (MANUAL o QR)</div>
+      <div class="paso" data-actor="BD" data-detalle="Inserta TomaAsistencia con número correlativo. El índice único filtrado UX_TomaAsistencia_Sesion_Abierta garantiza que solo haya una toma abierta por sesión. Bloqueos: Sesion, luego TomaAsistencia, luego TokenAsistenciaToma.">Registra la toma</div>
+      <div class="paso" data-actor="Docente titular" data-detalle="En modo QR, usp_abrir_qr_toma emite el token: el backend genera el token de 32 bytes y el PIN y envía solo el SHA-256; la BD guarda el hash (TokenAsistenciaToma.tokenHash, único). Un PIN repetido responde AQR_006 y el backend reintenta con otro.">Emite token y PIN (modo QR)</div>
+      <div class="paso" data-actor="Estudiante" data-detalle="El backend primero aplica la red del campus y los límites por minuto (ASISTENCIA_QR/LIMITE_*); luego llama usp_registrar_asistencia_por_token. La BD resuelve el token o PIN, exige matrícula activa en el grupo (AQR_004) y escribe AN con usp_sincronizar_asistencia_estudiante_interno. Es idempotente por estudiante y toma (AQR_008).">Se registra con el QR o el PIN</div>
+      <div class="paso" data-actor="Docente titular" data-detalle="En modo manual, usp_registrar_asistencias_toma recibe un JSON [{idEstudiante, estado}] con estado AN, SJC o EX. Valida todo el lote antes de escribir (ATT_001, ATT_003, EST_004, RC_001); el lote es atómico y la ventana se revalida al confirmar.">Marca el lote manual</div>
+      <div class="paso" data-actor="Docente titular" data-detalle="usp_cerrar_toma_asistencia cierra el token QR activo y, si la ventana sigue abierta, usp_internal_marcar_ausentes_toma inserta SJC en bloque a las matrículas activas sin detalle. Cerrar una toma ya cerrada es un éxito idempotente (TOM_011).">Cierra la toma y marca ausentes</div>
+      <div class="paso" data-actor="Job del servidor" data-detalle="usp_cerrar_tomas_vencidas cierra las tomas cuya sesión ya cumplió fin + margen o fue cancelada, en lotes (TOMA_ASISTENCIA/LOTE_CIERRE_AUTOMATICO) y una transacción por toma, con READPAST para que dos instancias del job no choquen.">Cierre automático de vencidas</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Fuera de la ventana (SES_007 a SES_010), con la sesión cancelada, o con un periodo cerrado por el cierre masivo (PER_008), no se escribe nada. Después de la ventana la corrección es por reclamo del estudiante.">Rechazos de ventana y periodo</div>
+    </div>
+
+    <h3 id="flujo-20">Cálculo de inasistencia y la regla del 20 %</h3>
+    <p>La inasistencia se mide <strong>por horas</strong> y contra el <strong>período completo</strong> (decisión ATA D2): <code>porcentaje = 100 × horasFalta ÷ horasPeriodo</code>, acotado a [0, 100] por <code>ufn_<wbr>calcular_<wbr>porcentaje_<wbr>inasistencia_<wbr>horas</code>. Las excusas (<code>EX</code>) no cuentan como falta. La vista <code>uv_<wbr>resumen_<wbr>asistencia_<wbr>estudiante_<wbr>grupo</code> entrega una fila por matrícula con horas asistidas, de falta, de excusa, sin registro y el porcentaje; <code>ufn_clasificar_permanencia</code> clasifica el resultado.</p>
+    <div class="flujo" data-flujo data-titulo="De las faltas a la alerta de riesgo y de pérdida">
+      <div class="paso" data-actor="Docente / estudiante" data-detalle="Cada toma deja un DetalleAsistencia por estudiante con razón AN, SJC o EX. Las horas de cada toma salen de ufn_horas_toma (horas de la sesión ÷ número de tomas).">Se registran las tomas</div>
+      <div class="paso" data-actor="Vista" data-detalle="uv_resumen_asistencia_estudiante_grupo suma horasFalta (SJC) y horasExcusa (EX) por matrícula activa y usa como denominador las horas del período (sesiones que cuentan: programadas, vencidas o futuras, con las extraordinarias aprobadas; sin canceladas).">Calcula horas y porcentaje</div>
+      <div class="paso" data-actor="Backend o job" data-detalle="El motor usp_evaluar_alertas_inasistencia_grupo es un comando de sistema (sin usuario) que invocan solo el backend y el job. Serializa por grupo con la marca de agua EvaluacionAlertaGrupo y está habilitado por ALERTA_INASISTENCIA/HABILITADA.">Ejecuta el motor de alertas</div>
+      <div class="paso" data-actor="BD" data-detalle="Al alcanzar el umbral ADVERTENCIA (15 % por defecto) crea una AlertaInasistencia de riesgo, una por matrícula y tipo. Si la inasistencia baja, la alerta pasa a SUPERADA; si vuelve a subir, se reactiva.">Alerta de riesgo</div>
+      <div class="paso" data-actor="BD" data-detalle="Al cruzar el umbral PERDIDA (20 % por defecto) crea la alerta de pérdida y, una sola vez por matrícula, una RevisionCancelacion en PENDIENTE_DOCENTE. La matrícula NO pasa a CI automáticamente: CI solo nace de una revisión aprobada.">Alerta de pérdida y revisión</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Si el motor está apagado o los umbrales son inválidos (ALR_001, ALR_002) no escribe nada y el hecho queda auditado. Los umbrales son parámetros editables, por eso nunca van quemados en el código.">Motor apagado o umbral inválido</div>
+      <div class="paso" data-actor="Backend" data-detalle="El resultado trae novedadesJSON (una por alerta creada, con esPrincipal en la de mayor nivel) y el backend las convierte en notificaciones, eventos SSE y correos.">Notifica y publica en tiempo real</div>
+    </div>
+
+    <h3 id="flujo-reclamo">Reclamo de inasistencia y justificación</h3>
+    <p>Cuando el estudiante quedó ausente (<code>SJC</code>) en una toma, puede reclamarla dentro del plazo. El reclamo es <strong>por toma</strong> (<code>usp_<wbr>radicar_<wbr>solicitud_<wbr>revision_<wbr>asistencia_<wbr>v4</code>); las versiones v1 a v3 se conservan por compatibilidad. La decisión del docente es definitiva dentro del sistema: si rechaza, cualquier apelación se hace fuera de la plataforma por el conducto regular.</p>
+    <div class="flujo" data-flujo data-titulo="Reclamo por toma, soportes y decisión del docente">
+      <div class="paso" data-actor="Estudiante" data-detalle="Radica el reclamo con idToma obligatorio, la categoría de justificación y de 0 a ARCHIVOS/MAXIMO_SOPORTES_POR_RECLAMO soportes. Los archivos los escanea el antivirus y los guarda MinIO desde el backend; la BD solo guarda metadatos y el checksum SHA-256 en ArchivoSoporte.">Radica el reclamo</div>
+      <div class="paso" data-actor="usp_internal_validar_plazo_justificacion" data-detalle="Calcula el límite con ufn_calcular_fecha_limite_justificacion: la fecha local de fin de la sesión más DIAS_LIMITE_JUSTIFICACION días. Fuera de plazo responde REV_020; si no se puede calcular, REV_025.">Valida el plazo</div>
+      <div class="paso" data-actor="BD" data-detalle="Solo se reclama una toma de la sesión en la que el estudiante quedó ausente (REV_026) y que no tenga otro reclamo vigente (REV_027). Un reclamo retirado permite radicar otro; uno aprobado o rechazado no.">Valida toma y duplicados</div>
+      <div class="paso" data-actor="BD" data-detalle="usp_internal_radicar_solicitud_revision escribe SolicitudRevisionAsistencia con su toma y categoría, en transacción propia o savepoint. Un rechazo no escribe nada.">Registra la solicitud</div>
+      <div class="paso" data-actor="Docente titular" data-detalle="usp_resolver_solicitud_revision_asistencia recibe APROBADA o RECHAZADA (REV_001 si es otro valor). Con APROBADA elige el resultado: AN (sí estuvo presente) o EX (ausencia justificada); otro valor responde REV_028. RECHAZADA no toca el detalle.">Resuelve: aprueba o rechaza</div>
+      <div class="paso" data-actor="BD" data-detalle="Lee la solicitud con UPDLOCK, HOLDLOCK: dos resoluciones simultáneas se serializan. Repetir la misma decisión es idempotente; una decisión contradictoria sobre una solicitud ya resuelta responde REV_002. Escribe AuditoriaEvento en la misma transacción.">Serializa y audita</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Si la sesión pertenece a un período ya cerrado por el cierre masivo, un reclamo pendiente ya no se resuelve (PER_008). El reintento de una decisión ya aplicada sigue siendo idempotente.">Período cerrado: bloqueado</div>
+    </div>
+
+    <h3 id="flujo-revision">Revisión de cancelación por inasistencia (docente → coordinador)</h3>
+    <p>Al cruzar el 20 % nace una <code>RevisionCancelacion</code>. El docente titular decide, y la <strong>decisión final es del coordinador</strong> del programa del estudiante (decisión DEC-065 (1)): no hay escalamiento al decano, que solo consulta y audita.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> PENDIENTE_DOCENTE : motor crea la revisión al cruzar 20 por ciento
+  PENDIENTE_DOCENTE --> MANTENIDA : docente MANTENER
+  PENDIENTE_DOCENTE --> PROPUESTA : docente PROPONER con motivo
+  MANTENIDA --> PROPUESTA : docente PROPONER
+  RECHAZADA --> PROPUESTA : docente PROPONER
+  PROPUESTA --> APROBADA : coordinador APROBAR
+  PROPUESTA --> RECHAZADA : coordinador RECHAZAR
+  APROBADA --> [*] : matrícula pasa a CI
+      </pre>
+      <figcaption>Estados y transiciones legales, tal como están sembrados en <code>TransicionRevisionCancelacion</code> (<code>schema/<wbr>seed/<wbr>40_<wbr>culm001_<wbr>c_<wbr>catalogos.sql</code>). El grafo es dato, no código.</figcaption>
+    </figure>
+    <div class="flujo" data-flujo data-titulo="Decisión del docente y resolución del coordinador">
+      <div class="paso" data-actor="Docente titular" data-detalle="usp_decidir_revision_cancelacion: MANTENER o PROPONER (con motivo de 10 a 500 caracteres). Bloquea RevisionCancelacion con UPDLOCK, HOLDLOCK. Las transiciones salen de TransicionRevisionCancelacion.">Decide MANTENER o PROPONER</div>
+      <div class="paso" data-actor="BD" data-detalle="PROPONER exige umbral de pérdida vigente y un resolutor disponible: ufn_revision_cancelacion_resolutores devuelve los coordinadores titulares activos de los programas del estudiante que también son del grupo, excluyendo a quien propone. Sin coordinador, RCN_013 sin cambios.">Busca resolutores</div>
+      <div class="paso" data-actor="Backend" data-detalle="El resultado trae codigoPerfilResolutor y tipoPlantillaNotificacion (PROPUESTA_CANCELACION): el backend avisa al coordinador por correo y SSE.">Notifica al coordinador</div>
+      <div class="paso" data-actor="Coordinador" data-detalle="usp_resolver_revision_cancelacion: APROBAR o RECHAZAR. Una revisión ajena es indistinguible de una inexistente (RCN_001); nadie resuelve su propia propuesta (RCN_014); el decano recibe RCN_016. Bloqueos: RevisionCancelacion y luego EstudianteGrupo.">Aprueba o rechaza</div>
+      <div class="paso" data-actor="BD" data-detalle="Con APROBAR la matrícula pasa a CI (MATRICULA/ESTADO_CANCELADA_INASISTENCIA) y queda fuera de todo registro; con RECHAZAR sigue activa. La plantilla de aviso es CANCELACION_APROBADA o CANCELACION_RECHAZADA.">Aplica el resultado</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Repetir la misma decisión es idempotente (RCN_011). La bitácora RevisionCancelacionHistorial conserva cada evento con el actor, su perfil, el porcentaje y la correlación.">Idempotencia y bitácora</div>
+    </div>
+
+    <h3 id="flujo-matricula">Matrícula por QR con programa común (DEC-078 y regla nueva)</h3>
+    <p>La matrícula no se sincroniza con sistemas externos: el docente la hace por <strong>código QR o PIN</strong> compartido en el aula, o de forma <strong>manual</strong>. El token vive en <code>TokenMatriculaGrupo</code> (solo su hash) y rota por <code>MATRICULA_<wbr>QR/<wbr>ROTACION_<wbr>SEGUNDOS</code> con <code>usp_<wbr>rotar_<wbr>token_<wbr>matricula_<wbr>automatico</code>. Una persona sin cuenta se registra con <code>usp_<wbr>registrar_<wbr>estudiante_<wbr>por_<wbr>token_<wbr>publico</code> (la credencial es el token); un estudiante ya identificado usa <code>usp_<wbr>matricular_<wbr>estudiante_<wbr>por_<wbr>token</code>. Ambas fachadas delegan en el mismo núcleo.</p>
+    <div class="flujo" data-flujo data-titulo="Matrícula por QR/PIN con programa común">
+      <div class="paso" data-actor="Docente titular" data-detalle="Abre una ventana de matrícula del grupo (usp_abrir_ventana_matricula_grupo). La BD guarda el hash del token, opcionalmente el programa por defecto, y el docente comparte el QR o PIN en el aula.">Abre la ventana de matrícula</div>
+      <div class="paso" data-actor="Estudiante" data-detalle="El backend valida la red Wi-Fi institucional y los límites antes de llamar. En modo público no hay Usuario.id: la credencial es el token. En modo autenticado se exige perfil ESTUDIANTE.">Presenta el token o PIN</div>
+      <div class="paso" data-actor="usp_internal_resolver_token_matricula" data-detalle="Resuelve el token contra la ventana ACTIVA. Token inválido o vencido: MQR_001. Una ventana vencida se marca EXPIRADA de forma perezosa y esa marca persiste.">Resuelve la ventana</div>
+      <div class="paso" data-actor="usp_internal_matricular_por_token" data-detalle="Modo público: crea Usuario (activo, correoConfirmado = 0) y Estudiante con correo institucional obligatorio (VCE_001). Documento o correo ya registrados: MQR_005 sin cambios.">Alta del estudiante (si no existe)</div>
+      <div class="paso" data-actor="Validación de programa" data-detalle="Regla vigente de la revisión final P3: un estudiante existente que ya tiene programas solo se matricula si tiene un programa COMÚN con el grupo (EST_010, EST_011, MQR_008). Un estudiante sin ningún vínculo no se restringe y queda vinculado al programa del grupo.">Exige programa común</div>
+      <div class="paso" data-actor="usp_internal_asegurar_estudiante_programa_grupo" data-detalle="DEC-078: garantiza al menos un EstudiantePrograma en un programa del grupo. Si ya tiene vínculo con alguno, no crea nada; si el grupo tiene uno solo, lo crea; si tiene varios exige un programa elegido (EST_005 si falta, EST_006 si es ajeno). Protegido con UPDLOCK, HOLDLOCK.">Asegura el vínculo con el programa</div>
+      <div class="paso" data-actor="BD" data-detalle="Aplica las reglas de HU050 con usp_registrar_estudiante_en_grupo_interno: cupo, cruce de horario y duplicado (MQR_004). El estado de la matrícula sale del parámetro MATRICULA_QR/ESTADO_MATRICULA, validado antes de escribir. Todo es atómico con savepoint.">Matricula con cupo y cruces</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="La matrícula manual del docente aplica el mismo criterio de programa común (decisión BD-4 de 2026-11-22, validada en usp_validar_programa_comun_estudiante_grupo_interno antes de escribir nada).">Matrícula manual: misma regla</div>
+    </div>
+
+    <h3 id="flujo-cierre">Cierre masivo de período</h3>
+    <p>Lo ejecuta el administrador con <code>usp_<wbr>ejecutar_<wbr>cierre_<wbr>masivo_<wbr>periodo</code>. Ya <strong>no</strong> escribe «cancelado por inasistencia» por conteo de faltas: CI solo nace de una revisión aprobada. El cierre finaliza las matrículas activas y deja el período como cerrado.</p>
+    <div class="flujo" data-flujo data-titulo="Cierre masivo de un período académico">
+      <div class="paso" data-actor="Administrador" data-detalle="Pide cerrar un período por su nombre o código (@codigoPeriodo). Sin código responde GEN_002; un código que no existe, PER_001. Antes, el caso de uso del backend ejecuta el motor de alertas (el SP no lo ejecuta).">Pide cerrar el período</div>
+      <div class="paso" data-actor="BD" data-detalle="Solo se cierra un período que ya terminó: la fecha local debe ser estrictamente posterior a fechaFin (el día de fechaFin aún cuenta como vigente). Si no, PER_007 con la fecha de fin, antes de abrir transacción.">Verifica que terminó</div>
+      <div class="paso" data-actor="BD" data-detalle="Transacción propia o savepoint. Bloquea primero la fila de PeriodoAcademico con UPDLOCK, HOLDLOCK: así dos cierres concurrentes no cierran dos veces. Un segundo cierre responde PER_009 con la fecha del primero.">Bloquea el período</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Con el motor activo, si hay revisiones esperando al docente o al coordinador, o pérdidas por horas sin revisión, el cierre se bloquea con RCN_012 sin crear nada y sin marcar el período.">Bloqueo por revisiones pendientes</div>
+      <div class="paso" data-actor="BD" data-detalle="Matrículas A pasan a F (MATRICULA/ESTADO_FINALIZADA) y se actualizan los contadores de Grupo (cantidadEstudiantesCancelaronAutomaticamente = matrículas en CI al cierre).">Finaliza matrículas y contadores</div>
+      <div class="paso" data-actor="BD" data-detalle="Marca PeriodoAcademico.fechaCierreUtc y registra AuditoriaEvento CIERRE_MASIVO_PERIODO con motorHabilitado, umbralesValidos, perdidasSinRevision y revisionesPendientes. Devuelve siempre una sola fila.">Marca el cierre y audita</div>
+      <div class="paso" data-actor="BD" data-detalle="Desde el cierre, las sesiones del período ya no admiten tomas, lotes ni reclamos (PER_008); las tomas que queden abiertas las cierra usp_cerrar_tomas_vencidas, que no aplica esa restricción.">Efecto en el resto del sistema</div>
+    </div>
+
+    <h3 id="flujo-receso">Receso académico</h3>
+    <p>Decisión DEC-081: un período puede tener días de <strong>receso</strong> (un día completo sin clase para toda la institución). Al registrarlo se cancelan de inmediato las sesiones de ese día en todos los grupos del período, y los grupos que se creen después las generan ya canceladas.</p>
+    <div class="flujo" data-flujo data-titulo="Registrar un día de receso académico">
+      <div class="paso" data-actor="Administrador" data-detalle="usp_crear_receso_academico recibe período, fecha y motivo. Resuelve la institución con usp_resolver_institucion_gestor_periodo_interno: SEC_001 si no es administrador, PER_005 si no tiene institución; un período de otra institución responde PER_001.">Registra el día de receso</div>
+      <div class="paso" data-actor="usp_validar_receso_academico_interno" data-detalle="Valida la fecha dentro del período, que no sea duplicada (índice único filtrado por período y fecha activos) y el motivo de hasta 200 caracteres (REC_003 a REC_008).">Valida fecha y motivo</div>
+      <div class="paso" data-actor="BD" data-detalle="Inserta PeriodoRecesoAcademico en transacción propia o savepoint, con el creador y la correlación.">Inserta el receso</div>
+      <div class="paso" data-actor="usp_internal_cancelar_sesiones_receso" data-detalle="Marca como canceladas por RECESO las sesiones cuya fecha local coincide, solo futuras (soloFuturas = 1), con procedencia temporal confirmada y sin cancelación previa. Bloquea Sesion con UPDLOCK, HOLDLOCK. El motivo es el prefijo RECESO/PREFIJO_MOTIVO_CANCELACION más el motivo del día.">Cancela las sesiones del día</div>
+      <div class="paso" data-actor="BD" data-detalle="Una sesión con asistencia o toma no se toca; se informa en sesionesConAsistencia. El resultset 2 opcional lista cada sesión cancelada (idSesion, idGrupo, fecha, inicioUtc).">Respeta lo ya registrado</div>
+      <div class="paso" data-actor="Backend" data-detalle="Con el detalle y usp_consultar_destinatarios_receso_academico arma los avisos a estudiantes y docentes (plantillas RECESO_CLASES_CANCELADAS_*, que migran al servicio de Notificaciones).">Notifica a los afectados</div>
+      <div class="paso" data-actor="BD" data-tipo="error" data-detalle="Un día de receso que ya canceló sesiones no se retira (usp_retirar_receso_academico lo rechaza). La migración 68 deja un down que borra las cancelaciones hechas por recesos y restaura las versiones anteriores de los SP.">Retiro restringido</div>
+    </div>
+
+    <h2 id="seguridad">Seguridad: rol runtime y mínimo privilegio</h2>
+    <p>El backend se conecta con el rol de base de datos <code>rol_asistencias_runtime</code> (mínimo privilegio). El modelo es deliberadamente simple: <strong>ejecuta procedimientos públicos y lee vistas, nada más</strong>.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  BE["Backend (login mapeado a rol_asistencias_runtime)"] -->|"GRANT EXECUTE, uno por SP público"| PUB["usp_* públicos (213)"]
+  BE -->|"GRANT SELECT, vista por vista"| VW["uv_* (lectura)"]
+  BE -->|"GRANT SELECT, INSERT"| AU["AuditoriaEvento"]
+  BE -. "DENY EXECUTE" .-> INTN["usp_internal_* y *_interno (102)"]
+  BE -. "DENY INSERT, UPDATE, DELETE" .-> SES["Sesion y SesionProcedenciaClasificacion"]
+  BE -. "sin permiso" .-> TBL["Tablas de negocio"]
+  CLA["rol_asistencias_clasificador_temporal"] -->|"único con EXEC"| CLS["usp_clasificar_procedencia_sesion"]
+      </pre>
+      <figcaption>Permisos del backend. Los núcleos internos no reciben <code>EXECUTE</code>; solo se alcanzan desde las fachadas por encadenamiento de propiedad <code>dbo → dbo</code>.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Sin acceso directo a tablas:</strong> no hay <code>SELECT</code> sobre tablas (salvo <code>AuditoriaEvento</code>, donde el backend inserta). Las vistas se conceden una por una (<code>GRANT SELECT ON dbo.uv_x</code>), no con <code>SELECT ON SCHEMA</code>.</li>
+      <li><strong>Sin <code>GRANT EXECUTE ON SCHEMA::dbo</code>:</strong> el script base hace <code>REVOKE EXECUTE ON SCHEMA::dbo</code> y concede procedimiento por procedimiento, derivado del inventario del código Java. Cada paquete de trabajo agrega su script (<code>rol_<wbr>asistencias_<wbr>runtime_<wbr>*.sql</code>, 53 archivos, unas 166 sentencias <code>GRANT EXECUTE</code> y 30 <code>DENY</code>).</li>
+      <li><strong>Fallo ruidoso:</strong> si un procedimiento requerido no existe, el script lanza <code>THROW 52120</code> o <code>52401</code> con la lista de faltantes; así un SP nuevo sin permiso no pasa inadvertido (sin él, la ruta respondería 500 «EXECUTE permission was denied»).</li>
+      <li><strong>Defensa en profundidad:</strong> el trigger <code>tr_<wbr>Sesion_<wbr>procedencia_<wbr>temporal</code> vigila el DML directo sobre <code>Sesion</code> cuando el login real aún tenga privilegios de propietario.</li>
+      <li><strong>Prueba del inventario:</strong> <code>test/<wbr>test_<wbr>runtime_<wbr>grants_<wbr>backend_<wbr>inventory.sql</code> y los scripts <code>verify_runtime_role_*.ps1</code>.</li>
+    </ul>
+    <pre><code>REVOKE EXECUTE ON SCHEMA::[dbo] FROM [rol_asistencias_runtime];
+GRANT EXECUTE ON [dbo].[usp_registrar_asistencias_toma] TO [rol_asistencias_runtime];  -- uno por SP
+GRANT SELECT  ON [dbo].[uv_auth_sesion] TO [rol_asistencias_runtime];                    -- una por vista
+DENY  EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencias_runtime];</code></pre>
+    <p class="nota-fuente"><small>Patrón de <code>GestioAsistenciaDB/<wbr>schema/<wbr>security/<wbr>rol_<wbr>asistencias_<wbr>runtime.sql</code> (los GRANT reales se generan con cursores a partir de listas; aquí se muestra la forma).</small></p>
+    <div class="nota"><strong>Los scripts no crean logins.</strong> Mapear el login real del backend al rol es una decisión de despliegue por ambiente. Mientras el backend use un principal sysadmin o db_owner, los <code>DENY</code> no le aplican y la única defensa ante DML directo es el trigger.</div>
+
+    <h2 id="migraciones">Migraciones, despliegue y congelación</h2>
+    <p>Hay dos caminos para tener una base al día, y es importante no confundirlos:</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Camino</th><th>Cuándo</th><th>Qué hace</th></tr></thead>
+        <tbody>
+          <tr><td><code>deploy_schema.ps1</code></td><td>Base nueva o recreada desde cero.</td><td>Crea la base si falta y despliega por objeto en este orden: tablas, triggers, funciones, vistas (con reintentos por dependencias), procedimientos, seguridad y semillas. Todo con <code>CREATE OR ALTER</code> y <code>MERGE</code> idempotentes.</td></tr>
+          <tr><td><code>scripts/migrar.ps1</code></td><td>Base existente con datos.</td><td>Aplica en orden las migraciones <code>NN_nombre_up.sql</code> pendientes y las registra en <code>dbo.MigracionAplicada</code> (versión, nombre, archivo, checksum, modo, fecha, usuario, duración).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 id="migrar-modos">Modos de migrar.ps1</h3>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Modo</th><th>Escribe</th><th>Para qué</th></tr></thead>
+        <tbody>
+          <tr><td><code>Estado</code> (por defecto)</td><td>No</td><td>Lista cada migración como APLICADA, BASELINE, PENDIENTE o DERIVA (el archivo cambió después de aplicarse).</td></tr>
+          <tr><td><code>Detectar</code></td><td>No</td><td>Busca en la base el <em>efecto</em> de cada migración con los marcadores de <code>scripts/<wbr>migrar-marcadores.json</code> y la clasifica APLICADA_DETECTADA, AUSENTE o PARCIAL. No usa ni crea <code>MigracionAplicada</code>.</td></tr>
+          <tr><td><code>Baseline</code></td><td>Solo el registro</td><td>Registra sin ejecutar hasta <code>-HastaVersion</code>, para una base creada con <code>deploy_schema.ps1</code>. Con <code>-SoloDetectadas</code> registra solo las que Detectar da por aplicadas; si alguna es PARCIAL no registra nada.</td></tr>
+          <tr><td><code>Aplicar</code></td><td>Sí (ejecuta)</td><td>Ejecuta las pendientes en orden y las registra. Se detiene sin aplicar nada si hay deriva de checksum.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota peligro"><strong>Nunca ejecutes <code>-Modo Aplicar</code> sin consultar antes <code>-Modo Estado</code>.</strong> Si <code>MigracionAplicada</code> está vacía en una base que ya tiene el efecto de las migraciones (por ejemplo, creada con <code>deploy_schema.ps1</code>), <code>Aplicar</code> re-ejecuta todo desde la 05. Para una base sin registro, el camino seguro es <code>Estado</code> → <code>Detectar</code> → <code>Baseline -SoloDetectadas</code> → <code>Aplicar</code>.</div>
+    <pre><code># 1. Solo lectura: ver qué está aplicado y qué falta
+.\scripts\migrar.ps1                        # equivale a -Modo Estado
+# 2. Solo lectura: detectar el efecto de cada migración en una base sin registro
+.\scripts\migrar.ps1 -Modo Detectar
+# 3. Registrar sin ejecutar lo ya presente (para bases creadas con deploy_schema)
+.\scripts\migrar.ps1 -Modo Baseline -SoloDetectadas
+# 4. Solo entonces, aplicar las pendientes
+.\scripts\migrar.ps1 -Modo Aplicar</code></pre>
+    <p class="nota-fuente"><small>Fuente: encabezado de <code>GestioAsistenciaDB/<wbr>scripts/<wbr>migrar.ps1</code>. La contraseña se toma del <code>.env</code> o del entorno y nunca se imprime.</small></p>
+
+    <h3 id="migraciones-marcadores">Convenciones de las migraciones</h3>
+    <ul>
+      <li><strong>Pares up/down:</strong> <code>NN_nombre_up.sql</code> y <code>NN_nombre_down.sql</code>. Los <code>down</code> no los aplica <code>migrar.ps1</code>: la reversión es manual (ejecutar el down y borrar la fila de <code>MigracionAplicada</code>). Algunas pruebas verifican que un down no borre datos sin confirmación (<code>test_<wbr>pc_<wbr>migracion_<wbr>37_<wbr>down_<wbr>sin_<wbr>confirmacion.sql</code>).</li>
+      <li><strong>Numeración:</strong> 01 a 04 son cargas iniciales anteriores al esquema por objeto; las administradas empiezan en la 05. Hay 71 versiones (la 35 no existe). Se ordena por versión y luego por nombre.</li>
+      <li><strong>Marcadores:</strong> cada migración tiene en <code>migrar-marcadores.json</code> un efecto propio que sigue vigente (tabla, columna, índice, restricción, objeto o fila) para que <code>Detectar</code> sepa si ya se aplicó.</li>
+      <li><strong>Idempotencia:</strong> las migraciones se escriben para poder repetirse; los cuerpos de vistas y SP se despliegan con <code>deploy_schema.ps1</code> (<code>CREATE OR ALTER</code>) y la migración solo toca lo que <code>CREATE OR ALTER</code> no puede (tablas, columnas, datos, restricciones).</li>
+    </ul>
+
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Cantidad de versiones de migración por década de numeración, de la 01 a la 73" role="img" data-grafica='{"type":"bar","data":{"labels":["01-09","10-19","20-29","30-39","40-49","50-59","60-69","70-73"],"datasets":[{"label":"Versiones de migración","data":[9,10,10,9,10,10,10,4]}]},"options":{"plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>Línea de tiempo por numeración (2026-11-22): 72 versiones entre la 01 y la 73, sin la 35. Las 15 a 28 son el paquete CULM-001 (festivos, tomas, alertas, parámetros editables…); 61 a 64 son grupos compartidos, matrícula por programa y calendario del semestre; 68 es el receso; 69 y 70 son la revisión final P3 y la auditoría de BD; 71 retira las plantillas por la separación de Notificaciones 72 agrega el rótulo del estado CANCELADA y 73 (INT-004) crea la bitácora de sincronización de parámetros con el Catálogo externo.</figcaption>
+    </figure>
+    <details class="acordeon">
+      <summary>Hitos de la línea de tiempo (migraciones destacadas)</summary>
+      <div class="tabla-contenedor">
+        <table>
+          <thead><tr><th>Versión</th><th>Archivo</th><th>Tema</th></tr></thead>
+          <tbody>
+            <tr><td>07</td><td><code>07_<wbr>notif001_<wbr>notificacion_<wbr>saliente</code></td><td>Outbox de notificaciones.</td></tr>
+            <tr><td>11</td><td><code>11_<wbr>hu176b_<wbr>token_<wbr>matricula_<wbr>grupo</code></td><td>Matrícula por token en el grupo.</td></tr>
+            <tr><td>15</td><td><code>15_<wbr>culm001_<wbr>b1_<wbr>sesion_<wbr>cancelada_<wbr>festivos</code></td><td>Cancelación de sesiones y festivos.</td></tr>
+            <tr><td>16</td><td><code>16_<wbr>culm001_<wbr>b2_<wbr>tomas_<wbr>asistencia_<wbr>qr</code></td><td>Tomas de asistencia y QR.</td></tr>
+            <tr><td>19</td><td><code>19_<wbr>culm001_<wbr>c_<wbr>cancelacion_<wbr>inasistencia</code></td><td>Alertas y revisión de cancelación.</td></tr>
+            <tr><td>22</td><td><code>22_<wbr>culm001_<wbr>d3_<wbr>parametros_<wbr>editables</code></td><td>Parámetros editables con rango.</td></tr>
+            <tr><td>30–32</td><td><code>30_mrm_solicitud_sesion</code> y siguientes</td><td>Solicitud de sesión extraordinaria y decisión del coordinador.</td></tr>
+            <tr><td>37</td><td><code>37_pc_tomas_puntos_control</code></td><td>Puntos de control por toma.</td></tr>
+            <tr><td>48–49</td><td><code>48_<wbr>fix_<wbr>cierre_<wbr>periodo_<wbr>no_<wbr>terminado</code>, <code>49_val_periodo_cerrado</code></td><td>Reglas del cierre masivo.</td></tr>
+            <tr><td>51–57</td><td><code>51_ata_aviso_falta_sesion</code> … <code>57_<wbr>notoma_<wbr>aviso_<wbr>sesion_<wbr>sin_<wbr>toma</code></td><td>Avisos de falta y de sesión sin toma.</td></tr>
+            <tr><td>61–62</td><td><code>61_<wbr>dec076_<wbr>dec077_<wbr>creacion_<wbr>grupo</code>, <code>62_<wbr>dec078_<wbr>matricula_<wbr>programa_<wbr>estudiante</code></td><td>Grupos compartidos y matrícula por programa.</td></tr>
+            <tr><td>64</td><td><code>64_<wbr>ses_<wbr>gen_<wbr>01_<wbr>calendario_<wbr>semestre</code></td><td>Semestre de 16 semanas y franjas de horario.</td></tr>
+            <tr><td>66</td><td><code>66_<wbr>seg11_<wbr>retiro_<wbr>password_<wbr>usuario</code></td><td>Se retira la contraseña de <code>Usuario</code>.</td></tr>
+            <tr><td>68</td><td><code>68_receso_academico</code></td><td>Receso académico (DEC-081).</td></tr>
+            <tr><td>69–70</td><td><code>69_p3_revision_final</code>, <code>70_auditoria_bd_2026_11_22</code></td><td>Revisión final y auditoría de BD (<code>usp_actualizar_grupo</code> transaccional, 28 índices de llaves foráneas, <code>XACT_ABORT</code>).</td></tr>
+            <tr><td>71–72</td><td><code>71_p3_f5_notificaciones_servicio</code>, <code>72_p3_regresion_estado_cancelada</code></td><td>Retiro de plantillas y cola administrativa (servicio de Notificaciones) y rótulo <code>RPT_ASISTENCIA_ESTADO_CANCELADA</code>.</td></tr>
+            <tr><td>73</td><td><code>73_int004_sincronizar_parametros</code></td><td>INT-004: tabla <code>SincronizacionParametroExterno</code> (bitácora e idempotencia por <code>idEvento</code>), mensajes <code>PRM_013</code> a <code>PRM_016</code> y <code>GRANT EXECUTE</code> de <code>usp_sincronizar_parametro_catalogo_externo</code> al rol runtime.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <h3 id="freeze">Congelación WORM y supersesión</h3>
+    <p>El contrato público de la BD está congelado bajo el principio <strong>WORM</strong> (escribir una vez, leer muchas) en <code>AsistenciasUCO-Infra/<wbr>docs/<wbr>contracts/<wbr>db/<wbr></code>: <code>DB_BASELINE_CONTRACT.md</code> con su <code>.sha256</code>, <code>DB_<wbr>DEVELOP_<wbr>FREEZE_<wbr>ADDENDUM.md</code> y <code>DB_<wbr>DEVELOP_<wbr>FREEZE_<wbr>MANIFEST.sha256</code>. El manifiesto lista los archivos congelados con su SHA-256 (calculado con CRLF normalizado a LF, para que sea idéntico en Windows y Linux).</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Manifiesto</th><th>Qué registra</th></tr></thead>
+        <tbody>
+          <tr><td><code>DB_<wbr>DEVELOP_<wbr>FREEZE_<wbr>MANIFEST.sha256</code></td><td>La línea base congelada (DB-GP-001C). Se genera solo tras una decisión autorizada.</td></tr>
+          <tr><td><code>DB_<wbr>UTC_<wbr>D06_<wbr>POST_<wbr>FREEZE_<wbr>MANIFEST.sha256</code></td><td>Extensiones posteriores al congelamiento, con dos formas de línea: <code>SUPERSEDES &lt;hash-original&gt;</code> (un archivo congelado que cambió por un work item aprobado) y <code>WORK_ITEM</code> (archivo nuevo).</td></tr>
+          <tr><td><code>DB_<wbr>CULM001_<wbr>D_<wbr>POST_<wbr>FREEZE_<wbr>MANIFEST.sha256</code></td><td>Archivos del paquete D (solo líneas <code>WORK_ITEM</code>), actualizados con <code>freeze-manifest.ps1 -Mode UpdateCulm001D</code>.</td></tr>
+          <tr><td><code>DB_<wbr>LB004D_<wbr>SUPPORT_<wbr>BINDING_<wbr>MANIFEST.sha256</code></td><td>Archivos del vínculo de soportes de reclamos.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>La verificación (<code>.\scripts\freeze-manifest.ps1 -Mode Verify</code>, id <code>GOLDEN_<wbr>PATH_<wbr>FREEZE_<wbr>MANIFEST_<wbr>VERIFIED</code> dentro del gate) acepta el nuevo hash de un archivo congelado <strong>solo si</strong> la línea de supersesión nombra el hash exacto original. Así los SP congelados (por ejemplo <code>usp_generar_sesiones_grupo</code>) no cambian en silencio: la evolución se hace creando <code>_v2</code> y dejando el original intacto.</p>
+    <div class="nota alerta"><strong>Regla de contrato.</strong> Toda modificación de un contrato exige formalización previa, actualización del hash y verificación cruzada de repositorios. Nunca se «acomoda» la base para que el backend o el frontend compilen; si la forma difiere, se reconstruye desde el contrato.</div>
+
+    <h2 id="pruebas">Suite de pruebas y gate</h2>
+    <p>El resultado más reciente del <strong>gate de BD</strong> es 1118 casos críticos y 0 fallos, con migraciones 01–73 (medido el 2026-11-22, después de INT-004). La regla de oro de <code>AGENTS.md</code> aplica sin excepción: si una prueba falla, se corrige el código de producción, no la prueba.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Pieza</th><th>Rol</th></tr></thead>
+        <tbody>
+          <tr><td><code>test_suite.sql</code></td><td>Incluye con <code>:r /tmp/test/...</code> 174 archivos T-SQL de <code>test/</code>; cada caso imprime <code>TEST_PASS:&lt;ID&gt;</code>.</td></tr>
+          <tr><td><code>test_summary.ps1</code></td><td>Ejecuta la suite en el contenedor y exige que aparezcan los ids de <code>$criticalIds</code> y <code>$resultIds</code> (1118 en total). Valida los bloques de resultado canónico (<code>TEST_RESULT_BEGIN/END</code>, estado, mensaje de usuario y <code>DBCODE</code> esperado contra el catálogo).</td></tr>
+          <tr><td><code>scripts/<wbr>check-test-summary-parity.ps1</code></td><td>Verifica que los ids que exige el resumen existan en las pruebas (<code>-Check</code>: sin ids «fantasma»; <code>-Strict</code>: también sin ids emitidos que nadie exige, salvo la lista permitida).</td></tr>
+          <tr><td><code>scripts/<wbr>freeze-manifest.ps1</code></td><td>Verifica los hashes WORM.</td></tr>
+          <tr><td><code>test/*.ps1</code> (38)</td><td>Concurrencia, migraciones y deploy limpio con bases temporales (<code>test_<wbr>culm001_<wbr>b2_<wbr>concurrencia.ps1</code>, <code>test_val_migrar.ps1</code>…).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Casos críticos del gate de BD agrupados por área" role="img" data-grafica='{"type":"bar","data":{"labels":["Núcleo: asistencia, sesión, grupo, plan, HU","CULM-001: tomas, festivos, alertas, paquete D","Otros","Validación, correcciones y auditoría","Consultas por rol (W1-W3)","ATA y avisos","Puntos de control","Tiempo UTC"],"datasets":[{"label":"Casos críticos","data":[328,299,144,128,78,57,41,25]}]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}}}'></canvas></div>
+      <figcaption>1118 casos críticos agrupados por el prefijo de su identificador en <code>test_summary.ps1</code>. El gráfico es la agrupación de la medición previa a INT-004 (2026-11-22); los 11 casos de INT-004 se suman al total de 1118. La agrupación es una lectura aproximada por prefijo, no una clasificación oficial.</figcaption>
+    </figure>
+
+    <h3 id="correr-gate">Cómo correr el gate de BD</h3>
+    <p>El gate local debe parecerse a la CI: <strong>base nueva desplegada desde cero</strong> y luego el resumen. Correr <code>test_suite.sql</code> sobre una base respaldada no basta, porque puede ocultar objetos que el despliegue limpio no crearía.</p>
+    <div class="flujo" data-flujo data-titulo="Gate de BD local igual al de la CI">
+      <div class="paso" data-actor="Desarrollador" data-detalle="Con el contenedor SQL Server arriba y el .env con la contraseña local. Libera memoria de Docker deteniendo los servicios que no se usen (Kong, Pulsar, ClamAV) antes del gate.">Prepara el entorno</div>
+      <div class="paso" data-actor="Desarrollador" data-detalle="Borra la base de pruebas y ejecuta .\deploy_schema.ps1 -ContainerName sql_server_asistencias: despliega tablas, funciones, vistas, procedimientos, seguridad y semillas.">Despliega el esquema desde cero</div>
+      <div class="paso" data-actor="Desarrollador" data-detalle=".\test_summary.ps1 copia las pruebas al contenedor, corre test_suite.sql y valida cada id crítico y cada bloque de resultado.">Ejecuta test_summary.ps1</div>
+      <div class="paso" data-actor="Desarrollador" data-detalle=".\scripts\check-test-summary-parity.ps1 -Check y .\scripts\freeze-manifest.ps1 -Mode Verify (este último ya corre dentro del resumen).">Paridad y congelación</div>
+      <div class="paso" data-actor="Desarrollador" data-detalle="Desde la raíz del workspace, .\AsistenciasUCO-Infra\infra.ps1 verify revisa secretos y la paridad de contratos WORM sin deriva; es obligatorio antes de cerrar una tarea.">Pre-flight global</div>
+      <div class="paso" data-actor="Gate" data-tipo="error" data-detalle="Cualquier id crítico ausente, repetido o con resultado distinto del esperado falla el gate con exit distinto de cero. La respuesta correcta es investigar la causa raíz en la implementación.">Un caso falla</div>
+    </div>
+    <pre><code># Desde GestioAsistenciaDB, con el contenedor local ya arriba
+.\deploy_schema.ps1 -ContainerName sql_server_asistencias -Password &lt;sa-local&gt;
+.\test_summary.ps1
+.\scripts\check-test-summary-parity.ps1 -Check
+# Desde la raíz del workspace
+.\AsistenciasUCO-Infra\infra.ps1 verify</code></pre>
+    <div class="nota"><strong>Estado.</strong> La suite está pensada para ejecutarse en un contenedor Docker local. El encabezado de <code>scripts/migrar.ps1</code> y <code>deploy_schema.ps1</code> documentan cómo se resuelven el nombre del contenedor y la contraseña (<code>.env</code> o variables de entorno); nunca se imprimen.</div>
+
+    <h2 id="datos-prueba">Datos de prueba</h2>
+    <p>El laboratorio local carga un conjunto consolidado y variado para probar <strong>todos los roles</strong>: <strong>73 usuarios</strong> distribuidos así:</p>
+    <div class="kpis">
+      <div class="kpi"><div class="valor">1</div><div class="rotulo">administrador</div></div>
+      <div class="kpi"><div class="valor">5</div><div class="rotulo">decanos</div></div>
+      <div class="kpi"><div class="valor">10</div><div class="rotulo">coordinadores</div></div>
+      <div class="kpi"><div class="valor">16</div><div class="rotulo">asignaciones de docente</div></div>
+      <div class="kpi"><div class="valor">42</div><div class="rotulo">estudiantes</div></div>
+    </div>
+    <figure class="grafica">
+      <div class="lienzo"><canvas aria-label="Composición de los 73 usuarios de prueba por rol" role="img" data-grafica='{"type":"doughnut","data":{"labels":["Estudiantes","Docentes (asignaciones)","Coordinadores","Decanos","Administrador"],"datasets":[{"label":"Usuarios","data":[42,16,10,5,1]}]}}'></canvas></div>
+      <figcaption>Composición de los datos de prueba (<code>GestioAsistenciaDB/<wbr>scripts/<wbr>datos-prueba/<wbr>README.md</code>).</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Contenido:</strong> 4 facultades, 7 programas, 22 asignaturas (9 compartidas entre programas), 40 grupos (34 en 2026-2 y 6 en 2026-1) con horarios sin cruces, historial de asistencia hasta la fecha de carga, alertas, revisiones de cancelación, reclamos, un retiro y solicitudes de sesión.</li>
+      <li><strong>Casos pensados:</strong> 2026-1 terminó sin cierre masivo, así que sirve para probar el cierre y un estudiante que supera el 20 %; hay sesiones sin toma a propósito para probar los avisos de cumplimiento del docente.</li>
+      <li><strong>Directorio de usuarios por rol:</strong> <code>GestioAsistenciaDB/<wbr>scripts/<wbr>datos-prueba/<wbr>USUARIOS.md</code> (nombres, correos institucionales de prueba y programa o facultad, <strong>sin contraseñas</strong>). La contraseña común del laboratorio está en <code>AGENTS.md</code>, sección 7, y solo es válida en entornos locales.</li>
+      <li><strong>Cómo recrearlos:</strong> respaldar la base y detener el backend, borrar la base, correr <code>deploy_schema.ps1</code> y luego, en orden, <code>01_estructura.sql</code>, <code>02_sesiones.sql</code>, <code>03_asistencia.sql</code> y <code>04_flujos.sql</code> (con <code>sqlcmd -f 65001</code>); después se provisiona la identidad con <code>usuarios_datos_prueba.json</code>. Los archivos se generan con <code>generar_datos_prueba.py</code> con identificadores deterministas. Guía operativa vigente: <code>AsistenciasUCO-Infra/<wbr>docs/<wbr>runbooks/<wbr>PRUEBAS_<wbr>LOCALES.md</code>.</li>
+      <li><strong>Atajo oficial:</strong> <code>.\AsistenciasUCO-Infra\infra.ps1 datos-prueba cargar -Yes</code> deja la base desde cero con los 73 usuarios.</li>
+    </ul>
+    <div class="nota alerta"><strong>Aviso.</strong> El historial de 2026-2 depende de la fecha de carga (se registran las sesiones vencidas a ese momento) y las acciones hechas con los SP no generan correos: el backend los encola solo cuando se actúa desde la aplicación.</div>
+
+    <h2 id="resumen">Resumen para llevar</h2>
+    <div class="tarjetas">
+      <div class="tarjeta"><div class="icono">1️⃣</div><h4>La BD decide</h4><p>Reglas, permisos, ventanas y umbrales viven en SP; el backend solo orquesta y traduce.</p></div>
+      <div class="tarjeta"><div class="icono">2️⃣</div><h4>Una tupla, un catálogo</h4><p>Cuatro columnas fijas y mensajes con <code>DBCODE</code> desde el catálogo; nada de frases quemadas.</p></div>
+      <div class="tarjeta"><div class="icono">3️⃣</div><h4>Atómico y ordenado</h4><p>Transacción propia o savepoint, <code>UPDLOCK, HOLDLOCK</code> y un orden de bloqueos fijo.</p></div>
+      <div class="tarjeta"><div class="icono">4️⃣</div><h4>Ámbito en la BD</h4><p>Las vistas <code>uv_auth_*</code> y la titularidad jerárquica aíslan docente, coordinador, decano y administrador.</p></div>
+      <div class="tarjeta"><div class="icono">5️⃣</div><h4>Migrar con cuidado</h4><p><code>Estado</code> antes de <code>Aplicar</code>, siempre; los contratos congelados solo se supersedan con hash.</p></div>
+      <div class="tarjeta"><div class="icono">6️⃣</div><h4>Gate desde cero</h4><p>Despliegue limpio más <code>test_summary.ps1</code>: 1118 casos y 0 fallos.</p></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

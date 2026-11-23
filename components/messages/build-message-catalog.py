@@ -16,6 +16,9 @@ Reglas (limites vigentes de MessageUcoLab):
   * titulo: 10..50. Contiene el nombre canonico para poder buscarlo: "<CANONICO> - <descripcion>" y, si el canonico
     es largo (>30), solo el canonico.
   * contenido: tal cual el seed. La plantilla vigente admite hasta 100; los mas largos se marcan con --limite.
+  * contenido minimo: 5 (MessageUcoLab 0.3.0; antes 10). Los de menos de 5 solo pasan si estan en REMOTE_EXPORT_EXCLUDED
+    (se omiten del Excel remoto y el Backend usa el respaldo de BD); cualquier otro detiene el generador.
+  * codigos largos: ERR_/VAL_ -> ERR###, SUC_/OK_ -> SUC###, RPT_ -> INF### (ver PREFIX_FOR_LONG).
 
 Uso:
   python build-message-catalog.py --seed <04_mensaje.sql> --template <plantilla.xlsx> \
@@ -30,7 +33,7 @@ import zipfile
 from xml.sax.saxutils import escape
 
 SEP = "|"
-MAX_REMOTE, TITLE_MIN, TITLE_MAX, CONTENT_MIN = 10, 10, 50, 10
+MAX_REMOTE, TITLE_MIN, TITLE_MAX, CONTENT_MIN = 10, 10, 50, 5  # CONTENT_MIN: contenido 5..2000 desde MessageUcoLab 0.3.0
 TYPE_MAP = {  # tipoMensaje del seed -> (Tipo, Categoria) de la plantilla
     "BUSINESS_ERROR": ("Funcional", "Error"),
     "SYSTEM_ERROR": ("Técnico", "Error"),
@@ -40,8 +43,17 @@ TYPE_MAP = {  # tipoMensaje del seed -> (Tipo, Categoria) de la plantilla
     "SECURITY_ERROR": ("Funcional", "Error"),
     "TECHNICAL_ERROR": ("Técnico", "Error"),
     "INFO": ("Funcional", "Información"),
+    "INFORMATIVO": ("Funcional", "Información"),  # SES-GEN-01 (HOR_*) y DEC-081 (REC_011): avisos informativos
 }
-PREFIX_FOR_LONG = {"ERR_": "ERR", "SUC_": "SUC"}
+# Prefijo remoto (ERR/SUC/INF + 3 digitos) de los codigos canonicos largos: ERR_* y VAL_* de error, SUC_*/OK_* de exito y
+# RPT_* (rotulos informativos del reporte Excel). Los ya importados conservan su codigo (--previo).
+PREFIX_FOR_LONG = {"ERR_": "ERR", "SUC_": "SUC", "OK_": "SUC", "RPT_": "INF"}
+# Mensajes que el catalogo remoto rechazaria por longitud (contenido < CONTENT_MIN; MessageUcoLab 0.3.0: contenido 5..2000).
+# Se omiten SOLO del Excel de importacion; siguen en el seed/catalogo de BD y en el fixture .psv, y el Backend resuelve su
+# texto con el respaldo de BD. Todo contenido corto fuera de esta lista detiene el generador (no se relaja la regla).
+REMOTE_EXPORT_EXCLUDED = {
+    "RPT_ASISTENCIA_FIN": "contenido 'Fin' (3 caracteres) < 5",
+}
 
 
 ROW_RE = re.compile(r"\(\s*N?'([A-Za-z0-9_]+)'\s*,\s*N?'([A-Z_]+)'\s*,\s*N?'([A-Z]+)'\s*,\s*N?'((?:[^']|'')*)'\s*\)")
@@ -163,9 +175,11 @@ def main():
         tipo, categoria = TYPE_MAP[tipo_seed]
         title = title_for(code, content)
         assert TITLE_MIN <= len(title) <= TITLE_MAX, (code, title, len(title))
-        assert len(content) >= CONTENT_MIN, (code, content)
+        if len(content) < CONTENT_MIN and code not in REMOTE_EXPORT_EXCLUDED:
+            sys.exit(f"Contenido de {code} con menos de {CONTENT_MIN} caracteres y fuera de REMOTE_EXPORT_EXCLUDED: {content!r}")
         assert "|" not in content and "\n" not in content, code
-        records.append((remote[code], "Mensajes institucionales", tipo, categoria, "Activo", title, content))
+        if code not in REMOTE_EXPORT_EXCLUDED:
+            records.append((remote[code], "Mensajes institucionales", tipo, categoria, "Activo", title, content))
         psv.append(SEP.join((code, remote[code], tipo, categoria, title, content)))
         if remote[code] != re.sub(r"[^A-Za-z0-9]", "", code):
             aliases.append((code, remote[code]))

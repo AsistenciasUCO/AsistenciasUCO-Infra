@@ -14,6 +14,20 @@ Use `mensajes`, `parametros`, `soportes` u `observabilidad` según lo que vaya a
 La Seguridad del equipo debe estar aprovisionada una vez (`provision_asistencias.py keycloak` y `pdp`, ver
 `GestioAsistenciaBackend/infra/security-baseline`).
 
+### Servicio de Notificaciones (`ext-notificaciones`)
+
+Todo escenario con la app levanta también el Servicio de Notificaciones UCO (componente propio). Primera vez:
+`.\AsistenciasUCO-Infra\infra.ps1 stack build notificaciones`. Luego `stack up` genera sus secretos (en `stack/.env`), crea
+`notificacionesdb` y deja el servicio en `http://localhost:18090` (`GET /actuator/health` abierto; el resto exige la cabecera
+`X-Api-Key`, cuyo valor es `NOTIFICACIONES_API_KEY` de `stack/.env`; no la pegue en chats ni en commits). Canal `smtp` con el
+mismo modo de pruebas del Backend (todo se redirige al buzón de prueba). Hasta la fase F4 el Backend sigue enviando con su
+SMTP propio; el servicio ya recibe las variables `NOTIFICACIONES_SERVICE_URL` y `NOTIFICACIONES_API_KEY`.
+
+```powershell
+$k = @{ 'X-Api-Key' = ((Get-Content .\AsistenciasUCO-Infra\stack\.env | Where-Object { $_ -like 'NOTIFICACIONES_API_KEY=*' }) -split '=', 2)[1] }
+Invoke-RestMethod http://localhost:18090/api/v1/plantillas -Headers $k | Select-Object tipo, versionActiva   # 22 tipos
+```
+
 ## 2. Cargar los datos de prueba variados
 
 ```powershell
@@ -22,12 +36,29 @@ La Seguridad del equipo debe estar aprovisionada una vez (`provision_asistencias
 
 Respalda la base actual en `/var/opt/mssql/backup`, la recrea desde el esquema de `develop`, carga el conjunto de
 `GestioAsistenciaDB/scripts/datos-prueba`, da de alta los 73 usuarios en Keycloak y el PDP y verifica cada rol (unos 10
-minutos). Requiere Python 3 de Windows (`-Python <ruta>` si no está el lanzador `py`).
+minutos). Requiere Python 3 de Windows, que se resuelve en este orden: `-Python <ruta>`, la variable de entorno
+`ASISTENCIAS_PYTHON` (ruta a `python.exe`), el lanzador `py`, `python`/`python3` y `%LOCALAPPDATA%\Programs\Python`. Cada
+candidato se prueba con `python -c "import sys"` (15 s máximo); el alias de la Microsoft Store (`WindowsApps`) y el Python
+de MSYS se descartan. Si no hay ninguno, falla de inmediato, antes de tocar la base, pidiendo definir `ASISTENCIAS_PYTHON`
+(`$env:ASISTENCIAS_PYTHON = 'C:\Users\<usuario>\AppData\Local\Programs\Python\Python312\python.exe'`).
+
+Catálogo de Parámetros (INT-004): con el escenario `parametros` el Catálogo es la fuente de verdad y el Backend reconcilia
+`dbo.CatalogoParametro` contra él al arrancar y por evento; un `UPDATE` de los datos de prueba que no esté en el Catálogo se
+revertiría solo (así pasó con `RED.CIDRS_CAMPUS`: el QR/PIN daba 403 `AQR_002` desde Docker). Por eso `datos-prueba cargar`
+termina con `datos-prueba catalogo` (se omite si `ext-parametros-app` no está arriba): lee los `UPDATE dbo.CatalogoParametro`
+de `01_estructura.sql` y, si el valor del Catálogo (AsistenciasUCO / Desarrollo) es otro, lo cambia por la API
+administrativa con la sesión de `lab-pdp-admin`; el evento hace que el Backend lo aplique a la BD en segundos. Idempotente.
+Prueba del Catálogo: `scripts/tests/test_catalogo_parametros.ps1` (M2M y eventos; cambia y restaura un parámetro entero).
+
+Concesiones del PDP: `stack up` (con Seguridad y la app) y `datos-prueba cargar|seguridad` ejecutan
+`provision_asistencias.py verify` y, si hay líneas `FALTA`, `pdp` (aditivo, nunca `--prune`), de modo que un endpoint
+nuevo ya no responde 403. Se omite con `-SinPdp`. Guía de la demo final: [DEMO_DOCKER](DEMO_DOCKER.md).
 
 | Paso suelto | Comando |
 | :--- | :--- |
 | Solo cuentas y perfiles de Seguridad | `infra.ps1 datos-prueba seguridad` |
 | Solo la verificación por rol (lectura) | `infra.ps1 datos-prueba verificar` |
+| Empujar al Catálogo de Parámetros lo que los datos de prueba fijan solo en la BD (`RED.CIDRS_CAMPUS`) | `infra.ps1 datos-prueba catalogo` |
 | Guardar el estado actual antes de probar | `infra.ps1 db-reset-qa -Mode Snapshot` |
 | Volver a ese estado | `infra.ps1 db-reset-qa -Mode Restore -Backup <archivo.bak> -Yes` (detener antes el backend) |
 
@@ -51,7 +82,7 @@ laboratorio (`AGENTS.md`, sección 7) y entran por correo en `http://localhost:4
 | Visibilidad por rol | Cualquiera | Grupos compartidos entre programas y facultades (Cátedra, Ética, Cálculo, Costos) |
 | Doble rol | Diana Londoño | Coordinadora de Tec. Software y docente de Pruebas de Software |
 
-Los correos que genere la aplicación van al buzón de prueba (`SMTP_NOTIFICATION_TEST_MODE_ENABLED=true`).
+Los correos que genere la aplicación van al buzón de prueba (`SMTP_NOTIFICATION_TEST_MODE_ENABLED=true` en el servicio de Notificaciones, no en el Backend).
 
 ## 4. Suites automáticas
 
@@ -80,3 +111,18 @@ Guion de pruebas manuales por rol para la demostración (qué cambió en el cier
 - El historial de asistencia se registra hasta el momento de la carga; las cifras exactas cambian según el día.
 - Los scripts siembran el período 2026-2 (1 de agosto a 15 de diciembre de 2026): después de esa fecha el generador
   de sesiones rechaza el período y hay que mover las fechas en `generar_datos_prueba.py`.
+
+## Catálogo de Parámetros (escenario `parametros`)
+
+* `.\AsistenciasUCO-Infra\infra.ps1 stack up parametros` levanta Catálogo 0.1.17, su microfrontend (`http://localhost:4201`) y su Pulsar propio
+  (`http://localhost:8082/admin/v2/brokers/health`). No necesita ClamAV ni observabilidad; con MessageUcoLab apagado el kit lleva `PULSAR_ENABLED=false`.
+* El Backend lee los parámetros por M2M con la identidad `asistencias-uco → Catálogo` (variables `CATALOGO_PARAMETROS_M2M_*` del `.env` del Backend)
+  y recibe los cambios por `pulsar://pulsar-parametros:6650`. Preparación única en Seguridad y en el Catálogo: [INT-004](../work-items/INT-004-parametros-m2m-eventos/ESTADO.md) §7.
+* Si la consulta M2M devuelve `parametros: []`, revise que los metadatos del Catálogo apunten al ambiente Desarrollo
+  (`00000000-0000-0000-0000-000000000011`) y que la identidad esté asociada a él (TD-127).
+
+## Auto-registro de Keycloak desactivado (laboratorio)
+
+El realm `security-baseline` del componente de Seguridad llega con `registrationAllowed=true`, lo que muestra el enlace "Register" en el login y permite crear cuentas fuera del flujo de la app. `infra.ps1 stack up` (seccion `ext-seguridad`) ejecuta `scripts/security/Disable-KeycloakSelfRegistration.ps1`, idempotente, que lo pone en `false` por el Admin REST con las credenciales de `lab.env`. Manual: `powershell -File AsistenciasUCO-Infra\scripts\security\Disable-KeycloakSelfRegistration.ps1`.
+
+Recomendacion para el equipo de Seguridad: que el realm importado de Security Baseline traiga `registrationAllowed=false` (hoy el realm propio de contingencia, `components/keycloak/realm-import/asistencias-uco-realm.json`, ya lo tiene asi) o que `provision_asistencias.py` lo fije; mientras tanto el script de Infra lo corrige en cada `stack up`.

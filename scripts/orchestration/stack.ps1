@@ -11,10 +11,12 @@
                                 Con asis-app genera stack/generado/{backend,frontend}.env segun las secciones activas.
       down   [secciones...]     Detiene secciones (sin argumentos: todo menos asis-datos). Nunca borra volumenes.
       status                    Estado y memoria por seccion.
-      build  [backend|frontend] Construye las imagenes asistencias-backend:develop / asistencias-frontend:develop.
+      build  [backend|frontend|notificaciones]
+                                Construye las imagenes asistencias-backend:develop / asistencias-frontend:develop /
+                                notificaciones-uco:0.1.1 (componente propio, Complementos/Notificaciones).
 
-    Un objetivo es una seccion (asis-datos, ext-seguridad, ext-mensajes, ext-parametros, asis-antivirus, asis-obs,
-    asis-contingencia, asis-app) o un escenario (minimo, basico, mensajes, parametros, completo, soportes, observabilidad,
+    Un objetivo es una seccion (asis-datos, ext-seguridad, ext-mensajes, ext-parametros, ext-notificaciones, asis-antivirus,
+    asis-obs, asis-contingencia, asis-app) o un escenario (minimo, basico, mensajes, parametros, completo, soportes, observabilidad,
     contingencia). asis-datos se incluye siempre.
 
 .EXAMPLE
@@ -37,7 +39,9 @@ param(
     # up: no espera la salud de los contenedores.
     [switch]$SinEsperar,
     # down: tambien detiene asis-datos.
-    [switch]$IncluirDatos
+    [switch]$IncluirDatos,
+    # up: no verifica ni aprovisiona el PDP (concesiones de endpoints nuevos) al terminar.
+    [switch]$SinPdp
 )
 
 Set-StrictMode -Version Latest
@@ -52,11 +56,13 @@ foreach ($o in $Objetivo) {
         '^-(?i:Conservar)$' { $Conservar = [switch]::Present; continue }
         '^-(?i:SinEsperar)$' { $SinEsperar = [switch]::Present; continue }
         '^-(?i:IncluirDatos)$' { $IncluirDatos = [switch]::Present; continue }
+        '^-(?i:SinPdp)$' { $SinPdp = [switch]::Present; continue }
         default { $restantes += $o }
     }
 }
 $Objetivo = $restantes
 
+. (Join-Path $PSScriptRoot 'pdp-lib.ps1')
 $infraRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $workspace = (Resolve-Path (Join-Path $infraRoot '..')).Path
 $stackDir = Join-Path $infraRoot 'stack'
@@ -200,12 +206,29 @@ function New-ConfiguracionApp([string[]]$secciones) {
     $b['ASISTENCIAS_UCO_LOG_FILE_PATTERN'] = 'infra/observability/logs/backend-contenedor.%d{yyyy-MM-dd}.%i.jsonl'
     if ($secciones -contains 'asis-obs') {
         $b['MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT'] = 'http://asis-obs-alloy:4318/v1/traces'
+        $b['MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED'] = 'true'
         # Prometheus recolecta por host.docker.internal:8090 (publicado solo en 127.0.0.1 del PC).
         $b['MANAGEMENT_SERVER_ADDRESS'] = '0.0.0.0'
     } else {
+        # Sin asis-obs no hay recolector de trazas: el exportador OTLP fallaba cada pocos segundos ("Failed to export N spans",
+        # ERROR con traza completa) y tapaba los logs utiles. Las trazas siguen activas (traceId/spanId en los logs JSONL).
+        $b['MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED'] = 'false'
         $b['MANAGEMENT_SERVER_ADDRESS'] = '127.0.0.1'
     }
     if ($b.Contains('APP_ADAPTERS_IDENTITY_PROVIDER')) { $b.Remove('APP_ADAPTERS_IDENTITY_PROVIDER') }
+
+    # Notificaciones: el Backend ya no envia correo (no lee SMTP_NOTIFICATION_*); las credenciales SMTP viajan solo al .env del
+    # servicio (Initialize-Notificaciones las toma del .env del checkout). Se renombran las variables propias del Backend.
+    foreach ($k in @($b.Keys)) { if ($k.StartsWith('SMTP_NOTIFICATION_')) { $b.Remove($k) } }
+    $urlPlataforma = $null
+    $envFuente = Read-EnvFile (Join-Path $workspace 'GestioAsistenciaBackend\.env')
+    if ($envFuente['SMTP_NOTIFICATION_PLATFORM_URL']) { $urlPlataforma = $envFuente['SMTP_NOTIFICATION_PLATFORM_URL'] }
+    if ($envFuente['NOTIFICACIONES_PLATFORM_URL']) { $urlPlataforma = $envFuente['NOTIFICACIONES_PLATFORM_URL'] }
+    if ($urlPlataforma) { $b['NOTIFICACIONES_PLATFORM_URL'] = $urlPlataforma }
+    if ($envFuente['SMTP_NOTIFICATION_REQUIRE_CONFIRMED_EMAIL'] -and -not $envFuente['NOTIFICACIONES_REQUIRE_CONFIRMED_EMAIL']) {
+        $b['NOTIFICACIONES_REQUIRE_CONFIRMED_EMAIL'] = $envFuente['SMTP_NOTIFICATION_REQUIRE_CONFIRMED_EMAIL']
+    }
+    $b['OUTBOX_NOTIFICATION_SENDER'] = 'servicio'
 
     # Emisor publico de los tokens (el que ve el navegador; en asis-red keycloak.localhost es alias del Keycloak de Seguridad).
     $kc = 'http://keycloak.localhost:19090'
@@ -228,6 +251,20 @@ function New-ConfiguracionApp([string[]]$secciones) {
         $b['SECURITY_BASELINE_ISSUER_URI'] = "$kc/realms/security-baseline"
         $b['SECURITY_BASELINE_JWK_SET_URI'] = "$kcLoopback/realms/security-baseline/protocol/openid-connect/certs"
         $b['KEYCLOAK_ISSUER_URI'] = "$kc/realms/security-baseline"
+        # SEC-BASELINE-020 (0.1.14): consumidor de eventos de asignacion del PDP por RabbitMQ (asis-app-enlaces reenvia
+        # 127.0.0.1:25672 al broker). Sin credenciales o sin applicationId en lab.env queda apagado (Seguridad 0.1.13).
+        if ($lab['RABBITMQ_USERNAME'] -and $lab['RABBITMQ_PASSWORD'] -and $lab['ASISTENCIAS_PDP_APPLICATION_ID']) {
+            $b['APP_ADAPTERS_ASSIGNMENT_EVENTS_ENABLED'] = 'true'
+            $b['RABBITMQ_HOST'] = 'localhost'
+            $b['RABBITMQ_PORT'] = '25672'
+            $b['RABBITMQ_VIRTUAL_HOST'] = '/security'
+            $b['RABBITMQ_USERNAME'] = $lab['RABBITMQ_USERNAME']
+            $b['RABBITMQ_PASSWORD'] = $lab['RABBITMQ_PASSWORD']
+            $b['SECURITY_BASELINE_ASSIGNMENT_EVENTS_APPLICATION_ID'] = $lab['ASISTENCIAS_PDP_APPLICATION_ID']
+        } else {
+            $b['APP_ADAPTERS_ASSIGNMENT_EVENTS_ENABLED'] = 'false'
+            Write-Host '  * Eventos de asignacion (RabbitMQ) apagados: lab.env sin RABBITMQ_USERNAME/RABBITMQ_PASSWORD o ASISTENCIAS_PDP_APPLICATION_ID.' -ForegroundColor DarkYellow
+        }
     } elseif ($secciones -contains 'asis-contingencia') {
         # El Keycloak propio emite tokens con http://localhost:8081 (lo que ve el navegador); asis-app-enlaces lo reenvia.
         $b['APP_ADAPTERS_SECURITY_PROVIDER'] = 'legacy'
@@ -247,8 +284,25 @@ function New-ConfiguracionApp([string[]]$secciones) {
     if ($secciones -contains 'ext-parametros') {
         $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'] = 'catalogoparametros'
         $b['CATALOGO_PARAMETROS_BASE_URL'] = 'http://ext-parametros-app:8080/catalogo-parametros/api/v1'
+        # INT-004 (Catalogo 0.1.17): consulta M2M (client_credentials) y eventos de cambios por el Pulsar propio del Catalogo.
+        # CATALOGO_PARAMETROS_M2M_CLIENT_ID/SECRET salen del .env del checkout (no se escriben aqui). pulsar-parametros es un
+        # alias de asis-red (ver secciones/ext-parametros.yml): el listener "internal" del broker lo anuncia con ese nombre.
+        $b['CATALOGO_PARAMETROS_M2M_TOKEN_URI'] = "$kcLoopback/realms/security-baseline/protocol/openid-connect/token"
+        $b['CATALOGO_PARAMETROS_PULSAR_URL'] = 'pulsar://pulsar-parametros:6650'
+        $b['CATALOGO_PARAMETROS_EVENTS_SUBSCRIPTION'] = 'asistencias-uco-backend'
+        if ($b['CATALOGO_PARAMETROS_M2M_CLIENT_ID']) {
+            $b['CATALOGO_PARAMETROS_EVENTS_TOPIC'] = 'persistent://public/default/catalogo-parametros-events-' + $b['CATALOGO_PARAMETROS_M2M_CLIENT_ID']
+        } else {
+            Write-Host '  * Catalogo de Parametros sin CATALOGO_PARAMETROS_M2M_CLIENT_ID en el .env del Backend: sin consulta M2M ni topic de eventos (INT-004).' -ForegroundColor DarkYellow
+        }
     } else {
         $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'] = 'sqlserver'
+    }
+    # Servicio de Notificaciones (componente propio): el Backend envia por el (OUTBOX_NOTIFICATION_SENDER=servicio).
+    if ($secciones -contains 'ext-notificaciones') {
+        $sn = Get-SecretosNotificaciones
+        $b['NOTIFICACIONES_SERVICE_URL'] = 'http://ext-notificaciones-servicio:8080'
+        $b['NOTIFICACIONES_API_KEY'] = $sn['NOTIFICACIONES_API_KEY']
     }
     Write-EnvGenerado (Join-Path $gen 'backend.env') $b 'Backend de Asistencias UCO en contenedor (asis-app)'
 
@@ -276,8 +330,82 @@ function New-ConfiguracionApp([string[]]$secciones) {
     $f['MENSAJES_UI_DESDE_CATALOGO'] = $(if ($secciones -contains 'ext-mensajes') { 'true' } else { 'false' })
     Write-EnvGenerado (Join-Path $gen 'frontend.env') $f 'Frontend de Asistencias UCO en contenedor (asis-app)'
 
-    Write-Host ("  * Configuracion de asis-app: seguridad={0}, mensajes={1}, parametros={2}" -f `
-        $b['APP_ADAPTERS_SECURITY_PROVIDER'], $b['APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER'], $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER']) -ForegroundColor Gray
+    $eventosAsignacion = $(if ($b['APP_ADAPTERS_ASSIGNMENT_EVENTS_ENABLED'] -eq 'true') { 'rabbitmq' } else { 'apagados' })
+    Write-Host ("  * Configuracion de asis-app: seguridad={0}, mensajes={1}, parametros={2}, eventos-asignacion={3}" -f `
+        $b['APP_ADAPTERS_SECURITY_PROVIDER'], $b['APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER'], $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'], $eventosAsignacion) -ForegroundColor Gray
+}
+
+# ---- ext-notificaciones: secretos generados, .env del servicio y BD propia (idempotente) ----
+# Los secretos viven en stack/.env (fuera de Git, junto a MSSQL_SA_PASSWORD) y se generan una sola vez.
+function New-ClaveAleatoria([int]$longitud, [switch]$ConComplejidadSql) {
+    $alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+    $bytes = New-Object byte[] $longitud
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($x in $bytes) { [void]$sb.Append($alfabeto[$x % $alfabeto.Length]) }
+    # SQL Server exige mayuscula, minuscula y digito: se garantizan al final (solo alfanumerico: viaja bien por .env/JDBC/sqlcmd).
+    if ($ConComplejidadSql) { [void]$sb.Append('Aa7') }
+    return $sb.ToString()
+}
+
+function Set-ValorEnvStack([string]$clave, [string]$valor) {
+    $ruta = Join-Path $stackDir '.env'
+    $lineas = @(); if (Test-Path $ruta) { $lineas = @(Get-Content -LiteralPath $ruta -Encoding UTF8) }
+    $lineas += "$clave=$valor"
+    [System.IO.File]::WriteAllText($ruta, (($lineas -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+}
+
+function Get-SecretosNotificaciones {
+    $envStack = Read-EnvFile (Join-Path $stackDir '.env')
+    if (-not $envStack['NOTIFICACIONES_API_KEY']) { Set-ValorEnvStack 'NOTIFICACIONES_API_KEY' (New-ClaveAleatoria 48); Write-Host '    + NOTIFICACIONES_API_KEY generada en stack/.env' -ForegroundColor Gray }
+    if (-not $envStack['NOTIFICACIONES_DB_PASSWORD']) { Set-ValorEnvStack 'NOTIFICACIONES_DB_PASSWORD' (New-ClaveAleatoria 24 -ConComplejidadSql); Write-Host '    + NOTIFICACIONES_DB_PASSWORD generada en stack/.env' -ForegroundColor Gray }
+    return (Read-EnvFile (Join-Path $stackDir '.env'))
+}
+
+function Initialize-Notificaciones {
+    $dir = Join-Path $workspace (Get-Seccion 'ext-notificaciones').directorio
+    $ejemplo = Join-Path $dir '.env.example'
+    if (-not (Test-Path $ejemplo)) { throw "Falta $ejemplo (componente Complementos/Notificaciones)." }
+    $envStack = Get-SecretosNotificaciones
+    if (-not $envStack['MSSQL_SA_PASSWORD']) { throw 'stack/.env no define MSSQL_SA_PASSWORD (necesaria para crear notificacionesdb).' }
+    # .env del servicio = .env.example + secretos de stack/.env + SMTP_NOTIFICATION_* del .env del checkout del Backend (solo fuente; al contenedor del Backend no llegan; mismos nombres,
+    # incluido el modo de pruebas con redireccion). Nada se imprime. Se regenera en cada up.
+    $backendEnv = Read-EnvFile (Join-Path $workspace 'GestioAsistenciaBackend\.env')
+    $salida = New-Object System.Collections.Generic.List[string]
+    foreach ($linea in Get-Content -LiteralPath $ejemplo -Encoding UTF8) {
+        $t = $linea.Trim()
+        $i = $t.IndexOf('=')
+        if ($t.Length -eq 0 -or $t.StartsWith('#') -or $i -lt 1) { $salida.Add($linea); continue }
+        $k = $t.Substring(0, $i).Trim()
+        if ($k -in 'NOTIFICACIONES_API_KEY', 'NOTIFICACIONES_DB_PASSWORD') { $salida.Add("$k=$($envStack[$k])") }
+        elseif ($k.StartsWith('SMTP_NOTIFICATION_') -and $backendEnv.Contains($k) -and $backendEnv[$k] -ne '') { $salida.Add("$k=$($backendEnv[$k])") }
+        else { $salida.Add($linea) }
+    }
+    $destino = Join-Path $dir '.env'
+    [System.IO.File]::WriteAllText($destino, (($salida -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $pendientes = @($salida | Where-Object { $_ -match '^[A-Z0-9_]+=<.*>\s*$' } | ForEach-Object { ($_ -split '=', 2)[0] })
+    if ($pendientes.Count -gt 0) {
+        Write-Host "    !!  .env de Notificaciones con valores sin definir: $($pendientes -join ', ') (el canal SMTP puede fallar; use NOTIFICACIONES_CANAL=log)" -ForegroundColor Yellow
+    }
+    # BD y login propios (idempotente: reasigna la clave). Las claves viajan por el entorno del proceso hijo, no por argumentos.
+    $env:MSSQL_SA_PASSWORD = $envStack['MSSQL_SA_PASSWORD']
+    $env:NOTIFICACIONES_DB_PASSWORD = $envStack['NOTIFICACIONES_DB_PASSWORD']
+    try {
+        $script = Join-Path $dir 'scripts\crear-bd.ps1'
+        $ps = (Get-Process -Id $PID).Path
+        $ok = $false
+        for ($intento = 1; $intento -le 6 -and -not $ok; $intento++) {
+            & $ps -NoProfile -ExecutionPolicy Bypass -File $script | Out-Null
+            if ($LASTEXITCODE -eq 0) { $ok = $true } else { Start-Sleep -Seconds 5 }
+        }
+        if (-not $ok) { throw 'No se pudo crear/verificar notificacionesdb (scripts/crear-bd.ps1; SQL Server arriba?).' }
+        Write-Host '    + notificacionesdb y su login listos (idempotente)' -ForegroundColor Gray
+    }
+    finally {
+        Remove-Item Env:\MSSQL_SA_PASSWORD -ErrorAction SilentlyContinue
+        Remove-Item Env:\NOTIFICACIONES_DB_PASSWORD -ErrorAction SilentlyContinue
+    }
 }
 
 function Invoke-Compose([string]$nombre, [string[]]$argumentos) {
@@ -355,10 +483,16 @@ switch ($Accion) {
         Write-Host "`n==> stack up $($Objetivo -join ' ')" -ForegroundColor Cyan
         $total = Show-Plan $secciones
         if ($total -gt $manifiesto.limiteMemoriaMb) { throw "La memoria estimada ($total MB) supera el limite ($($manifiesto.limiteMemoriaMb) MB). Levante menos secciones." }
-        if ($secciones -contains 'asis-app') {
-            foreach ($img in (Get-Seccion 'asis-app').requiereImagenes) {
-                docker image inspect $img 2>$null | Out-Null
-                if ($LASTEXITCODE -ne 0) { throw "Falta la imagen $img. Construyala con: .\infra.ps1 stack build" }
+        foreach ($n in $secciones) {
+            $imgs = Get-Prop (Get-Seccion $n) 'requiereImagenes'
+            if ($imgs) {
+                foreach ($img in $imgs) {
+                    docker image inspect $img 2>$null | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        $cual = $(if ($img -like 'notificaciones-uco:*') { 'notificaciones' } else { '' })
+                        throw "Falta la imagen $img (seccion $n). Construyala con: .\infra.ps1 stack build $cual"
+                    }
+                }
             }
         }
         $seccionesConfiguracion = Get-SeccionesConfiguracion $secciones
@@ -376,8 +510,22 @@ switch ($Accion) {
                 if ($extra.Count -gt 0) { Write-Host "  * Configuracion con las secciones que ya estan arriba: $($extra -join ', ')" -ForegroundColor Gray }
                 New-ConfiguracionApp $seccionesConfiguracion
             }
+            if ($n -eq 'ext-notificaciones') { Initialize-Notificaciones }
             Invoke-Compose $n (@('up', '-d', '--no-build', '--remove-orphans') + @($s.servicios))
             if (-not $SinEsperar) { Wait-Salud $n }
+            if ($n -eq 'ext-seguridad' -and -not $SinEsperar) {
+                # El realm del laboratorio no debe permitir auto-registro (cuentas solo por el flujo de la app).
+                try { & (Join-Path $infraRoot 'scripts\security\Disable-KeycloakSelfRegistration.ps1') }
+                catch { Write-Host "    !!  no se pudo desactivar el auto-registro de Keycloak: $($_.Exception.Message)" -ForegroundColor Red }
+            }
+        }
+        if ($secciones -contains 'asis-app' -and ($seccionesConfiguracion -contains 'ext-seguridad') -and -not $SinPdp -and -not $SinEsperar) {
+            # Un endpoint nuevo del backend responde 403 hasta que el PDP tenga su concesion (aditivo, nunca --prune).
+            try {
+                $okPdp = Invoke-PdpProvision -BackendRepo (Join-Path $workspace 'GestioAsistenciaBackend') -PythonExe (Resolve-PythonWindows)
+                if (-not $okPdp) { Write-Host '    !!  PDP con diferencias; revise: python -X utf8 -I GestioAsistenciaBackend/infra/security-baseline/scripts/provision_asistencias.py verify' -ForegroundColor Yellow }
+            }
+            catch { Write-Host "    !!  PDP no verificado: $($_.Exception.Message) (use -SinPdp para omitir)" -ForegroundColor Yellow }
         }
         Write-Host "`nListo. Direcciones:" -ForegroundColor Cyan
         foreach ($n in $secciones) { foreach ($u in (Get-Seccion $n).urls) { Write-Host "  [$n] $u" } }
@@ -428,7 +576,15 @@ switch ($Accion) {
                     & docker build --label "org.opencontainers.image.revision=$sha" -t asistencias-frontend:develop -t "asistencias-frontend:$sha" $repo
                     if ($LASTEXITCODE -ne 0) { throw 'Fallo el build del Frontend.' }
                 }
-                default { throw "build acepta backend o frontend, no '$c'." }
+                'notificaciones' {
+                    # El Dockerfile compila con -DskipTests (las pruebas del componente las corre su equipo); ver Complementos/Notificaciones/README.md.
+                    $repo = Join-Path $workspace 'Complementos\Notificaciones\notificaciones-uco'
+                    if (-not (Test-Path (Join-Path $repo 'Dockerfile'))) { throw "Falta $repo\Dockerfile (componente Complementos/Notificaciones)." }
+                    Write-Host '==> notificaciones-uco:0.1.1 desde Complementos/Notificaciones/notificaciones-uco' -ForegroundColor Cyan
+                    & docker build -t notificaciones-uco:0.1.1 $repo
+                    if ($LASTEXITCODE -ne 0) { throw 'Fallo el build de Notificaciones.' }
+                }
+                default { throw "build acepta backend, frontend o notificaciones, no '$c'." }
             }
         }
     }

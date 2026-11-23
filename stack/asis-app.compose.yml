@@ -19,6 +19,7 @@ services:
         socat TCP-LISTEN:18081,fork,reuseaddr,bind=127.0.0.1 TCP:ext-seguridad-pep:8081 &
         socat TCP-LISTEN:18080,fork,reuseaddr,bind=127.0.0.1 TCP:ext-seguridad-pdp:8080 &
         socat TCP-LISTEN:19090,fork,reuseaddr,bind=127.0.0.1 TCP:ext-seguridad-keycloak:19090 &
+        socat TCP-LISTEN:25672,fork,reuseaddr,bind=127.0.0.1 TCP:ext-seguridad-rabbitmq:5672 &
         socat TCP-LISTEN:8081,fork,reuseaddr,bind=127.0.0.1 TCP:asis-contingencia-keycloak:8080 &
         wait
     ports:

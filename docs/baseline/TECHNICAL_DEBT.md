@@ -18,7 +18,7 @@ Clasificación de lo que sigue abierto según su efecto en la entrega. La entreg
 
 - **Bloquea la demostración:** ninguna. Las cuatro que la bloqueaban el 2026-11-16 (TD-097, TD-098, TD-102 y TD-107) quedaron cerradas con el cierre del 2026-11-16/17 (ver "Cerradas" más abajo y el work item [CIERRE-001](../work-items/CIERRE-001-cierre-proyecto/README.md)).
 - **Pendiente de decisión del responsable (no bloquea):** TD-116 (cifras de pérdida: matrículas frente a personas), TD-117 (enlace directo a las decisiones de cancelación pendientes del docente) y TD-118 (semántica de `esResolutorActual` del docente).
-- **Requisito para producción (no bloquea la demo):** TD-003, TD-011, TD-014, TD-018, TD-020, TD-023, TD-027, TD-063, TD-072, TD-073, TD-093, TD-099, TD-100, TD-101, TD-103, TD-104, TD-108, TD-110.
+- **Requisito para producción (no bloquea la demo):** TD-003, TD-011, TD-014, TD-018, TD-020, TD-023, TD-027, TD-063, TD-072, TD-073, TD-093, TD-099, TD-100, TD-101, TD-103, TD-104, TD-108, TD-110, TD-124.
 - **Aplazable:** TD-004, TD-006, TD-007, TD-012, TD-013, TD-015, TD-016, TD-019, TD-024 a TD-026, TD-034, TD-044, TD-045, TD-046, TD-050, TD-054, TD-056, TD-062, TD-064 a TD-071, TD-074 a TD-083, TD-085 a TD-092, TD-105, TD-106, TD-111 a TD-115, TD-119 a TD-123, TD-CULM001-A-01 a A-03 y TD-CULM001-D-01 a D-05.
 - **Cerradas en esta revisión (2026-11-16), con evidencia en su entrada:** TD-010, TD-022, TD-039, TD-041, TD-043, TD-047, TD-049, TD-055 y TD-084. TD-094 a TD-096 llegan cerradas desde el registro del backend.
 - **Cerradas en la revisión del 2026-11-17 (cierre en `develop`), con evidencia en su entrada:** TD-097 (BD PR 140), TD-098 (W1B), TD-102 en cuanto al arranque (Frontend PR 140; el simulador sigue en el bundle, ver TD-106), TD-107 (los seis paquetes W1A a W3I; lo que quedó expresamente sin mover en el cliente está en TD-119; relacionadas: TD-113, TD-114 y TD-117) y TD-109 (Frontend PR 140).
@@ -159,6 +159,12 @@ Equivalencias con el registro histórico del backend (congelado al 2026-11-12): 
 | [TD-121](#td-121) | `/admin/docentes` muestra solo docentes con vínculo activo (HU136): un docente sin vínculo no aparece en el selector del administrador | ABIERTA / NON_BLOCKING | no |
 | [TD-122](#td-122) | 14 cuentas de prueba posteriores al conjunto de datos alteran los conteos de `verificar_datos_prueba.py` (26 de 28) | ABIERTA / NON_BLOCKING | no |
 | [TD-123](#td-123) | Incidente operativo del 2026-11-16: contenedor desechable montó el volumen de MinIO del laboratorio; verificación de objetos pendiente | ABIERTA / NON_BLOCKING (verificación) | no |
+| [TD-124](#td-124) | Notificaciones: autenticación entre servicios con `X-Api-Key` (secreto compartido); falta OAuth2 client-credentials | ABIERTA | no; requisito de producción |
+| [TD-125](#td-125) | Prueba inestable del Backend `CatalogoParametrosHttpParameterCatalogAdapterTest.fallo_sincrono_al_lanzar_el_refresco` (TooManyActualInvocations por tiempos) | ABIERTA | no |
+| [TD-126](#td-126) | Notificaciones: el token de verificación de correo vive en memoria (`VerificacionCorreoMarcadorProvider`); un reinicio entre intentos reemite y revoca el enlace previo | ABIERTA | no |
+| [TD-127](#td-127) | Catálogo de Parámetros 0.1.17: los ambientes y estados de metadato-ambiente pasaron a ids fijos sin migrar los datos de 0.1.7 (metadatos huérfanos; `GET /ambientes/<id viejo>` 404) | ABIERTA | no |
+| [TD-128](#td-128) | Catálogo de Parámetros 0.1.17: el compose obliga a `app` a depender de `otel-collector` y este de `jaeger`; sin observabilidad no se puede levantar solo el núcleo | ABIERTA | no |
+| [TD-129](#td-129) | Seguridad 0.1.13/0.1.14: crear una identidad de servicio puede responder 500 por timeout de 3 s y dejar el cliente en Keycloak sin fila en el PDP | ABIERTA | no |
 
 ## TD-001
 
@@ -1549,3 +1555,63 @@ Origen: desviaciones de DEC-046 y DEC-055..DEC-060, `ESTADO.md` y hallazgos de l
 - **Resolución esperada:** conservar el conteo de objetos antes de operar sobre volúmenes del laboratorio; no montar volúmenes con nombre en contenedores desechables.
 - **Bloquea línea base:** no.
 - **Estado:** ABIERTA / NON_BLOCKING (verificación pendiente).
+
+## TD-124
+
+- **Origen:** fase F3 (Infra) del plan del componente propio de Notificaciones, 2026-11-22.
+- **Descripción:** el Backend y el Servicio de Notificaciones UCO se autentican entre sí con un secreto compartido en la cabecera `X-Api-Key` (`NOTIFICACIONES_API_KEY`, generado por `infra.ps1 stack up` en `stack/.env`). Es suficiente para el laboratorio y la demostración, pero no da identidad por servicio, rotación ni revocación individual. El destino es OAuth2 client-credentials emitido por Seguridad para servicios, como ya hace MessageUcoLab; hoy Seguridad no lo ofrece para este tipo de cliente.
+- **Impacto:** Medio para producción; sin efecto en la demostración.
+- **Evidencia:** `docs/contracts/notificaciones/NOTIFICACIONES_CONTRACT.md` (sección 4); `Complementos/Notificaciones/Guia-integracion-Notificaciones.md` (sección 2).
+- **Resolución esperada:** cuando Seguridad ofrezca client-credentials para servicios, registrar al Backend como cliente, validar el JWT en el componente (y retirar `X-Api-Key`), publicar el cambio como addendum del contrato con hash nuevo y rotar el secreto.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA; requisito de producción.
+
+## TD-125
+
+- **Origen:** extracción de Notificaciones, corridas del Backend del 2026-11-22.
+- **Descripción:** la prueba `CatalogoParametrosHttpParameterCatalogAdapterTest.fallo_sincrono_al_lanzar_el_refresco` es inestable: a veces falla con `TooManyActualInvocations` (2 esperadas frente a 3 reales) porque depende de los tiempos del refresco asíncrono del adaptador. No hay cambio de código de por medio: la misma prueba pasa y falla en corridas consecutivas.
+- **Impacto:** Bajo: falsos rojos en `mvnw test` y en la CI.
+- **Evidencia:** `GestioAsistenciaBackend`, clase `CatalogoParametrosHttpParameterCatalogAdapterTest` (corridas intermitentes).
+- **Resolución esperada:** volver determinista la prueba (ejecutor síncrono o sincronización explícita en lugar de depender de los tiempos), sin relajar la aserción de invocaciones.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-126
+
+- **Origen:** extracción de Notificaciones, 2026-11-22.
+- **Descripción:** `VerificacionCorreoMarcadorProvider` recuerda en memoria el token de verificación de correo ya emitido. Si el proceso se reinicia entre dos intentos de despacho, el marcador se pierde: se emite un token nuevo, se revoca el enlace anterior y el correo ya entregado queda con un enlace inválido.
+- **Impacto:** Bajo/Medio: caso residual acotado a reinicios entre intentos de despacho.
+- **Evidencia:** `GestioAsistenciaBackend`, `VerificacionCorreoMarcadorProvider`.
+- **Resolución esperada:** persistir el marcador con un procedimiento almacenado idempotente (emitir-o-reutilizar token vigente por usuario y propósito) en la BD, en vez de memoria del proceso; cambio de DB y Backend con su contrato.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-127
+
+- **Origen:** INT-004, actualización del Catálogo de Parámetros a 0.1.17 (2026-11-22).
+- **Descripción:** en 0.1.17 los ambientes son un catálogo fijo (`00000000-0000-0000-0000-000000000010/11/12`: Producción, Desarrollo, Pruebas) y los estados de metadato-ambiente también (`…0020` Activo, `…0021` Inactivo). Los metadatos y metadatos-ambiente creados con 0.1.7 conservaron sus ids viejos (ambiente `36ddaf78-…`, estado `829875d4-…`), que ya no existen (`GET /ambientes/36ddaf78-…` 404). El volumen persiste y no hay migración ni aviso: la consulta M2M no devuelve parámetros hasta corregir cada fila a mano.
+- **Impacto:** Medio para quien actualiza con datos: la configuración parece intacta en el listado y la consulta sale vacía.
+- **Evidencia:** `Complementos/CatalogoParametros/Catalogo-Parametros`, `/administracion` de la aplicación `AsistenciasUCO` antes y después de la migración (INT-004 §4).
+- **Resolución esperada:** del equipo de Parámetros (migración de datos o nota de actualización). En el laboratorio se migró con `PUT` de cada fila; se reporta al equipo, no se parcha su componente.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-128
+
+- **Origen:** INT-004, kit del Catálogo 0.1.17.
+- **Descripción:** `docker-compose.yml` hace depender `app` de `otel-collector` (`service_started`) y este de `jaeger`: `docker compose up app` arranca Prometheus, Grafana, Loki y Jaeger aunque no se quieran. Infra lo evita con `depends_on: !override` en `stack/secciones/ext-parametros.yml`. El app, sin collector, registra `UnknownHostException` cada minuto.
+- **Impacto:** Bajo (memoria del laboratorio).
+- **Evidencia:** compose del kit; `stack/secciones/ext-parametros.yml`.
+- **Resolución esperada:** del equipo de Parámetros: perfil `observabilidad` para esos servicios y exportación OTLP apagada por defecto.
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.
+
+## TD-129
+
+- **Origen:** INT-004, creación de la identidad `asistencias-uco-a-catalogo-parametros-dev` (2026-11-22); mismo patrón que INT-002 (identidad `…-dev` de Catálogo → MessageUcoLab).
+- **Descripción:** `POST /api/v1/applications/{id}/service-identities` respondió 500 `INTERNAL_ERROR` (`TimeoutException` de 3000 ms en `ServiceIdentityAdministrationController#create`) pero el cliente `svc-…` ya estaba creado en Keycloak y el PDP no tenía la fila: el nombre queda ocupado y el secreto perdido. En el laboratorio se borró el cliente huérfano por el Admin REST de Keycloak y se reintentó.
+- **Impacto:** Medio en el laboratorio; operación riesgosa en cualquier ambiente.
+- **Evidencia:** log de `ext-seguridad-pdp` (`Error no manejado al atender la petición`), clientes `svc-*` de `security-baseline`.
+- **Resolución esperada:** del equipo de Seguridad: timeout configurable, creación idempotente o compensación (borrar el cliente si falla el registro).
+- **Bloquea línea base:** no.
+- **Estado:** ABIERTA / NON_BLOCKING.

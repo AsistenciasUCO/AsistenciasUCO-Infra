@@ -8,9 +8,13 @@
   "volumenesExternos": [
     "asis-datos-mssql",
     "asistencias-minio-data",
-    "ext-mensajes-pulsar-data"
+    "ext-mensajes-pulsar-data",
+    "catalogo-parametros_redis-data",
+    "catalogo-parametros_surrealdb-data",
+    "catalogo-parametros_pulsar-parametros-data",
+    "catalogo-parametros_pulsar-parametros-conf"
   ],
-  "limiteMemoriaMb": 9500,
+  "limiteMemoriaMb": 9700,
   "secciones": {
     "asis-datos": {
       "descripcion": "SQL Server (BD del laboratorio) y MinIO (soportes). Siempre arriba.",
@@ -43,7 +47,7 @@
       ]
     },
     "ext-seguridad": {
-      "descripcion": "Componente de Seguridad del equipo (Security Baseline 0.1.13: Keycloak, PDP, PEP, OPA).",
+      "descripcion": "Componente de Seguridad del equipo (Security Baseline 0.1.14: Keycloak, PDP, PEP, OPA y RabbitMQ de eventos).",
       "memoriaMb": 1600,
       "directorio": "GestioAsistenciaBackend/infra/security-baseline",
       "compose": [
@@ -61,11 +65,14 @@
         "opa",
         "pdp",
         "pep",
+        "rabbitmq",
+        "rabbitmq-init",
         "consola"
       ],
       "salud": [
         "contenedor:ext-seguridad-keycloak",
         "contenedor:ext-seguridad-pdp",
+        "contenedor:ext-seguridad-rabbitmq",
         "http:http://localhost:18081/actuator/health",
         "contenedor:ext-seguridad-consola",
         "http:http://localhost:5175/security-administration.js"
@@ -74,6 +81,7 @@
         "Keycloak: http://keycloak.localhost:19090",
         "PDP: http://localhost:18080",
         "PEP: http://localhost:18081",
+        "RabbitMQ (eventos del PDP): amqp://localhost:25672, consola http://localhost:25673",
         "Consola de seguridad: http://localhost:5175 (dist de Complementos/Seguridad/security-ui)"
       ],
       "proyectosAnteriores": [
@@ -120,8 +128,8 @@
       ]
     },
     "ext-parametros": {
-      "descripcion": "Catalogo de Parametros 0.1.7 y su microfrontend 0.1.6 (kit del equipo).",
-      "memoriaMb": 600,
+      "descripcion": "Catalogo de Parametros 0.1.17 y su microfrontend 0.1.16, con su broker Pulsar propio (kit del equipo; consulta M2M y eventos de cambios).",
+      "memoriaMb": 1500,
       "directorio": "Complementos/CatalogoParametros/Catalogo-Parametros",
       "compose": [
         "docker-compose.yml",
@@ -133,6 +141,7 @@
       "servicios": [
         "redis",
         "surrealdb",
+        "pulsar-parametros",
         "app",
         "frontend"
       ],
@@ -141,11 +150,13 @@
       ],
       "salud": [
         "contenedor:ext-parametros-app",
-        "http:http://localhost:8081/actuator/health"
+        "http:http://localhost:8081/actuator/health",
+        "http:http://localhost:8082/admin/v2/brokers/health"
       ],
       "urls": [
         "API: http://localhost:8081/catalogo-parametros/api/v1",
-        "Microfrontend: http://localhost:4201"
+        "Microfrontend: http://localhost:4201",
+        "Pulsar del Catalogo: pulsar://localhost:6652 (desde asis-red: pulsar://pulsar-parametros:6650), administracion http://localhost:8082"
       ],
       "proyectosAnteriores": [
         "catalogo-parametros"
@@ -154,8 +165,38 @@
         "ext-seguridad"
       ]
     },
-    "asis-antivirus": {
-      "descripcion": "ClamAV para las pruebas de soportes (adjuntos de reclamos y justificaciones).",
+    "ext-notificaciones": {
+      "descripcion": "Servicio de Notificaciones UCO 0.1.0 (componente propio: correos con plantillas, cola en notificacionesdb del SQL Server del laboratorio).",
+      "memoriaMb": 450,
+      "directorio": "Complementos/Notificaciones/notificaciones-local",
+      "compose": [
+        "compose.yaml"
+      ],
+      "envFiles": [
+        ".env"
+      ],
+      "servicios": [
+        "servicio"
+      ],
+      "requiere": [
+        "asis-datos"
+      ],
+      "requiereImagenes": [
+        "notificaciones-uco:0.1.1"
+      ],
+      "salud": [
+        "contenedor:ext-notificaciones-servicio",
+        "http:http://localhost:18090/actuator/health"
+      ],
+      "urls": [
+        "API: http://localhost:18090/api/v1 (cabecera X-Api-Key)",
+        "Entre contenedores: http://ext-notificaciones-servicio:8080"
+      ],
+      "proyectosAnteriores": [
+        "notificaciones-local"
+      ]
+    },
+    "asis-antivirus": {      "descripcion": "ClamAV para las pruebas de soportes (adjuntos de reclamos y justificaciones).",
       "memoriaMb": 1300,
       "directorio": "GestioAsistenciaBackend/infra/files",
       "compose": [
@@ -278,6 +319,7 @@
       "secciones": [
         "asis-datos",
         "ext-seguridad",
+        "ext-notificaciones",
         "asis-app"
       ],
       "pruebas": "HU de los 5 roles (e2e_baseline.py, test_all_hus.ps1). Mensajes y parametros desde la BD."
@@ -287,6 +329,7 @@
         "asis-datos",
         "ext-seguridad",
         "ext-mensajes",
+        "ext-notificaciones",
         "asis-app"
       ],
       "pruebas": "Catalogo de mensajes, avisos por Pulsar -> BD, textos UI### de la SPA (int003_e2e)."
@@ -296,6 +339,7 @@
         "asis-datos",
         "ext-seguridad",
         "ext-parametros",
+        "ext-notificaciones",
         "asis-app"
       ],
       "pruebas": "Catalogo de Parametros (test_catalogo_parametros.ps1) y microfrontend de administracion."
@@ -306,6 +350,7 @@
         "ext-seguridad",
         "ext-mensajes",
         "ext-parametros",
+        "ext-notificaciones",
         "asis-app"
       ],
       "pruebas": "Flujos completos con los tres componentes externos (sin antivirus ni observabilidad)."
@@ -315,6 +360,7 @@
         "asis-datos",
         "ext-seguridad",
         "asis-antivirus",
+        "ext-notificaciones",
         "asis-app"
       ],
       "pruebas": "Adjuntos de reclamos y justificaciones (MinIO + ClamAV)."
@@ -324,6 +370,7 @@
         "asis-datos",
         "ext-seguridad",
         "asis-obs",
+        "ext-notificaciones",
         "asis-app"
       ],
       "pruebas": "Trazas, metricas y logs por correlationId en Grafana."
@@ -332,6 +379,7 @@
       "secciones": [
         "asis-datos",
         "asis-contingencia",
+        "ext-notificaciones",
         "asis-app"
       ],
       "pruebas": "Arranque con el Keycloak propio (provider legacy) cuando falla el componente de Seguridad."

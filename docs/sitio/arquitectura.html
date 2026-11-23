@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arquitectura y patrones · Asistencia UCO</title>
+  <link rel="stylesheet" href="assets/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div class="barra-movil"></div>
+<div class="app">
+  <nav class="nav" aria-label="Documentación"></nav>
+  <main class="contenido">
+    <header class="hero">
+      <h1>Arquitectura y patrones</h1>
+      <p>Los principios que gobiernan el sistema, cómo se organizan sus piezas, cómo viaja una petición de extremo a extremo y qué decisiones de diseño explican lo que se ve en el código.</p>
+      <div class="etiquetas">
+        <span class="etiqueta">Clean Architecture</span>
+        <span class="etiqueta">Puertos y adaptadores</span>
+        <span class="etiqueta">Contract First</span>
+        <span class="etiqueta">SSOT</span>
+        <span class="etiqueta">SSE + Signals</span>
+        <span class="etiqueta">OpenTelemetry</span>
+      </div>
+    </header>
+
+    <p>La norma superior es <code>AsistenciasUCO-Infra/docs/governance/CONSTITUTION.md</code>. Esta página la resume con ejemplos reales del código. Si hay conflicto, manda la Constitución.</p>
+
+    <h2 id="principios">Principios de diseño</h2>
+    <div class="tarjetas">
+      <div class="tarjeta"><div class="icono">🧱</div><h4>Clean Architecture</h4><p>El negocio no depende de frameworks ni de la persistencia. Cambiar de base de datos o de proveedor de identidad no toca los casos de uso.</p></div>
+      <div class="tarjeta"><div class="icono">🔌</div><h4>Puertos y adaptadores</h4><p>La aplicación expone puertos primarios (entradas) y requiere puertos secundarios (salidas). Cada integración concreta es un adaptador en <code>infrastructure</code>.</p></div>
+      <div class="tarjeta"><div class="icono">📜</div><h4>API First / Contract First</h4><p>El contrato se define y se congela antes del código. Los contratos oficiales son inmutables (WORM) y llevan su firma SHA-256.</p></div>
+      <div class="tarjeta"><div class="icono">🎯</div><h4>Una sola fuente de verdad</h4><p>Cada dato tiene un dueño: estado y folios en SQL Server, textos en el catálogo de mensajes, parámetros en su catálogo, secretos en el almacén de secretos.</p></div>
+      <div class="tarjeta"><div class="icono">⚡</div><h4>Tiempo real nativo</h4><p>Eventos del servidor (SSE) y Signals en el cliente. El polling (<code>setInterval</code> o llamadas periódicas) está prohibido.</p></div>
+      <div class="tarjeta"><div class="icono">🔭</div><h4>Observabilidad</h4><p>OpenTelemetry para trazas, métricas y logs, con un <code>correlationId</code> que viaja desde el navegador hasta el procedimiento almacenado.</p></div>
+      <div class="tarjeta"><div class="icono">🗄️</div><h4>Base de datos gruesa</h4><p>Las reglas de negocio viven en procedimientos transaccionales. El backend orquesta y no recalcula nada.</p></div>
+      <div class="tarjeta"><div class="icono">🧪</div><h4>SDD y TDD por fases</h4><p>Plan, contrato, prueba en rojo, implementación en verde, auditoría y cierre. No se relajan pruebas para hacerlas pasar.</p></div>
+    </div>
+
+    <h3 id="detalle-principios">Qué significa cada principio en la práctica</h3>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Principio</th><th>Regla concreta</th><th>Dónde se hace cumplir</th></tr></thead>
+        <tbody>
+          <tr><td>Clean Architecture</td><td>La capa <code>application</code> no importa nada de <code>infrastructure</code>. Ningún <code>@RestController</code> ni caso de uso toca <code>JdbcTemplate</code>, <code>EntityManager</code> o <code>JpaRepository</code>.</td><td>Pruebas ArchUnit: <code>GestioAsistenciaBackend/src/test/java/co/edu/uco/asistenciasuco/architecture/CleanArchitectureRulesTest.java</code> y <code>JpaRepositoryArchitectureRulesTest.java</code></td></tr>
+          <tr><td>Flujo canónico</td><td><code>Controller → PrimaryPort → UseCaseImpl → SecondaryPort → *RepositorySqlServer*Adapter</code></td><td>ArchUnit y revisión de PR</td></tr>
+          <tr><td>Contract First</td><td>Un endpoint o procedimiento nuevo exige un contrato (o addendum) congelado con su <code>.sha256</code> antes de implementarse.</td><td><code>infra.ps1 verify</code> y pruebas de conformidad de <code>mvn verify</code></td></tr>
+          <tr><td>Base de datos gruesa</td><td>Escrituras solo por procedimiento <code>usp_*</code>. Lecturas por vistas <code>uv_*</code> o por <code>usp_consultar_*</code> paginados. Nunca tablas directas.</td><td>Usuario de aplicación con permisos mínimos (<code>app_asistencias_user</code>): EXEC en procedimientos, SELECT en vistas, DENY en tablas</td></tr>
+          <tr><td>Cero datos quemados</td><td>Los estados salen de catálogos <code>cat_*</code> o de parámetros; no se escriben GUID ni textos fijos en T-SQL.</td><td>Revisión de la BD y pruebas T-SQL</td></tr>
+          <tr><td>Sin polling</td><td>El cliente se entera de los cambios por SSE. Los contadores se actualizan por eventos.</td><td><code>GestioAsistenciaFrontend</code> (<code>npm run verify</code>) y revisión</td></tr>
+          <tr><td>Frontend de presentación</td><td>No parsea errores de infraestructura ni traduce textos libres: muestra el <code>message</code> del backend.</td><td>Revisión y pruebas del frontend</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="contexto">Contexto del sistema (nivel 1)</h2>
+    <p>Quién usa el sistema y con qué sistemas externos se comunica.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  subgraph personas["Personas"]
+    E["Estudiante"]
+    D["Docente"]
+    C["Coordinador"]
+    DE["Decano"]
+    A["Administrador"]
+  end
+  SIS["Sistema de Asistencia UCO"]
+  subgraph externos["Sistemas de otros equipos"]
+    SEG["Security Baseline: identidad y permisos"]
+    MSG["MessageUcoLab: textos de usuario"]
+    PAR["Catalogo de Parametros: M2M y eventos"]
+  end
+  NOT["Servicio de Notificaciones: correo"]
+  SMTP["Servidor SMTP institucional"]
+  FES["Calendarios de festivos"]
+  E --> SIS
+  D --> SIS
+  C --> SIS
+  DE --> SIS
+  A --> SIS
+  SIS --> SEG
+  SIS --> MSG
+  SIS --> PAR
+  SIS --> NOT
+  NOT --> SMTP
+  SIS --> FES
+      </pre>
+      <figcaption>Contexto: cinco roles usan el sistema, que depende de tres componentes externos, del servicio de correo y de una fuente de festivos. El correo sale solo por el Servicio de Notificaciones.</figcaption>
+    </figure>
+
+    <h2 id="contenedores">Contenedores (nivel 2)</h2>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart TB
+  subgraph cliente["Navegador"]
+    SPA["SPA Angular 22: Signals, OnPush, SSE"]
+  end
+  subgraph app["Asistencias UCO"]
+    API["API Spring Boot 4: casos de uso, adaptadores"]
+    DB[("SQL Server: SP, vistas, catalogos")]
+    OUT["Outbox de notificaciones"]
+  end
+  subgraph soportes["Soportes"]
+    MIN[("MinIO S3")]
+    AV["ClamAV clamd 3310"]
+  end
+  subgraph ident["Identidad"]
+    KC["Keycloak"]
+    PEP["PEP"]
+    PDP["PDP + OPA"]
+  end
+  subgraph cat["Catalogos externos"]
+    ML["MessageUcoLab via Kong"]
+    CP["Catalogo de Parametros"]
+    PP["Pulsar del Catalogo"]
+  end
+  NS["Servicio de Notificaciones"]
+  OBS["Alloy, Tempo, Loki, Prometheus, Grafana"]
+  SPA -->|"REST + JWT"| API
+  API -->|"SSE"| SPA
+  SPA -->|"PKCE"| KC
+  API -->|"EXEC usp_ y SELECT uv_"| DB
+  API --> OUT
+  OUT -->|"HTTP idempotente"| NS
+  API --> AV
+  API --> MIN
+  API -->|"decision"| PEP
+  PEP --> PDP
+  API --> ML
+  API -->|"M2M"| CP
+  PP -.->|"eventos de cambio"| API
+  API -->|"OTLP"| OBS
+      </pre>
+      <figcaption>Contenedores: el navegador nunca llega a MinIO ni a los catálogos. Todo adjunto pasa por la API, que lo escanea con ClamAV antes de guardarlo.</figcaption>
+    </figure>
+
+    <h2 id="capas-backend">Capas del backend</h2>
+    <p>El backend está organizado en dos hexágonos: el interno (<code>application</code>) y el externo (<code>infrastructure</code>). Rutas reales: <code>GestioAsistenciaBackend/src/main/java/co/edu/uco/asistenciasuco/</code>.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  subgraph primario["infrastructure/adapter/primary"]
+    CT["controller: 79 controladores REST"]
+    RT["realtime: SSE"]
+    SC["scheduler: tareas de fondo"]
+    MS["messaging: Pulsar y RabbitMQ"]
+  end
+  subgraph nucleo["application"]
+    PP["primaryports"]
+    UC["usecase y features: 160 UseCaseImpl"]
+    SP2["secondaryports"]
+  end
+  subgraph secundario["infrastructure/adapter/secondary"]
+    PE["persistence: JPA hacia SQL Server"]
+    CA["catalog: mensajes y parametros"]
+    NO["notification: outbox y cliente HTTP"]
+    ST["storage y malwarescan"]
+    SB["securitybaseline: PEP y PDP"]
+  end
+  CT --> PP
+  RT --> PP
+  SC --> PP
+  MS --> PP
+  PP --> UC
+  UC --> SP2
+  SP2 --> PE
+  SP2 --> CA
+  SP2 --> NO
+  SP2 --> ST
+  SP2 --> SB
+      </pre>
+      <figcaption>Las flechas siempre apuntan hacia el núcleo. Los adaptadores implementan los puertos secundarios; los casos de uso solo conocen las interfaces.</figcaption>
+    </figure>
+    <p>Ejemplos de puertos secundarios reales: <code>MessageCatalogPort</code>, <code>ParameterCatalogPort</code>, <code>NotificacionPort</code> y <code>SecretVaultPort</code> (en <code>application/secondaryports/</code>). Cambiar de proveedor es cambiar la propiedad <code>APP_ADAPTERS_MESSAGE_CATALOG_PROVIDER</code> o <code>APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER</code>, no el negocio.</p>
+
+    <h2 id="contratos">Contratos congelados (WORM)</h2>
+    <p>Un contrato congelado no se edita: se agrega un addendum y se regenera la firma. La firma SHA-256 vive junto al archivo y se verifica automáticamente.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Contrato</th><th>Archivo en <code>AsistenciasUCO-Infra/docs/contracts/</code></th><th>Qué fija</th></tr></thead>
+        <tbody>
+          <tr><td>OpenAPI Golden Path</td><td><code>openapi/openapi-golden-path.yaml</code> (+ <code>.sha256</code>)</td><td>13 rutas congeladas, modelos de error y de paginación.</td></tr>
+          <tr><td>Backend Golden Path</td><td><code>openapi/BACKEND_GOLDEN_PATH_CONTRACT.md</code></td><td>Flujo, errores y reglas del camino principal.</td></tr>
+          <tr><td>Base de datos</td><td><code>db/DB_BASELINE_CONTRACT.md</code> y <code>db/DB_DEVELOP_FREEZE_ADDENDUM.md</code></td><td>Procedimientos, vistas y tupla de salida estándar.</td></tr>
+          <tr><td>Eventos en tiempo real</td><td><code>events/REALTIME_EVENT_CONTRACT.md</code></td><td>Sobre del evento, audiencias y nombres de eventos.</td></tr>
+          <tr><td>Addendum de tomas y avisos</td><td><code>ADDENDUM_ATA_ASISTENCIA_TOMAS_AVISOS.md</code></td><td>Cierre de tomas, denominador de la pérdida y solicitudes.</td></tr>
+          <tr><td>Notificaciones</td><td><code>notificaciones/NOTIFICACIONES_CONTRACT.md</code> y <code>openapi-notificaciones.yaml</code></td><td>API del servicio de correo (ver <a href="notificaciones.html">Notificaciones</a>).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>La verificación es <code>.\AsistenciasUCO-Infra\infra.ps1 verify</code>. Ejecuta tres pasos: auditoría de secretos, contratos WORM con paridad entre repos y comprobación de las rutas por rol.</p>
+    <div class="nota"><strong>Regla de oro</strong> Si necesitas cambiar un contrato congelado, no lo edites: redacta el addendum, regenera el <code>.sha256</code> y ejecuta <code>infra.ps1 verify</code>. Una firma que no coincide rompe la CI.</div>
+
+    <h2 id="ssot">Fuente única de verdad</h2>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Qué</th><th>Dueño</th><th>Cómo se consume</th></tr></thead>
+        <tbody>
+          <tr><td>Estado de las entidades, folios (<code>SES-01</code>, <code>DEC-01</code>), catálogos relacionales</td><td>SQL Server</td><td>Procedimientos y vistas</td></tr>
+          <tr><td>Textos para el usuario y mensajes técnicos</td><td>Catálogo de mensajes (MessageUcoLab o BD según el escenario)</td><td><code>MessageCatalogPort</code></td></tr>
+          <tr><td>Parámetros de negocio ajustables</td><td>Catálogo de Parámetros (o <code>dbo.CatalogoParametro</code> sin él); con el Catálogo activo, la tabla es una copia mantenida por eventos y reconciliación</td><td><code>ParameterCatalogPort</code></td></tr>
+          <tr><td>Secretos</td><td>Almacén de secretos (Key Vault en producción, <code>.env</code> local no versionado)</td><td><code>SecretVaultPort</code></td></tr>
+          <tr><td>Normas de diseño y hardening</td><td><code>CONSTITUTION.md</code> y <code>HARDENING_QUICK_GUIDE.md</code> en Infra</td><td>No se duplican en otros repos</td></tr>
+          <tr><td>Contratos públicos</td><td>Infra, con firma SHA-256</td><td>Copias verificadas por paridad</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Los textos incrustados en enums de Java o en el frontend son solo respaldo de contingencia. El frontend no genera identificadores de negocio: los asigna la BD o el backend.</p>
+
+    <h2 id="tiempo-real">Tiempo real: SSE y Signals</h2>
+    <p>El canal es <code>GET /api/v1/realtime/stream?grupoId={UUID}</code>, con el token Bearer en la cabecera (nunca en la URL). El backend publica un evento después de confirmar la transacción; el frontend lo convierte en una actualización de un Signal. Cada tipo de evento tiene una audiencia exacta definida en <code>RealtimeAudienciaPolicy</code> (<code>infrastructure/adapter/primary/realtime/sse/</code>).</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Evento (ejemplos reales)</th><th>Cuándo se publica</th><th>A quién llega</th></tr></thead>
+        <tbody>
+          <tr><td><code>TOMA_ABIERTA</code> · <code>TOMA_CERRADA</code></td><td>El docente abre o cierra una toma</td><td>Solo el docente titular</td></tr>
+          <tr><td><code>ASISTENCIAS_SESION_ACTUALIZADAS</code></td><td>Se guarda un lote de asistencia</td><td>Titular, estudiantes del grupo y ámbito de lectura</td></tr>
+          <tr><td><code>ASISTENCIA_QR_ROTADO</code> · <code>ASISTENCIA_QR_REGISTRADA</code></td><td>Rota el token del QR o un estudiante marca</td><td>Solo el docente titular</td></tr>
+          <tr><td><code>SESION_CANCELADA</code></td><td>Cancelación por docente, festivo o receso</td><td>Titular, estudiantes del grupo y ámbito de lectura</td></tr>
+          <tr><td><code>SESION_SOLICITUD_CREADA</code> · <code>SESION_SOLICITUD_RECHAZADA</code></td><td>Solicitud de sesión extraordinaria</td><td>Ámbito de lectura (coordinador) y docente titular; nunca los estudiantes</td></tr>
+          <tr><td><code>FALTA_SESION_AVISADA</code></td><td>Se avisó una falta de la sesión</td><td>Solo los estudiantes avisados</td></tr>
+          <tr><td><code>PARAMETER_UPDATED</code></td><td>Se actualiza un parámetro</td><td>Solo el rol administrador (no sale por el canal de grupo)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota alerta"><strong>Límite conocido</strong> El proveedor actual (<code>local-sse</code>) es efímero y vive en una sola JVM: no hay repetición de eventos ni garantía para clientes desconectados. El estado se recupera por la API. Escalar a varias réplicas exige un bus distribuido (deuda TD-003, no bloquea la demostración).</div>
+
+    <h2 id="seguridad">Arquitectura de seguridad</h2>
+    <p>La identidad la gestiona el componente de Seguridad del equipo (Security Baseline). El frontend inicia sesión con Authorization Code + PKCE y guarda el token de acceso solo en memoria. El backend valida el JWT y consulta al PEP, que apoya su decisión en el PDP y en OPA.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as Usuario
+  participant S as SPA Angular
+  participant K as Keycloak
+  participant A as API Spring Boot
+  participant P as PEP
+  participant D as PDP y OPA
+  participant B as SQL Server
+  U->>S: abre la aplicacion
+  S->>K: redirige con code challenge PKCE
+  K-->>S: codigo de autorizacion
+  S->>K: intercambia codigo y code verifier
+  K-->>S: token de acceso en memoria
+  S->>A: GET /api/v1/... con Bearer
+  A->>A: valida firma, emisor y audiencia
+  A->>P: consulta decision para ruta y rol
+  P->>D: evalua politica
+  D-->>P: permitir o denegar
+  P-->>A: decision
+  A->>B: EXEC usp con ambito del ejecutor
+  B-->>A: filas o error de negocio
+  A-->>S: 200 o error uniforme
+      </pre>
+      <figcaption>Inicio de sesión y llamada autorizada. Si el PEP no responde, el backend deniega con 503 (falla cerrada).</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Capa 1, el PDP:</strong> decide si el rol puede usar la ruta. Una ruta nueva sin concesión devuelve 403 hasta provisionarla (ver <a href="operacion.html#pdp">Operación</a>). El filtro es <code>SecurityPepEnforcementFilter</code> en <code>infrastructure/config/security/</code>.</li>
+      <li><strong>Capa 2, la BD:</strong> el procedimiento resuelve el ámbito del ejecutor (por ejemplo <code>ufn_programas_ambito_ejecutor</code>) y devuelve solo lo que corresponde al docente, coordinador o decano.</li>
+      <li><strong>Token:</strong> en el laboratorio dura 5 minutos y se renueva por PKCE; la sesión SSO dura 30 minutos. Nunca va a <code>localStorage</code> ni <code>sessionStorage</code>.</li>
+      <li><strong>Soportes:</strong> el navegador no recibe URLs de MinIO. Cada archivo se escanea con ClamAV antes de guardarse, y el backend usa credenciales acotadas al prefijo de soportes.</li>
+      <li><strong>Contingencia:</strong> existe un Keycloak propio (<code>asis-contingencia</code>) solo para emergencias si la Seguridad del equipo no está disponible.</li>
+    </ul>
+
+    <h2 id="flujo-peticion">Flujo de una petición de extremo a extremo</h2>
+    <p>Ejemplo: el docente guarda la asistencia de una toma. Pulsa un paso para ver el detalle o deja que avance solo.</p>
+    <div class="flujo" data-flujo data-titulo="Guardar la asistencia de una toma">
+      <div class="paso" data-actor="SPA" data-detalle="El componente llama al servicio de la API. El interceptor agrega el Bearer y la cabecera X-Correlation-Id. El estado local es un Signal.">Envía la petición</div>
+      <div class="paso" data-actor="Backend" data-detalle="Los filtros validan el JWT, inicializan CorrelationIdContext y consultan al PEP. Si el PEP deniega, responde 403; si no responde, 503.">Autentica y autoriza</div>
+      <div class="paso" data-actor="Controlador" data-detalle="El @RestController solo valida la forma de la petición y delega al puerto primario. No contiene SQL ni reglas.">Delega al puerto</div>
+      <div class="paso" data-actor="Caso de uso" data-detalle="El UseCaseImpl orquesta: arma el comando, llama al puerto secundario y decide qué publicar después.">Orquesta</div>
+      <div class="paso" data-actor="Adaptador" data-detalle="El adaptador JPA ejecuta el procedimiento usp_registrar_asistencias_toma pasando el correlationId y el ejecutor.">Ejecuta el SP</div>
+      <div class="paso" data-actor="SQL Server" data-detalle="El SP valida el ámbito del docente titular, la ventana de la sesión y las reglas; escribe dentro de una transacción con XACT_ABORT.">Aplica las reglas</div>
+      <div class="paso" data-actor="SQL Server" data-tipo="error" data-detalle="Si una regla falla (por ejemplo la ventana cerrada, SES_008), el SP revierte y devuelve exitoso = 0 con mensajeUsuario y un código estable.">Rechazo de negocio</div>
+      <div class="paso" data-actor="Backend" data-detalle="Con el resultado exitoso, el caso de uso publica ASISTENCIAS_SESION_ACTUALIZADAS después del commit y responde con ApiDataResponse.">Responde y publica</div>
+      <div class="paso" data-actor="SPA" data-detalle="La SPA recibe la respuesta y el evento SSE; actualiza sus Signals sin recargar ni sondear.">Actualiza la vista</div>
+    </div>
+
+    <h2 id="errores">Manejo de errores entre capas</h2>
+    <p>La separación es estricta: la BD clasifica, el backend traduce y el frontend presenta.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart LR
+  BD["SQL Server: idResultado, exitoso, mensajeUsuario, mensajeTecnico, codigo estable"]
+  AD["Adaptador: mapea el codigo a una excepcion tipada"]
+  GH["GlobalExceptionHandler: ApiErrorResponse"]
+  MC["MessageCatalogPort: texto institucional"]
+  FE["Frontend: muestra message sin interpretarlo"]
+  BD --> AD --> GH
+  MC --> GH
+  GH --> FE
+      </pre>
+      <figcaption>El código estable (por ejemplo <code>SES_008</code>, <code>RCN_013</code>) es la clave; el texto sale del catálogo de mensajes.</figcaption>
+    </figure>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Pieza</th><th>Contrato</th><th>Ruta</th></tr></thead>
+        <tbody>
+          <tr><td>Salida de todo procedimiento de comando</td><td>Tupla <code>idCorrelacion</code>, <code>mensajeUsuarioResultado</code>, <code>mensajeTecnicoResultado</code>, <code>estadoResultado</code></td><td><code>GestioAsistenciaDB/schema/stored-procedures</code></td></tr>
+          <tr><td>Error HTTP</td><td><code>ApiErrorResponse</code>: <code>timestamp</code>, <code>status</code>, <code>error</code>, <code>code</code>, <code>message</code>, <code>path</code>, <code>correlationId</code> y <code>details[]</code> opcional</td><td><code>GestioAsistenciaBackend/src/main/java/.../infrastructure/adapter/primary/controller/error/</code></td></tr>
+          <tr><td>Respuestas correctas</td><td><code>ApiDataResponse&lt;T&gt;</code> y <code>ApiPageResponse&lt;T&gt;</code> (<code>elementos</code>, <code>numeroPagina</code>, <code>tamanoPagina</code>, <code>totalElementos</code>, <code>totalPaginas</code>)</td><td>Contrato OpenAPI Golden Path</td></tr>
+          <tr><td>Frontend</td><td>Un interceptor avisa los 403 y 5xx; un aviso global cubre 400, 409 y 422 que ninguna pantalla haya mostrado (TD-120)</td><td><code>GestioAsistenciaFrontend/src/app/core/interceptors</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="mensajes-parametros">Mensajes y parámetros como fuente única</h2>
+    <p>Los textos de error y de pantalla y los valores de negocio (por ejemplo los días límite para reclamar o los segmentos de red del campus) no están en el código. Se consumen por puerto y se guardan en caché.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Escenario</th><th>Mensajes</th><th>Parámetros</th></tr></thead>
+        <tbody>
+          <tr><td><code>basico</code></td><td>Desde la BD (<code>sqlserver</code>)</td><td>Desde la BD (<code>dbo.CatalogoParametro</code>)</td></tr>
+          <tr><td><code>mensajes</code></td><td>MessageUcoLab (caché de 5 minutos; respaldo configurable)</td><td>Desde la BD</td></tr>
+          <tr><td><code>parametros</code></td><td>Desde la BD</td><td>Catálogo de Parámetros (consulta M2M, caché de 5 minutos invalidada por eventos de su Pulsar, copia en <code>dbo.CatalogoParametro</code>)</td></tr>
+          <tr><td><code>completo</code></td><td>MessageUcoLab</td><td>Catálogo de Parámetros</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>El adaptador se elige con las propiedades <code>app.adapters.message-catalog.provider</code> y <code>app.adapters.parameter-catalog.provider</code> de <code>application.yml</code>. Desde INT-004 el Catálogo avisa de sus cambios por un Pulsar propio y el backend los refleja en la caché y en la BD (<a href="componentes-externos.html#parametros">flujo completo</a>). Más detalle en <a href="componentes-externos.html">Componentes externos</a>.</p>
+
+    <h2 id="observabilidad">Observabilidad</h2>
+    <ul>
+      <li>Cada petición HTTP crea un <code>correlationId</code> (<code>CorrelationIdContext</code>) que se escribe en los logs, viaja en la cabecera <code>X-Correlation-Id</code> y se pasa a los procedimientos almacenados.</li>
+      <li>Los logs son estructurados (JSONL con <code>correlationId</code>, <code>traceId</code>, <code>spanId</code> y <code>service</code>) y nunca incluyen correos ni cuerpos de mensajes.</li>
+      <li>Las métricas salen por <code>/actuator/prometheus</code> (puerto de gestión 8090 con la sección <code>asis-obs</code>). Las trazas van por OTLP a Alloy y Tempo; Grafana las muestra junto a Loki y Prometheus.</li>
+      <li>El servicio de Notificaciones propaga el mismo <code>X-Correlation-Id</code> y <code>traceparent</code>, de modo que un correo se rastrea hasta la petición que lo originó.</li>
+    </ul>
+
+    <h2 id="despliegue">Despliegue del laboratorio Docker</h2>
+    <p>El laboratorio completo no cabe en la memoria de Docker (límite configurado de 9700 MB), así que se levanta por secciones o por escenarios descritos en <code>AsistenciasUCO-Infra/stack/secciones.json</code>. Los prefijos <code>asis-</code> son de Asistencias y <code>ext-</code> de otros equipos o componentes.</p>
+    <figure class="diagrama">
+      <pre class="mermaid">
+flowchart TB
+  subgraph red["Red Docker asis-red"]
+    subgraph d["asis-datos: siempre arriba"]
+      SQL[("SQL Server")]
+      MIN[("MinIO")]
+    end
+    subgraph s["ext-seguridad"]
+      KC["Keycloak"]
+      PDP["PDP, PEP, OPA"]
+      RMQ["RabbitMQ: eventos del PDP"]
+    end
+    subgraph n["ext-notificaciones"]
+      NS["Servicio de Notificaciones"]
+    end
+    subgraph a["asis-app"]
+      BE["Backend"]
+      FE["Frontend"]
+    end
+    subgraph m["ext-mensajes"]
+      KONG["Kong"]
+      PUL["Pulsar"]
+      MUL["MessageUcoLab"]
+    end
+    subgraph p["ext-parametros"]
+      CP["Catalogo y microfrontend"]
+      PPA["pulsar-parametros"]
+    end
+    subgraph v["asis-antivirus"]
+      CLAM["ClamAV"]
+    end
+    subgraph o["asis-obs"]
+      GR["Grafana, Prometheus, Loki, Tempo, Alloy"]
+    end
+  end
+  FE --> BE
+  BE --> SQL
+  BE --> KC
+  BE --> PDP
+  BE --> NS
+  NS --> SQL
+  BE -.-> KONG
+  BE -.-> CP
+  BE -.-> CLAM
+  BE -.-> MIN
+  BE -.-> GR
+  RMQ -.-> BE
+  PUL -.-> BE
+  PPA -.-> BE
+      </pre>
+      <figcaption>Las líneas punteadas son secciones opcionales según el escenario. <code>asis-contingencia</code> (Keycloak propio) no se muestra porque reemplaza a <code>ext-seguridad</code> solo en emergencias.</figcaption>
+    </figure>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>Escenario</th><th>Secciones</th><th>Memoria estimada</th><th>Para qué sirve</th></tr></thead>
+        <tbody>
+          <tr><td><code>minimo</code></td><td>datos</td><td>2,5 GB</td><td>Gate de BD y scripts SQL</td></tr>
+          <tr><td><code>basico</code></td><td>datos, seguridad, notificaciones, app</td><td>5,75 GB</td><td>HU de los 5 roles</td></tr>
+          <tr><td><code>mensajes</code></td><td>básico + mensajes</td><td>9,05 GB</td><td>Catálogo de mensajes y textos de pantalla</td></tr>
+          <tr><td><code>parametros</code></td><td>básico + parámetros</td><td>7,25 GB</td><td>Catálogo de Parámetros</td></tr>
+          <tr><td><code>completo</code></td><td>básico + mensajes + parámetros</td><td>10,55 GB (supera el límite de 9,7 GB)</td><td>Flujos con los tres componentes externos; hoy <code>stack up</code> lo rechaza por memoria</td></tr>
+          <tr><td><code>soportes</code></td><td>básico + antivirus</td><td>7,05 GB</td><td>Adjuntos con MinIO y ClamAV</td></tr>
+          <tr><td><code>observabilidad</code></td><td>básico + obs</td><td>6,65 GB</td><td>Trazas, métricas y logs</td></tr>
+          <tr><td><code>contingencia</code></td><td>datos, contingencia, notificaciones, app</td><td>5,05 GB</td><td>Arranque con el Keycloak propio</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>La memoria es la suma de <code>memoriaMb</code> de cada sección en <code>secciones.json</code>. Cómo levantar y operar el laboratorio está en <a href="operacion.html">Operación</a>.</p>
+
+    <h2 id="decisiones">Decisiones de diseño importantes</h2>
+    <p>Las decisiones del responsable del producto se registran con identificador en <code>AsistenciasUCO-Infra/docs/work-items/CULM-001-culminacion/DECISIONES.md</code>. Estas son las que más explican el diseño actual.</p>
+    <div class="tabla-contenedor">
+      <table>
+        <thead><tr><th>ID</th><th>Fecha</th><th>Decisión</th><th>Efecto</th></tr></thead>
+        <tbody>
+          <tr><td>DEC-015</td><td>2026-11-06</td><td>Asistencia por QR con tabla de tokens propia (hash SHA-256, PIN de 6 dígitos, token vigente y anterior, rotación por tarea de fondo) y límites por IP, token y estudiante.</td><td>El QR rota solo; el estudiante se identifica al marcar; nunca viaja el código estático de la sesión.</td></tr>
+          <tr><td>DEC-016</td><td>2026-11-06</td><td>La cancelación de sesión es una tabla propia (<code>SesionCancelacion</code>) con un tipo por catálogo, y no una columna <code>estado</code>.</td><td>Festivos, docente y receso comparten un mismo mecanismo de cancelación auditado.</td></tr>
+          <tr><td>DEC-017</td><td>2026-11-06</td><td>Festivos desde un proveedor principal, un respaldo y un cálculo local (Ley 51 de 1983).</td><td>La generación de sesiones no depende de una sola fuente externa.</td></tr>
+          <tr><td>DEC-018</td><td>2026-11-06</td><td>Parámetros nuevos sembrados en BD y leídos por <code>ParameterCatalogPort</code> con el mismo valor por defecto.</td><td>Una sola fuente efectiva en el laboratorio.</td></tr>
+          <tr><td>DEC-019 / DEC-020</td><td>2026-11-06</td><td>Una asignatura puede estar en varios planes y programas (tabla puente); la pertenencia del estudiante a un programa se resuelve por <code>EstudiantePrograma</code>.</td><td>Grupos compartidos entre programas, con el ámbito del coordinador correcto.</td></tr>
+          <tr><td>DEC-060</td><td>2026-11-08</td><td>El gate de BD aplica las migraciones primero y el despliegue del esquema después.</td><td>Evita que una migración vieja pise procedimientos nuevos.</td></tr>
+          <tr><td>DEC-065</td><td>2026-11-09</td><td>La decisión final de la cancelación por inasistencia es del coordinador; las sesiones extraordinarias del docente pasan por aval previo del coordinador.</td><td>El decano queda en solo lectura y auditoría. Nada queda en cola sin aviso.</td></tr>
+          <tr><td>DEC-066</td><td>2026-11-12</td><td>Las tomas son puntos de control que parten la clase en tramos; las horas asistidas son la suma de los tramos presentes.</td><td>Reemplaza el reparto uniforme de la duración entre tomas.</td></tr>
+          <tr><td>DEC-067</td><td>2026-11-12</td><td>La edición de parámetros en la app se acepta como puente hasta que exista el componente externo.</td><td>El administrador ajusta valores desde Configuración.</td></tr>
+          <tr><td>DEC-070</td><td>2026-11-12</td><td>Se retira <code>POST /api/v1/usuarios</code>, que estaba abierto a cinco roles sin ámbito.</td><td>Cierra un hallazgo de autorización sin código nuevo.</td></tr>
+          <tr><td>DEC-074</td><td>2026-11-13</td><td>Se retira la carga masiva de usuarios por CSV.</td><td>Se registran uno por uno.</td></tr>
+          <tr><td>DEC-077 / DEC-078</td><td>2026-11</td><td>Para gestionar un grupo compartido basta coordinar al menos un programa; en la matrícula por QR el estudiante elige el programa.</td><td>Soporta grupos de varios programas sin duplicar filas.</td></tr>
+          <tr><td>DEC-079</td><td>2026-11-21</td><td>Rechazada: el administrador no gestiona categorías de justificación ni motivos de cancelación. Los catálogos son de solo consulta.</td><td>HU005 y HU016 quedan como consulta.</td></tr>
+          <tr><td>DEC-081</td><td>2026-11-21</td><td>Receso académico: un día por registro, gestionado por el administrador y bloqueado una vez aplicado.</td><td>Las sesiones de ese día se cancelan solas y se avisa por correo.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="nota"><strong>Pendiente</strong> DEC-080 (segundo administrador) sigue en revisión con el equipo de Seguridad.</div>
+  </main>
+</div>
+</body>
+</html>

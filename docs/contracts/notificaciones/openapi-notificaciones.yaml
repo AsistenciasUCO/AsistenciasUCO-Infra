@@ -1,0 +1,730 @@
+openapi: 3.0.3
+info:
+  title: Servicio de Notificaciones por correo (UCO)
+  version: 0.1.0
+  description: |
+    Componente independiente que recibe avisos de las aplicaciones cliente y los entrega por correo: plantillas versionadas
+    (marcadores permitidos por tipo), renderizado con layout institucional, cola con reserva (lease), reintentos con backoff,
+    tope de envios por minuto y por dia, correo de prueba y estado del canal.
+
+    **Entrega garantizada con idempotencia.** `POST /notificaciones` exige `idempotencyKey`. Una clave repetida de la misma
+    `aplicacion` devuelve 200 con la misma `id` y no genera un segundo envio; una clave nueva devuelve 202.
+    Un 4xx significa que el aviso es invalido y no debe reintentarse; un 5xx o un tiempo de espera agotado si se reintenta
+    con la misma clave.
+
+    **Seguridad (laboratorio).** Todas las rutas de `/api/v1` y `/actuator/prometheus` exigen la cabecera `X-Api-Key`
+    (secreto compartido, nunca en el repositorio). `/actuator/health/**` e `info` son abiertas. Pendiente: OAuth2
+    client-credentials cuando Seguridad lo ofrezca para servicios.
+
+    **Correlacion.** Se acepta y se devuelve `X-Correlation-Id` (hasta 64 caracteres `[A-Za-z0-9_.-]`; si falta o no es
+    valido el servicio genera un UUID) y se propaga `traceparent` (W3C Trace Context).
+
+    **Destinatarios.** La aplicacion cliente entrega los correos ya resueltos. El servicio nunca devuelve correos ni datos
+    de los avisos al consultar la cola: solo cuantos destinatarios tiene cada uno.
+
+    **Errores.** Toda falla responde `{code, message, correlationId}`. Codigos: `NO_AUTORIZADO`, `VALIDACION_FALLIDA`,
+    `CUERPO_INVALIDO`, `PARAMETRO_INVALIDO`, `METODO_NO_PERMITIDO`, `RECURSO_NO_ENCONTRADO`, `ERROR_INTERNO`,
+    `APLICACION_INVALIDA`, `IDEMPOTENCY_KEY_INVALIDA`, `TIPO_NO_SOPORTADO`, `IDIOMA_INVALIDO`, `DESTINATARIOS_OBLIGATORIOS`,
+    `DESTINATARIOS_EXCEDIDOS`, `DESTINATARIO_INVALIDO`, `DATOS_EXCEDIDOS`, `DATO_INVALIDO`, `CORRELACION_INVALIDA`,
+    `TRACEPARENT_INVALIDO`, `ASUNTO_INVALIDO`, `MENSAJE_INVALIDO`, `ESTADO_INVALIDO`, `NOTIFICACION_NO_ENCONTRADA`,
+    `ESTADO_NO_REINTENTABLE`, `TIPO_NO_ENCONTRADO`, `VERSION_NO_ENCONTRADA`, `PLANTILLA_ASUNTO_INVALIDO`,
+    `PLANTILLA_CUERPO_INVALIDO`, `PLANTILLA_SIN_MARCADORES`, `PLANTILLA_MARCADOR_OBLIGATORIO_AUSENTE`,
+    `PLANTILLA_MARCADOR_NO_PERMITIDO`, `PLANTILLA_LLAVES_INVALIDAS`.
+  contact:
+    name: Equipo de Asistencias UCO
+servers:
+  - url: http://localhost:18090
+    description: Laboratorio local (seccion ext-notificaciones del stack)
+security:
+  - ApiKey: []
+tags:
+  - name: Notificaciones
+    description: Recepcion idempotente, cola administrativa y reintento
+  - name: Plantillas
+    description: Tipos con descripcion y marcadores permitidos, versionado, activacion y vista previa
+  - name: Canal
+    description: Estado del canal de correo y correo de prueba
+paths:
+  /api/v1/notificaciones:
+    post:
+      tags: [Notificaciones]
+      operationId: registrarNotificacion
+      summary: Recibe un aviso para entregar por correo (idempotente)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudNotificacion'
+      responses:
+        '202':
+          description: Aviso nuevo aceptado; queda PENDIENTE y el despachador lo entrega.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificacionAceptada'
+        '200':
+          description: La clave de idempotencia ya existia; se devuelve la misma notificacion y no se envia de nuevo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificacionAceptada'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+    get:
+      tags: [Notificaciones]
+      operationId: consultarNotificaciones
+      summary: Cola administrativa paginada con resumen por estado
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/EstadoEnvio'
+        - name: tipo
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: aplicacion
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: pagina
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: tamano
+          in: query
+          required: false
+          description: Entre 1 y 100; fuera de rango se usa 20.
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Pagina de la cola, de la mas reciente a la mas antigua.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaNotificaciones'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/notificaciones/{id}/reintento:
+    post:
+      tags: [Notificaciones]
+      operationId: reintentarNotificacion
+      summary: Reencola una notificacion fallida (definitiva o reintentable)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Reencolada como PENDIENTE con intentos en cero.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reintento'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Solo se reencolan notificaciones en estado FALLIDA_DEFINITIVA o FALLIDA_REINTENTABLE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/plantillas:
+    get:
+      tags: [Plantillas]
+      operationId: consultarPlantillas
+      summary: Tipos de plantilla con descripcion, marcadores permitidos y versiones
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: idioma
+          in: query
+          required: false
+          schema:
+            type: string
+            default: es
+      responses:
+        '200':
+          description: Todos los tipos administrables (sin los internos), ordenados por nombre.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TipoPlantilla'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/plantillas/{tipo}/versiones:
+    post:
+      tags: [Plantillas]
+      operationId: crearVersionPlantilla
+      summary: Crea la version siguiente de una plantilla y la deja activa
+      description: |
+        Valida que esten todos los marcadores obligatorios y que no haya marcadores fuera de los permitidos para el tipo.
+        La version anterior queda en el historial (se puede volver a activar).
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Tipo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevaVersion'
+      responses:
+        '201':
+          description: Version creada y activa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionPlantilla'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/plantillas/{tipo}/versiones/{version}/activacion:
+    post:
+      tags: [Plantillas]
+      operationId: activarVersionPlantilla
+      summary: Activa una version existente (desactiva la vigente)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Tipo'
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: idioma
+          in: query
+          required: false
+          schema:
+            type: string
+            default: es
+      responses:
+        '200':
+          description: Version activada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionPlantilla'
+        '404':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/plantillas/vista-previa:
+    post:
+      tags: [Plantillas]
+      operationId: vistaPreviaPlantilla
+      summary: Renderiza un borrador con los ejemplos de los marcadores del tipo
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VistaPreviaRequest'
+      responses:
+        '200':
+          description: Asunto, texto plano y HTML con el layout institucional.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VistaPrevia'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/correos-prueba:
+    post:
+      tags: [Canal]
+      operationId: enviarCorreoPrueba
+      summary: Encola un correo de prueba con los ejemplos del tipo (o el correo generico del canal)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorreoPruebaRequest'
+      responses:
+        '202':
+          description: Prueba encolada; sale por el mismo despachador, tope y modo de pruebas que cualquier aviso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificacionAceptada'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/estado-canal:
+    get:
+      tags: [Canal]
+      operationId: consultarEstadoCanal
+      summary: Estado operativo del canal de correo (nunca incluye la clave del SMTP)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Configuracion visible y estado del ultimo envio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoCanal'
+        '401':
+          $ref: '#/components/responses/Error'
+  /actuator/health:
+    get:
+      tags: [Canal]
+      operationId: salud
+      summary: Salud del servicio (abierta). Incluye /actuator/health/liveness y /actuator/health/readiness
+      security: []
+      responses:
+        '200':
+          description: UP
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+        '503':
+          description: DOWN
+  /actuator/prometheus:
+    get:
+      tags: [Canal]
+      operationId: metricas
+      summary: Metricas Prometheus (exige X-Api-Key)
+      responses:
+        '200':
+          description: Formato de exposicion de Prometheus
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Identificador de correlacion; se devuelve en la respuesta y viaja en los logs.
+      schema:
+        type: string
+        maxLength: 64
+        pattern: '^[A-Za-z0-9_.-]{1,64}$'
+    Traceparent:
+      name: traceparent
+      in: header
+      required: false
+      description: W3C Trace Context; se guarda con el aviso y propaga la traza.
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$'
+    Tipo:
+      name: tipo
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 60
+  responses:
+    Error:
+      description: Error con cuerpo uniforme
+      headers:
+        X-Correlation-Id:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string
+    EstadoEnvio:
+      type: string
+      enum: [PENDIENTE, RESERVADA, FALLIDA_REINTENTABLE, ENTREGADA, FALLIDA_DEFINITIVA]
+    Destinatario:
+      type: object
+      required: [correo]
+      properties:
+        correo:
+          type: string
+          maxLength: 254
+          description: Una sola direccion valida (sin espacios, comas, punto y coma, comillas ni parentesis).
+        nombre:
+          type: string
+          maxLength: 200
+    SolicitudNotificacion:
+      type: object
+      required: [aplicacion, idempotencyKey, tipo, destinatarios]
+      properties:
+        aplicacion:
+          type: string
+          maxLength: 60
+          pattern: '^[A-Za-z0-9_.-]{1,60}$'
+          description: Aplicacion que origina el aviso; junto con idempotencyKey identifica el envio.
+        idempotencyKey:
+          type: string
+          maxLength: 120
+          pattern: '^[A-Za-z0-9_.:@-]{1,120}$'
+          description: Para Asistencias, el id de NotificacionSaliente. Misma clave = mismo envio.
+        tipo:
+          type: string
+          maxLength: 60
+          description: Uno de los tipos de GET /api/v1/plantillas.
+        idioma:
+          type: string
+          minLength: 2
+          maxLength: 2
+          default: es
+        asunto:
+          type: string
+          maxLength: 200
+          description: Texto de respaldo si el tipo no tiene plantilla utilizable para los datos recibidos.
+        mensaje:
+          type: string
+          maxLength: 4000
+          description: Texto de respaldo (ver asunto).
+        destinatarios:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/Destinatario'
+        datos:
+          type: object
+          maxProperties: 100
+          description: Valores de los marcadores. Claves alfanumericas (hasta 40) y valores de hasta 2000 caracteres.
+          additionalProperties:
+            type: string
+        idCorrelacion:
+          type: string
+          maxLength: 64
+        traceparent:
+          type: string
+          maxLength: 80
+    NotificacionAceptada:
+      type: object
+      required: [id, estado, idempotencyKey, duplicada]
+      properties:
+        id:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        idempotencyKey:
+          type: string
+        duplicada:
+          type: boolean
+          description: true cuando la clave ya existia (respuesta 200).
+    Reintento:
+      type: object
+      required: [id, estado]
+      properties:
+        id:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+    NotificacionAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        aplicacion:
+          type: string
+        tipo:
+          type: string
+        asunto:
+          type: string
+          description: Asunto de respaldo recibido o, si no hubo, el tipo.
+        codigoEstado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        nombreEstado:
+          type: string
+        esTerminal:
+          type: boolean
+        cantidadDestinatarios:
+          type: integer
+        intentos:
+          type: integer
+        creadoEn:
+          type: string
+          format: date-time
+        proximoIntentoEn:
+          type: string
+          format: date-time
+          nullable: true
+        entregadoEn:
+          type: string
+          format: date-time
+          nullable: true
+        codigoError:
+          type: string
+          nullable: true
+        detalleError:
+          type: string
+          nullable: true
+        idCorrelacion:
+          type: string
+          nullable: true
+    ResumenCola:
+      type: object
+      properties:
+        pendientes:
+          type: integer
+          format: int64
+        reservadas:
+          type: integer
+          format: int64
+        entregadas:
+          type: integer
+          format: int64
+        fallidasReintentables:
+          type: integer
+          format: int64
+        fallidasDefinitivas:
+          type: integer
+          format: int64
+    PaginaNotificaciones:
+      type: object
+      properties:
+        elementos:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificacionAdmin'
+        numeroPagina:
+          type: integer
+        tamanoPagina:
+          type: integer
+        totalElementos:
+          type: integer
+          format: int64
+        totalPaginas:
+          type: integer
+        resumen:
+          $ref: '#/components/schemas/ResumenCola'
+    Marcador:
+      type: object
+      properties:
+        marcador:
+          type: string
+          description: Nombre; en la plantilla se escribe {nombre}.
+        descripcion:
+          type: string
+        ejemplo:
+          type: string
+          description: Valor usado en vistas previas y correos de prueba.
+        obligatorio:
+          type: boolean
+    VersionPlantilla:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+        idioma:
+          type: string
+        version:
+          type: integer
+        asunto:
+          type: string
+        cuerpo:
+          type: string
+        activa:
+          type: boolean
+        creadoPor:
+          type: string
+          nullable: true
+        creadoEn:
+          type: string
+          format: date-time
+    TipoPlantilla:
+      type: object
+      properties:
+        tipo:
+          type: string
+        descripcion:
+          type: string
+          description: Texto para la pantalla de administracion (el cliente no debe quemarlo).
+        idioma:
+          type: string
+        versionActiva:
+          type: integer
+          description: 0 si el tipo no tiene version activa en ese idioma.
+        asuntoActivo:
+          type: string
+        cuerpoActivo:
+          type: string
+        actualizadoEn:
+          type: string
+          format: date-time
+        marcadores:
+          type: array
+          items:
+            $ref: '#/components/schemas/Marcador'
+        versiones:
+          type: array
+          description: Historial, de la mas reciente a la mas antigua. La version 1 es la de fabrica.
+          items:
+            $ref: '#/components/schemas/VersionPlantilla'
+    NuevaVersion:
+      type: object
+      required: [asunto, cuerpo]
+      properties:
+        idioma:
+          type: string
+          default: es
+        asunto:
+          type: string
+          maxLength: 200
+        cuerpo:
+          type: string
+          maxLength: 4000
+        creadoPor:
+          type: string
+          maxLength: 100
+    VistaPreviaRequest:
+      type: object
+      required: [tipo, asunto, cuerpo]
+      properties:
+        tipo:
+          type: string
+        idioma:
+          type: string
+          default: es
+        asunto:
+          type: string
+          maxLength: 200
+        cuerpo:
+          type: string
+          maxLength: 4000
+    VistaPrevia:
+      type: object
+      properties:
+        asunto:
+          type: string
+        textoPlano:
+          type: string
+        html:
+          type: string
+        origen:
+          type: string
+          example: preview
+    CorreoPruebaRequest:
+      type: object
+      required: [correoDestino]
+      properties:
+        tipo:
+          type: string
+          description: Si falta se envia el correo generico de prueba del canal.
+        correoDestino:
+          type: string
+          maxLength: 254
+        solicitadoPor:
+          type: string
+          maxLength: 64
+    EstadoCanal:
+      type: object
+      properties:
+        canalActivo:
+          type: boolean
+          description: Despachador habilitado y canal con cupo disponible.
+        dispatcherEnabled:
+          type: boolean
+        disponible:
+          type: boolean
+        canal:
+          type: string
+          enum: [smtp, log]
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+        tienePasswordConfigurado:
+          type: boolean
+        fromAddress:
+          type: string
+        fromName:
+          type: string
+        starttls:
+          type: boolean
+        ssl:
+          type: boolean
+        maxBcc:
+          type: integer
+        ratePerMinute:
+          type: integer
+        ratePerDay:
+          type: integer
+        platformUrl:
+          type: string
+        testModeEnabled:
+          type: boolean
+        testModeRedirectCount:
+          type: integer
+        ultimoEnvioUtc:
+          type: string
+          format: date-time
+          nullable: true
+        ultimoError:
+          type: string
+          nullable: true
+          description: Codigo del ultimo fallo posterior al ultimo envio, o null.

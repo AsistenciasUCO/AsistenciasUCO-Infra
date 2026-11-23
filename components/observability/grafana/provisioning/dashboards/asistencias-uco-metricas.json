@@ -44,6 +44,18 @@
         "allValue": ".*",
         "current": {},
         "hide": 0
+      },
+      {
+        "name": "correlationId",
+        "label": "correlationId / traceId",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "description": "Pegue un traceId (32 hex) para abrir su traza en el segundo panel; las trazas recientes se ven siempre en el primero."
       }
     ]
   },
@@ -789,6 +801,113 @@
           "legendFormat": "reclamos"
         }
       ]
+    },
+    {
+      "id": 21,
+      "type": "row",
+      "title": "Trazas (Tempo)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Trazas recientes de asistencias-uco",
+      "description": "OBS-11: busqueda en Tempo por service.name=asistencias-uco. Abra una traza con el enlace de la columna Trace ID. El correlationId viaja como atributo del span (X-Correlation-Id) y en los logs JSONL.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 16,
+        "x": 0,
+        "y": 44
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceqlSearch",
+          "limit": 30,
+          "tableType": "traces",
+          "filters": [
+            {
+              "id": "service-name",
+              "tag": "service.name",
+              "operator": "=",
+              "scope": "resource",
+              "value": [
+                "asistencias-uco"
+              ],
+              "valueType": "string"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "table",
+      "title": "Traza por traceId o correlationId",
+      "description": "Escriba en la variable correlationId un traceId para ver su traza; si el correlationId se registro como atributo, use la busqueda TraceQL equivalente: { span.correlationId = \"<valor>\" } desde Explore > Tempo.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 44
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "limit": 20,
+          "tableType": "traces",
+          "query": "${correlationId}"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "type": "text",
+      "title": "Enlaces",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "[Explorar trazas en Tempo](/explore?left=%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22queryType%22:%22traceqlSearch%22,%22filters%22:%5B%7B%22id%22:%22service-name%22,%22tag%22:%22service.name%22,%22operator%22:%22=%22,%22scope%22:%22resource%22,%22value%22:%5B%22asistencias-uco%22%5D%7D%5D%7D%5D%7D) · Para un correlationId concreto use `{ span.correlationId = \"<valor>\" }` en Explore."
+      }
     }
   ]
 }
