@@ -90,13 +90,16 @@ Para evitar saturar la memoria RAM en el equipo de desarrollo, el orquestador ma
 | **`observability`** | OpenTelemetry Collector + Prometheus + Grafana | ~1.0 GB | Monitoreo de trazas OTLP, logs JSONL y métricas. |
 | **`azure`** | Azurite (Emulación de Storage Blobs/Queues) | ~512 MB | Pruebas de almacenamiento offline. |
 | **`proxy`** | Traefik v3 con Hardened Headers | ~128 MB | Terminación de cabeceras de seguridad y proxy. |
+| **`cache`** | Redis 7.4 (REDIS-001), sin persistencia, tope 128 MB | ~160 MB | Caché de consultas y tiempo real entre réplicas del Backend. |
 | **`full`** | Todos los 8 contenedores simultáneos | ~5.2 GB | Pruebas de integración total antes de release. |
 
 **Dos réplicas del backend (VAL-oleada3, REA-06 / F12-08).** `docker-compose.replicas.yml` es un proyecto Compose aparte
 (`asistencias-uco-replicas`, no toca los perfiles de arriba ni necesita `.env`): un Traefik de prueba en `127.0.0.1:8088`
 que reparte round-robin entre las réplicas del host (8080 y 8082) con health check por réplica en su puerto de gestión
 (`components/proxy/replicas/`). Las réplicas se arrancan desde el backend con `.\scripts\load\start-replicas.ps1 -Replicas 2`
-y la carga con `.\scripts\load\run-load-test.ps1`. Resultados y guía: [work item](docs/work-items/VAL-oleada3-carga/PLAN.md).
+y la carga con `.\scripts\load\run-load-test.ps1`. Con Redis arriba (perfil `cache` o sección `asis-cache`) y las réplicas arrancadas con
+`APP_ADAPTERS_CACHE_PROVIDER=redis` y `APP_ADAPTERS_REALTIME_PROVIDER=redis-sse`, ambas comparten la caché, el límite del QR y
+los eventos SSE (un evento publicado en una réplica llega a los clientes conectados a la otra). Resultados y guía: [work item](docs/work-items/VAL-oleada3-carga/PLAN.md).
 
 ```powershell
 docker compose -f docker-compose.replicas.yml up -d    # http://127.0.0.1:8088
