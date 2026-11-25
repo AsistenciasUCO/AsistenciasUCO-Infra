@@ -6,6 +6,7 @@
 #  • 'observability'     : OpenTelemetry Collector + Prometheus + Grafana
 #  • 'azure'             : Azurite (Emulación de Storage para pruebas offline)
 #  • 'proxy'             : Traefik Reverse Proxy & Terminación TLS
+#  • 'cache'             : Redis (REDIS-001: caché de consultas y tiempo real entre réplicas)
 #  • 'full'              : Levanta la suite completa de contenedores
 #
 # ACCESO LOCAL:
@@ -329,3 +330,28 @@ services:
     networks:
       - asistencias_network
 
+  # ----------------------------------------------------------------------------
+  # 11. CACHE: Redis (REDIS-001) - caché de consultas, límite del QR y relevo de
+  #     tiempo real entre réplicas. Solo caché: sin persistencia, tope 128 MB, LRU.
+  #     El Backend lo usa con APP_ADAPTERS_CACHE_PROVIDER=redis y
+  #     APP_ADAPTERS_REALTIME_PROVIDER=redis-sse (REDIS_HOST/REDIS_PORT).
+  # ----------------------------------------------------------------------------
+  redis:
+    profiles: ["cache", "full"]
+    image: redis:7.4-alpine
+    container_name: ${REDIS_CONTAINER_NAME:-redis_asistencias}
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${HOST_BIND_IP:-127.0.0.1}:${REDIS_HOST_PORT:-6379}:6379"
+    deploy:
+      resources:
+        limits:
+          memory: ${REDIS_MEM_LIMIT:-160m}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - asistencias_network

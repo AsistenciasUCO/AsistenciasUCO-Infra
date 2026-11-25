@@ -1,0 +1,40 @@
+# Seccion asis-cache (bajo demanda, ~160 MB): Redis para la cache de consultas y el relevo de tiempo real entre replicas
+# del Backend (REDIS-001). Es solo cache: sin persistencia (ni RDB ni AOF), tope de 128 MB y expulsion LRU; si se apaga,
+# el Backend vuelve a la BD y al SSE local sin fallar. Con asis-cache arriba, `stack up` configura asis-app con
+# APP_ADAPTERS_CACHE_PROVIDER=redis y APP_ADAPTERS_REALTIME_PROVIDER=redis-sse.
+name: asis-cache
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: asis-cache-redis
+    command:
+      - redis-server
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+    ports:
+      # Solo loopback del PC: el Backend local (run-local.ps1) usa localhost:6379.
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    mem_limit: 160m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      asis-red:
+        aliases: [redis]
+    restart: "no"
+    labels:
+      asistencias.seccion: asis-cache
+
+networks:
+  asis-red:
+    name: asis-red
+    external: true

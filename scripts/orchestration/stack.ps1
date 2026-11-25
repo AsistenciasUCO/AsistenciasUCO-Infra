@@ -16,8 +16,8 @@
                                 notificaciones-uco:0.1.1 (componente propio, GestioAsistenciaBackend/servicios/notificaciones).
 
     Un objetivo es una seccion (asis-datos, ext-seguridad, ext-mensajes, ext-parametros, ext-notificaciones, asis-antivirus,
-    asis-obs, asis-contingencia, asis-app) o un escenario (minimo, basico, mensajes, parametros, completo, soportes, observabilidad,
-    contingencia). asis-datos se incluye siempre.
+    asis-cache, asis-obs, asis-contingencia, asis-app) o un escenario (minimo, basico, mensajes, parametros, completo, soportes,
+    cache, observabilidad, contingencia). asis-datos se incluye siempre.
 
 .EXAMPLE
     .\infra.ps1 stack up basico
@@ -297,6 +297,17 @@ function New-ConfiguracionApp([string[]]$secciones) {
         }
     } else {
         $b['APP_ADAPTERS_PARAMETER_CATALOG_PROVIDER'] = 'sqlserver'
+    }
+    # REDIS-001: con asis-cache, cache de consultas compartida y relevo de tiempo real por Redis (alias redis en asis-red);
+    # sin ella, cache en memoria del Backend y SSE local (los valores por defecto del Backend).
+    if ($secciones -contains 'asis-cache') {
+        $b['APP_ADAPTERS_CACHE_PROVIDER'] = 'redis'
+        $b['APP_ADAPTERS_REALTIME_PROVIDER'] = 'redis-sse'
+        $b['REDIS_HOST'] = 'redis'
+        $b['REDIS_PORT'] = '6379'
+    } else {
+        $b['APP_ADAPTERS_CACHE_PROVIDER'] = 'local'
+        $b['APP_ADAPTERS_REALTIME_PROVIDER'] = 'local-sse'
     }
     # Servicio de Notificaciones (componente propio): el Backend envia por el (OUTBOX_NOTIFICATION_SENDER=servicio).
     if ($secciones -contains 'ext-notificaciones') {

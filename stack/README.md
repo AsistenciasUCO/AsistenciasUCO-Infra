@@ -29,6 +29,7 @@ otros equipos.
 | `ext-parametros` | Catálogo de Parámetros 0.1.17 y su microfrontend 0.1.16, con su Pulsar propio (`pulsar-parametros`: consulta M2M y eventos de cambios) | 1,5 GB | Pruebas de parámetros |
 | `ext-notificaciones` | Servicio de Notificaciones UCO 0.1.1 (componente propio, `GestioAsistenciaBackend/servicios/notificaciones`): correos con plantillas y cola en `notificacionesdb` | 0,45 GB | Con `asis-app` (en todos los escenarios salvo `minimo`) |
 | `asis-antivirus` | ClamAV | 1,3 GB | Pruebas de soportes |
+| `asis-cache` | Redis 7.4 (REDIS-001): caché de consultas compartida, límite del QR y tiempo real entre réplicas. Sin persistencia, tope 128 MB | 0,16 GB | Pruebas de caché y de réplicas |
 | `asis-obs` | Grafana, Prometheus, Loki, Tempo, Alloy | 0,9 GB | Diagnóstico |
 | `asis-contingencia` | Keycloak propio (realm `asistencias-uco`) | 0,9 GB | **Solo emergencias**, si falla la Seguridad del equipo |
 | `asis-app` | Backend y Frontend (imágenes de `develop`) | 1,2 GB | Pruebas funcionales |
@@ -46,6 +47,7 @@ pueden convivir (ambos usan el puerto 8081 del PC).
 | `parametros` | `basico` + parámetros | Catálogo de Parámetros |
 | `completo` | `basico` + mensajes + parámetros | Flujos completos (9,65 GB estimados de 9,7 GB: no agregar más) |
 | `soportes` | `basico` + antivirus | Adjuntos |
+| `cache` | `basico` + caché | Caché Redis (portal, indicadores, catálogos), límite del QR y tiempo real entre réplicas |
 | `observabilidad` | `basico` + obs | Trazas y logs por `correlationId` |
 | `contingencia` | datos, contingencia, app | Arranque sin la Seguridad del equipo |
 
@@ -64,6 +66,7 @@ del `.env` del Backend, de `lab.env` y de los `env.js` locales del Frontend, seg
 | `ext-mensajes` | catálogo de mensajes `messageucolab` (Kong y Pulsar por `asis-red`); si no, `sqlserver` y sin avisos |
 | `ext-parametros` | catálogo de parámetros `catalogoparametros`; si no, `sqlserver` |
 | `asis-obs` | exporta trazas a Alloy |
+| `asis-cache` | `APP_ADAPTERS_CACHE_PROVIDER=redis`, `APP_ADAPTERS_REALTIME_PROVIDER=redis-sse` y `REDIS_HOST=redis`; si no, caché en memoria (`local`) y SSE local (`local-sse`) |
 | `ext-notificaciones` | recibe `NOTIFICACIONES_SERVICE_URL=http://ext-notificaciones-servicio:8080` y `NOTIFICACIONES_API_KEY` (el Backend los usa desde la fase F4; hasta entonces sigue con su SMTP propio) |
 
 El Frontend activa los textos del catálogo (`MENSAJES_UI_DESDE_CATALOGO`) solo con `ext-mensajes`.

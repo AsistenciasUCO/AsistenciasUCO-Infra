@@ -196,7 +196,8 @@
         "notificaciones-local"
       ]
     },
-    "asis-antivirus": {      "descripcion": "ClamAV para las pruebas de soportes (adjuntos de reclamos y justificaciones).",
+    "asis-antivirus": {
+      "descripcion": "ClamAV para las pruebas de soportes (adjuntos de reclamos y justificaciones).",
       "memoriaMb": 1300,
       "directorio": "GestioAsistenciaBackend/infra/files",
       "compose": [
@@ -218,6 +219,25 @@
       "proyectosAnteriores": [
         "asistencias-uco-infra"
       ]
+    },
+    "asis-cache": {
+      "descripcion": "Redis (REDIS-001): cache de consultas compartida, limite del QR y relevo de tiempo real entre replicas. Sin persistencia, tope 128 MB.",
+      "memoriaMb": 160,
+      "directorio": "AsistenciasUCO-Infra/stack",
+      "compose": [
+        "asis-cache.compose.yml"
+      ],
+      "envFiles": [],
+      "servicios": [
+        "redis"
+      ],
+      "salud": [
+        "contenedor:asis-cache-redis"
+      ],
+      "urls": [
+        "Redis: localhost:6379"
+      ],
+      "proyectosAnteriores": []
     },
     "asis-obs": {
       "descripcion": "Observabilidad propia (Grafana, Prometheus, Loki, Tempo y Alloy para OTLP).",
@@ -364,6 +384,16 @@
         "asis-app"
       ],
       "pruebas": "Adjuntos de reclamos y justificaciones (MinIO + ClamAV)."
+    },
+    "cache": {
+      "secciones": [
+        "asis-datos",
+        "ext-seguridad",
+        "asis-cache",
+        "ext-notificaciones",
+        "asis-app"
+      ],
+      "pruebas": "Cache Redis de consultas (portal, indicadores, catalogos), limite del QR y tiempo real entre replicas (REDIS-001)."
     },
     "observabilidad": {
       "secciones": [

@@ -1,7 +1,7 @@
 # Arquitectura Backend: Reactividad Nativa y Server-Sent Events (SSE)
 > **Constitución Técnica:** [`.specify/memory/constitution.md`](file:///.specify/memory/constitution.md) (Artículo I, Sección 1.04)  
 > **Ámbito:** Backend Spring Boot 4 / Java 25 & Frontend Angular 18/19  
-> **Estado:** Implementado (Provider: `local-sse` vía Project Reactor)
+> **Estado:** Implementado (Provider: `local-sse` vía Project Reactor; `redis-sse` para varias réplicas desde REDIS-001)
 
 ---
 
@@ -161,7 +161,7 @@ node scripts/realtime-smoke.mjs
 ## 7. Restricciones y Evolución Técnica
 
 1. **Sin Replay Histórico:** La implementación `local-sse` es efímera y best-effort en memoria de una única instancia JVM. No almacena eventos para clientes desconectados; el frontend debe rehidratar su estado consultando los endpoints REST tras una reconexión.
-2. **Escalabilidad Horizontal:** La distribución de eventos entre múltiples nodos del backend se delegará en una fase posterior a un broker de mensajería distribuido (**RabbitMQ**) conectado a través de `EventPublisherPort`.
+2. **Escalabilidad Horizontal (REDIS-001, 2026-11-25):** con `APP_ADAPTERS_REALTIME_PROVIDER=redis-sse` cada réplica conserva su `local-sse` y los casos de uso publican por un canal **Redis Pub/Sub** (`asistencias-uco:realtime:v1`); todas las réplicas, incluida la de origen, entregan lo que reciben a sus clientes, sin duplicados. Sigue siendo best-effort y sin replay (Pub/Sub no guarda mensajes). Si Redis no responde, el evento se entrega solo en la réplica de origen (`realtime.relay.fallback`). Redis se levanta con el perfil `cache` o la sección `asis-cache`. Se eligió SSE + Redis Pub/Sub y no WebSocket ni RabbitMQ: ningún caso necesita canal bidireccional y Redis ya cubre la caché. Detalle en el Backend: `docs/architecture/cache-y-tiempo-real.md` y ADR-007.
 
 ---
 **Documentos Relacionados:**
