@@ -57,8 +57,14 @@ if (Test-Path $infraEnv) {
 }
 
 if (-not $Password) {
-    $Password = if ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { "TuPasswordSeguro123" }
+    $Password = if ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } elseif ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } else { $null }
 }
+if (-not $Password) {
+    throw "MSSQL_SA_PASSWORD no está definida. Configura AsistenciasUCO-Infra/.env o pasa el parámetro -Password."
+}
+# La clave viaja a sqlcmd por SQLCMDPASSWORD (docker exec -e SQLCMDPASSWORD sin valor la toma de este proceso), no como
+# argumento -P: los argumentos se ven en la lista de procesos del PC y del contenedor.
+$env:SQLCMDPASSWORD = $Password
 
 Write-Host "==============================================================================" -ForegroundColor Cyan
 Write-Host " ASISTENCIAS UCO - RESTABLECIMIENTO DE DATOS LIMPIOS CANONICOS" -ForegroundColor Cyan
@@ -82,7 +88,7 @@ if ($dockerRunning) {
     Write-Host "Ejecutando siembra mediante Docker exec sqlcmd en $ContainerName..." -ForegroundColor Gray
     $tempFile = "/tmp/seed-clean.sql"
     docker cp $sqlFile "${ContainerName}:${tempFile}"
-    $result = docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d "$DatabaseName" -U sa -P "$Password" -C -b -i "$tempFile"
+    $result = docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d "$DatabaseName" -U sa -C -b -i "$tempFile"
     Write-Host $result
 } else {
     Write-Host "Ejecutando siembra mediante conexion directa a $Server , $Port..." -ForegroundColor Gray

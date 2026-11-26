@@ -174,9 +174,14 @@ if ($OmitirEventos) {
         $partes = $ParametroEvento -split '\.', 2
         $grupo = $partes[0]; $clave = $partes[1]
         function Sql([string]$consulta) {
-            $salida = docker exec -e "SQLCMDPASSWORD=$saPassword" $SqlContainer /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C `
-                -d gestionasistenciadb -h -1 -W -s '|' -b -Q "SET NOCOUNT ON; $consulta" 2>&1
-            if ($LASTEXITCODE -ne 0) { throw "sqlcmd fallo: $salida" }
+            # La clave viaja en el entorno (-e sin valor), no en los argumentos de docker (visibles en la lista de procesos).
+            $env:SQLCMDPASSWORD = $saPassword
+            try {
+                $salida = docker exec -e SQLCMDPASSWORD $SqlContainer /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C `
+                    -d gestionasistenciadb -h -1 -W -s '|' -b -Q "SET NOCOUNT ON; $consulta" 2>&1
+                $codigo = $LASTEXITCODE
+            } finally { Remove-Item Env:\SQLCMDPASSWORD -ErrorAction SilentlyContinue }
+            if ($codigo -ne 0) { throw "sqlcmd fallo: $salida" }
             return @($salida | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
         }
         function EstablecerEnCatalogo([string]$valor) {
@@ -200,14 +205,16 @@ if ($OmitirEventos) {
         function Ahora { return @(Sql "SELECT CONVERT(VARCHAR(30), SYSUTCDATETIME(), 121)")[0].Trim() }
         function ValorBd { return @(Sql "SELECT CONVERT(NVARCHAR(400), valor) FROM dbo.CatalogoParametro WHERE grupo = '$grupo' AND clave = '$clave'")[0].Trim() }
 
-        $original = $null
+        # Se restaura el valor que tenia el Catalogo (la fuente de verdad), no el de la BD: si estaban desincronizados,
+        # escribir el de la BD dejaria el Catalogo cambiado.
+        $originalCatalogo = $null
         try {
             $original = ValorBd
             $nuevo = [string]([int]$original + 1)
 
             # 7a. Cambio valido: APLICADO y la BD queda con el valor nuevo
             $t0 = Ahora
-            [void](EstablecerEnCatalogo $nuevo)
+            $originalCatalogo = EstablecerEnCatalogo $nuevo
             $res = EsperarAuditoria $t0 'APLICADO'
             Resultado (($res -eq 'APLICADO') -and ((ValorBd) -eq $nuevo)) "Evento: $ParametroEvento $original -> $nuevo en el Catalogo; el backend lo aplico a la BD (auditoria $res)"
 
@@ -227,15 +234,14 @@ if ($OmitirEventos) {
         } catch {
             Resultado $false "Flujo por eventos: $($_.Exception.Message)"
         } finally {
-            if ($null -ne $original) {
+            if ($null -ne $originalCatalogo) {
                 try {
-                    $t3 = Ahora
-                    [void](EstablecerEnCatalogo $original)
+                    [void](EstablecerEnCatalogo $originalCatalogo)
                     $limite = (Get-Date).AddSeconds($EsperaEventoSeg)
-                    do { $actual = ValorBd; if ($actual -eq $original) { break }; Start-Sleep -Milliseconds 700 } while ((Get-Date) -lt $limite)
-                    Resultado ($actual -eq $original) "Catalogo y BD restaurados: $ParametroEvento = $original"
+                    do { $actual = ValorBd; if ($actual -eq $originalCatalogo) { break }; Start-Sleep -Milliseconds 700 } while ((Get-Date) -lt $limite)
+                    Resultado ($actual -eq $originalCatalogo) "Catalogo y BD restaurados: $ParametroEvento = $originalCatalogo (valor previo del Catalogo)"
                 } catch {
-                    Resultado $false "No se pudo restaurar $ParametroEvento (valor original: $original): $($_.Exception.Message)"
+                    Resultado $false "No se pudo restaurar $ParametroEvento (valor previo del Catalogo: $originalCatalogo): $($_.Exception.Message)"
                 }
             }
         }

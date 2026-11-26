@@ -45,11 +45,17 @@ pueden convivir (ambos usan el puerto 8081 del PC).
 | `basico` | datos, seguridad, notificaciones, app | HU de los 5 roles (mensajes y parámetros desde la BD) |
 | `mensajes` | `basico` + mensajes | Catálogo de mensajes, avisos → BD, textos `UI###` |
 | `parametros` | `basico` + parámetros | Catálogo de Parámetros |
-| `completo` | `basico` + mensajes + parámetros | Flujos completos (9,65 GB estimados de 9,7 GB: no agregar más) |
+| `completo` | `basico` + mensajes + parámetros | Flujos completos. Con el Pulsar propio del Catálogo 0.1.17 estima 10,55 GB y supera el límite de 9,7 GB: requiere `-ForzarMemoria` (ver abajo) |
 | `soportes` | `basico` + antivirus | Adjuntos |
 | `cache` | `basico` + caché | Caché Redis (portal, indicadores, catálogos), límite del QR y tiempo real entre réplicas |
 | `observabilidad` | `basico` + obs | Trazas y logs por `correlationId` |
 | `contingencia` | datos, contingencia, app | Arranque sin la Seguridad del equipo |
+
+**Límite de memoria.** `stack up` se niega a levantar un objetivo cuya memoria estimada supere `limiteMemoriaMb`
+(9700 MB en [`secciones.json`](secciones.json), pensado para la VM de 10 GB). Desde que `ext-parametros` trae su Pulsar
+(1,5 GB), `completo` estima 10 550 MB. Para usarlo: suba la VM (`[wsl2] memory=12GB` en `%USERPROFILE%\.wslconfig`, si el PC
+tiene la RAM) y levante con `.\infra.ps1 stack up completo -ForzarMemoria`. Sin más memoria, Docker puede matar contenedores;
+en ese caso use `mensajes` y `parametros` por separado.
 
 Para dejar la base con los datos de prueba variados (73 usuarios, todos los roles y casos preparados) después de
 levantar un escenario: `.\infra.ps1 datos-prueba cargar -Yes`. Guía completa: [docs/runbooks/PRUEBAS_LOCALES.md](../docs/runbooks/PRUEBAS_LOCALES.md).
@@ -115,7 +121,9 @@ la publicación de eventos del Catálogo sigue activa. Consumo de memoria medido
 * Cada sección aplica un archivo propio de [`secciones/`](secciones/) **sobre el compose original** (el del Backend o el kit
   del otro equipo, que no se modifica): renombra contenedores, conecta a la red compartida `asis-red` solo los puntos de
   entrada (SQL, MinIO, ClamAV, Keycloak como `keycloak.localhost`, PDP, PEP, Kong, Pulsar, Catálogo, Alloy) y declara los
-  **volúmenes existentes como externos** (no se pierden datos y `down -v` no los borra).
+  **volúmenes existentes como externos** (no se pierden datos y `down -v` no los borra). Toda red o volumen
+  `external: true` de `secciones/` debe estar en `redesExternas` o `volumenesExternos` de `secciones.json`: `stack up` los crea
+  vacíos si faltan (PC nuevo); si no está en la lista, `docker compose up` falla con «declared as external, but could not be found».
 * `asis-app` vive en [`asis-app.compose.yml`](asis-app.compose.yml).
 * Al levantar una sección se detienen los contenedores de su proyecto anterior (`asistencias-security-lab`, `messageucolab`,
   `catalogo-parametros`, …), que usan los mismos puertos. Esos contenedores viejos no se borran; quedan sin reinicio automático.

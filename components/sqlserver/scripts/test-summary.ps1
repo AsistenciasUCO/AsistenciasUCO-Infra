@@ -53,8 +53,14 @@ if (-not $ContainerName) {
     $ContainerName = if ($env:SQL_CONTAINER_NAME) { $env:SQL_CONTAINER_NAME } else { "sql_server_asistencias" }
 }
 if (-not $Password) {
-    $Password = if ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { "TuPasswordSeguro123" }
+    $Password = if ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } elseif ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } else { $null }
 }
+if (-not $Password) {
+    throw "MSSQL_SA_PASSWORD no está definida. Configura AsistenciasUCO-Infra/.env o pasa el parámetro -Password."
+}
+# La clave viaja a sqlcmd por SQLCMDPASSWORD (docker exec -e SQLCMDPASSWORD sin valor la toma de este proceso), no como
+# argumento -P: los argumentos se ven en la lista de procesos del PC y del contenedor.
+$env:SQLCMDPASSWORD = $Password
 
 $dbRepoPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../../../../GestioAsistenciaDB"))
 
@@ -72,7 +78,7 @@ Write-Host "Suite SQL : $TestSuitePath" -ForegroundColor Gray
 Write-Host "==============================================================================" -ForegroundColor Cyan
 
 # 1. Precheck de seguridad en el contenedor
-$precheck = docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P "$Password" -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CONCAT(DB_NAME(), '|', @@SERVERNAME, '|', CONVERT(varchar(80), SERVERPROPERTY('Edition')));" 2>&1
+$precheck = docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CONCAT(DB_NAME(), '|', @@SERVERNAME, '|', CONVERT(varchar(80), SERVERPROPERTY('Edition')));" 2>&1
 if ($LASTEXITCODE -ne 0 -or ($precheck -join '').Trim() -notmatch '^gestionasistenciadb\|[^|]+\|Developer Edition') {
     throw "BLOCKED - Destino de base de datos no seguro o precheck de Developer Edition fallido: $precheck"
 }
@@ -89,7 +95,7 @@ docker exec -u 0 $ContainerName chmod -R a+rX /tmp/test /tmp/test_suite.sql 2>$n
 
 # 3. Ejecutar test_suite.sql
 Write-Host "`nEjecutando test_suite.sql..." -ForegroundColor Yellow
-$output = docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P "$Password" -C -b -h -1 -s '|' -w 65535 -y 1024 -Y 1024 -i /tmp/test_suite.sql 2>&1
+$output = docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -C -b -h -1 -s '|' -w 65535 -y 1024 -Y 1024 -i /tmp/test_suite.sql 2>&1
 $sqlExitCode = $LASTEXITCODE
 $outputStr = ($output | ForEach-Object { "$_" }) -join [System.Environment]::NewLine
 
@@ -153,9 +159,9 @@ $repoProcedures = @(Get-ChildItem (Join-Path $schemaDir 'stored-procedures') -Fi
 $repoViews = @(Get-ChildItem (Join-Path $schemaDir 'views') -Filter 'uv_*.sql' -ErrorAction SilentlyContinue |
     ForEach-Object { $_.BaseName })
 
-$instanceProcedures = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P "$Password" -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT name FROM sys.procedures WHERE schema_id=SCHEMA_ID('dbo') AND name LIKE 'usp[_]%' AND name NOT LIKE '%[_]interno' ORDER BY name;" 2>&1 |
+$instanceProcedures = @(docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT name FROM sys.procedures WHERE schema_id=SCHEMA_ID('dbo') AND name LIKE 'usp[_]%' AND name NOT LIKE '%[_]interno' ORDER BY name;" 2>&1 |
     ForEach-Object { "$_".Trim() } | Where-Object { $_ })
-$instanceViews = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P "$Password" -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT name FROM sys.views WHERE schema_id=SCHEMA_ID('dbo') AND name LIKE 'uv[_]%' ORDER BY name;" 2>&1 |
+$instanceViews = @(docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT name FROM sys.views WHERE schema_id=SCHEMA_ID('dbo') AND name LIKE 'uv[_]%' ORDER BY name;" 2>&1 |
     ForEach-Object { "$_".Trim() } | Where-Object { $_ })
 
 $missingProcedures = @($repoProcedures | Where-Object { $_ -notin $instanceProcedures })

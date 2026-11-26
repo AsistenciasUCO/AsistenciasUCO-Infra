@@ -52,3 +52,7 @@ desktop.ini
 .vscode/
 *.suo
 *.user
+
+# 7. Python (bytecode generado al ejecutar los scripts y sus pruebas)
+__pycache__/
+*.py[cod]

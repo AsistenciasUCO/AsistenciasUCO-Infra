@@ -3,7 +3,8 @@
   "red": "asis-red",
   "redesExternas": [
     "asis-red",
-    "asistencias-files-backend"
+    "asistencias-files-backend",
+    "asistencias-security-lab-net"
   ],
   "volumenesExternos": [
     "asis-datos-mssql",
@@ -12,7 +13,24 @@
     "catalogo-parametros_redis-data",
     "catalogo-parametros_surrealdb-data",
     "catalogo-parametros_pulsar-parametros-data",
-    "catalogo-parametros_pulsar-parametros-conf"
+    "catalogo-parametros_pulsar-parametros-conf",
+    "asistencias_clamav_data",
+    "asistencias-uco-security_keycloak_db_data",
+    "asistencias-uco-observability_grafana_data",
+    "asistencias-uco-observability_prometheus_data",
+    "asistencias-uco-observability_loki_data",
+    "asistencias-uco-observability_tempo_data",
+    "messageucolab_redis_data",
+    "messageucolab_surrealdb-data",
+    "messageucolab_pulsar-conf",
+    "messageucolab_grafana-data",
+    "messageucolab_loki-data",
+    "messageucolab_ollama-data",
+    "catalogo-parametros_grafana-data",
+    "catalogo-parametros_prometheus-data",
+    "asistencias-security-lab_asistencias-security-lab-keycloak-data",
+    "asistencias-security-lab_asistencias-security-lab-surrealdb-data",
+    "asistencias-security-lab_asistencias-security-lab-redis-data"
   ],
   "limiteMemoriaMb": 9700,
   "secciones": {

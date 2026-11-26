@@ -67,10 +67,11 @@ if ([string]::IsNullOrWhiteSpace($Password)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($Password)) {
-    if ($Username -eq 'docente.prueba') {
-        $Password = if ($env:TEST_DOCENTE_PASSWORD) { $env:TEST_DOCENTE_PASSWORD } else { 'Docente123456!' }
-    } elseif ($Username -eq 'admin.prueba') {
-        $Password = if ($env:TEST_ADMIN_PASSWORD) { $env:TEST_ADMIN_PASSWORD } else { 'Admin1234567!' }
+    # Sin clave fija en el codigo: E2E_*_PASSWORD del .env (arriba), TEST_*_PASSWORD del entorno o se pide por consola.
+    if ($Username -eq 'docente.prueba' -and $env:TEST_DOCENTE_PASSWORD) {
+        $Password = $env:TEST_DOCENTE_PASSWORD
+    } elseif ($Username -eq 'admin.prueba' -and $env:TEST_ADMIN_PASSWORD) {
+        $Password = $env:TEST_ADMIN_PASSWORD
     } else {
         $securePass = Read-Host -Prompt "Introduce la contraseña para $Username" -AsSecureString
         $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePass)

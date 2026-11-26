@@ -64,6 +64,9 @@ if (-not $Password) {
 if (-not $Password) {
     throw "MSSQL_SA_PASSWORD no está definida. Configura AsistenciasUCO-Infra/.env o pasa el parámetro -Password."
 }
+# La clave viaja a sqlcmd por SQLCMDPASSWORD (docker exec -e SQLCMDPASSWORD sin valor la toma de este proceso), no como
+# argumento -P: los argumentos se ven en la lista de procesos del PC y del contenedor.
+$env:SQLCMDPASSWORD = $Password
 
 # 3. Resolver la ruta canónica hacia GestioAsistenciaDB/schema
 if (-not $SchemaPath) {
@@ -85,7 +88,7 @@ Write-Host "====================================================================
 # 4. Asegurar que la base de datos existe con el collation institucional
 Write-Host "`n[1/6] Verificando base de datos '$DatabaseName'..." -ForegroundColor Yellow
 $createDbSql = "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'$DatabaseName') CREATE DATABASE [$DatabaseName] COLLATE Modern_Spanish_CI_AS;"
-docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$Password" -C -Q "$createDbSql"
+docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q "$createDbSql"
 if ($LASTEXITCODE -ne 0) { throw "Fallo al verificar/crear la base de datos $DatabaseName." }
 
 # 5. Copiar esquema al contenedor para prevenir problemas de codificación BOM y stdin de Windows
@@ -104,7 +107,7 @@ function Execute-Container-Sql {
     $relativePath = $LocalFilePath.Substring($SchemaPath.Length).Replace('\', '/')
     $containerPath = "/tmp/schema$relativePath"
     
-    $out = docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d "$DatabaseName" -U sa -P "$Password" -C -b -i "$containerPath" 2>&1
+    $out = docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d "$DatabaseName" -U sa -C -b -i "$containerPath" 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR en archivo: $LocalFilePath" -ForegroundColor Red
         Write-Host $out -ForegroundColor Red
@@ -144,7 +147,7 @@ while ($pendingViews.Count -gt 0 -and $progressMade -and $pass -le $maxPasses) {
     foreach ($viewFile in $pendingViews) {
         $relativePath = $viewFile.FullName.Substring($SchemaPath.Length).Replace('\', '/')
         $containerPath = "/tmp/schema$relativePath"
-        $sqlResult = docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d "$DatabaseName" -U sa -P "$Password" -C -b -i "$containerPath" 2>&1
+        $sqlResult = docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d "$DatabaseName" -U sa -C -b -i "$containerPath" 2>&1
         if ($LASTEXITCODE -ne 0 -or $sqlResult -match "Msg \d+, Level \d+") {
             $failedThisPass.Add($viewFile)
         } else {
@@ -189,10 +192,24 @@ $hardeningScript = Join-Path (Join-Path $PSScriptRoot "..") "init/01-hardening-l
 if (Test-Path $hardeningScript) {
     Write-Host "`nAplicando Hardening de Mínimo Privilegio (app_asistencias_user)..." -ForegroundColor Yellow
     docker cp "$hardeningScript" "${ContainerName}:/tmp/hardening.sql"
-    docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$Password" -C -b -i "/tmp/hardening.sql"
+    # La clave del login sale de APP_DB_PASSWORD (.env de Infra) y llega a sqlcmd como variable de entorno del proceso
+    # (-e sin valor), con las comillas simples duplicadas para el literal T-SQL. Sin APP_DB_PASSWORD se pasa el marcador
+    # __SIN_CLAVE__ por -v (no es secreto) y el script aplica solo el rol y los permisos.
+    $appDbPassword = $env:APP_DB_PASSWORD
+    if ([string]::IsNullOrWhiteSpace($appDbPassword) -or $appDbPassword -match '^(?i)change[-_]?me') {
+        Write-Host "  !! APP_DB_PASSWORD no definida en AsistenciasUCO-Infra/.env: no se crea el login app_asistencias_user (.\infra.ps1 init-env la genera)." -ForegroundColor Yellow
+        docker exec -e SQLCMDPASSWORD $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -v "APP_DB_PASSWORD_TSQL=__SIN_CLAVE__" -i "/tmp/hardening.sql"
+    } else {
+        $env:APP_DB_PASSWORD_TSQL = $appDbPassword.Replace("'", "''")
+        try {
+            docker exec -e SQLCMDPASSWORD -e APP_DB_PASSWORD_TSQL $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -i "/tmp/hardening.sql"
+        } finally { Remove-Item Env:\APP_DB_PASSWORD_TSQL -ErrorAction SilentlyContinue }
+    }
     if ($LASTEXITCODE -ne 0) { throw "Error al aplicar hardening de mínimo privilegio." }
     Write-Host "  -> Hardening de seguridad aplicado exitosamente." -ForegroundColor Green
 }
+
+Remove-Item Env:\SQLCMDPASSWORD -ErrorAction SilentlyContinue
 
 Write-Host "`n==============================================================================" -ForegroundColor Green
 Write-Host "✅ Despliegue de Base de Datos finalizado exitosamente en $ContainerName" -ForegroundColor Green

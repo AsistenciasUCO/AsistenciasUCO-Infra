@@ -42,6 +42,11 @@ CREATE USER [app_asistencias_user] FOR LOGIN [app_asistencias_user];
 ALTER ROLE [db_app_executor] ADD MEMBER [app_asistencias_user];
 ```
 
+* **Contraseña del login (REV-INFRA-001, 2026-11-26):** el script ya no trae una contraseña fija. `db-deploy`
+  (`deploy-schema.ps1`) toma `APP_DB_PASSWORD` del `.env` de Infra y se la pasa a sqlcmd como variable de entorno
+  (`$(APP_DB_PASSWORD_TSQL)`, nunca en la línea de comandos). Si el login ya existe, se le asigna esa contraseña para que
+  coincida con el `.env`. Sin `APP_DB_PASSWORD` no se crea el login y solo se aplican el rol y los permisos.
+
 * **Beneficio:** Las aplicaciones (Backend / APIs) solo pueden invocar procedimientos almacenados (`EXEC usp_*`) o consultar vistas (`SELECT uv_*`). Queda bloqueado cualquier intento de ejecutar sentencias `DELETE FROM`, `UPDATE` directo o inyecciones SQL que intenten mutar tablas omitiendo las reglas de negocio.
 
 ---

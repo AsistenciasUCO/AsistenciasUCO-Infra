@@ -26,12 +26,19 @@ BEGIN
 END
 GO
 
--- 2. Crear Login a nivel de Servidor si no existe
-IF NOT EXISTS (SELECT name FROM sys.server_principals WHERE name = N'app_asistencias_user')
+-- 2. Crear (o sincronizar) el Login a nivel de Servidor
+-- La contraseña NO está en este archivo: llega como variable de sqlcmd $(APP_DB_PASSWORD_TSQL), que deploy-schema.ps1
+-- toma de APP_DB_PASSWORD (.env de Infra, generado por init-env) con las comillas simples ya duplicadas, y pasa por el
+-- entorno del proceso (no por la línea de comandos). __SIN_CLAVE__ = no hay APP_DB_PASSWORD: no se crea ni se toca el
+-- login y solo se aplican el rol y los permisos. Si el login ya existe se le asigna la contraseña actual, para que coincida con el .env.
+IF N'$(APP_DB_PASSWORD_TSQL)' = N'__SIN_CLAVE__'
 BEGIN
-    -- Contraseña por defecto para desarrollo local (debe cambiarse en producción via Key Vault)
+    PRINT 'APP_DB_PASSWORD no definida: se omite el login [app_asistencias_user] (solo rol y permisos).';
+END
+ELSE IF NOT EXISTS (SELECT name FROM sys.server_principals WHERE name = N'app_asistencias_user')
+BEGIN
     CREATE LOGIN [app_asistencias_user]
-    WITH PASSWORD = N'AppAsistenciasSecure2026!',
+    WITH PASSWORD = N'$(APP_DB_PASSWORD_TSQL)',
          DEFAULT_DATABASE = [gestionasistenciadb],
          CHECK_EXPIRATION = OFF,
          CHECK_POLICY = ON;
@@ -39,7 +46,8 @@ BEGIN
 END
 ELSE
 BEGIN
-    PRINT 'Login a nivel de servidor [app_asistencias_user] ya existe.';
+    ALTER LOGIN [app_asistencias_user] WITH PASSWORD = N'$(APP_DB_PASSWORD_TSQL)';
+    PRINT 'Login a nivel de servidor [app_asistencias_user] ya existe: contraseña sincronizada con APP_DB_PASSWORD.';
 END
 GO
 
@@ -47,8 +55,9 @@ GO
 USE [gestionasistenciadb];
 GO
 
--- Crear Usuario de Base de Datos mapeado al Login
-IF NOT EXISTS (SELECT name FROM sys.database_principals WHERE name = N'app_asistencias_user')
+-- Crear Usuario de Base de Datos mapeado al Login (si el login existe)
+IF EXISTS (SELECT name FROM sys.server_principals WHERE name = N'app_asistencias_user')
+   AND NOT EXISTS (SELECT name FROM sys.database_principals WHERE name = N'app_asistencias_user')
 BEGIN
     CREATE USER [app_asistencias_user] FOR LOGIN [app_asistencias_user];
     PRINT 'Usuario de base de datos [app_asistencias_user] creado.';
@@ -79,8 +88,9 @@ DENY DELETE TO [db_app_executor];
 DENY ALTER TO [db_app_executor];
 DENY CREATE TABLE TO [db_app_executor];
 
--- 6. Asignar el usuario de aplicación al rol seguro
-ALTER ROLE [db_app_executor] ADD MEMBER [app_asistencias_user];
+-- 6. Asignar el usuario de aplicación al rol seguro (si existe)
+IF EXISTS (SELECT name FROM sys.database_principals WHERE name = N'app_asistencias_user')
+    ALTER ROLE [db_app_executor] ADD MEMBER [app_asistencias_user];
 GO
 
 PRINT '==============================================================================';

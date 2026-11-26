@@ -13,8 +13,8 @@
 
 .PARAMETER Profile
     Perfil de Docker Compose a levantar: 'core' (default: SQL Server + Security Baseline del equipo de seguridad),
-    'observability' (OTel + Prometheus + Grafana), 'azure', 'proxy', 'legacy' (ademas, el Keycloak propio en 8081,
-    solo si se necesita explicitamente el modo legacy) o 'full'.
+    'observability' (OTel + Prometheus + Grafana), 'azure', 'proxy', 'cache' (Redis de REDIS-001), 'legacy' (ademas,
+    el Keycloak propio en 8081, solo si se necesita explicitamente el modo legacy) o 'full'.
     El Keycloak propio y su Postgres ya NO forman parte de 'core' ni de 'full'.
 
 .PARAMETER SkipSeed
@@ -32,7 +32,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Position = 0, Mandatory = $false)]
-    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'legacy', 'full')]
+    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'legacy', 'cache', 'full')]
     [string]$Profile = 'core',
 
     [Parameter(Mandatory = $false)]
@@ -174,7 +174,7 @@ foreach ($cName in $clamavCandidateContainers) {
 }
 
 # Levantar otros servicios del perfil si aplica (ej. storage, observability)
-if ($Profile -eq 'storage' -or $Profile -eq 'observability' -or $Profile -eq 'full') {
+if ($Profile -in @('storage', 'observability', 'cache', 'full')) {
     docker compose -f "$composeFile" --profile "$Profile" up -d 2>$null
 }
 
@@ -188,7 +188,10 @@ if ($Profile -in @('core', 'security', 'full')) {
 }
 
 # 4. Esperar Healthcheck real de SQL Server
-$sqlPassword = if ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { "TuPasswordSeguro123" }
+$sqlPassword = if ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } elseif ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } else { $null }
+if (-not $sqlPassword) { throw "MSSQL_SA_PASSWORD no está definida. Configura AsistenciasUCO-Infra/.env (.\infra.ps1 init-env)." }
+# La clave va por SQLCMDPASSWORD (docker exec -e sin valor), no como argumento -P visible en la lista de procesos.
+$env:SQLCMDPASSWORD = $sqlPassword
 
 Write-Host "  -> Esperando conexion a SQL Server ($sqlContainer)..." -NoNewline -ForegroundColor Gray
 $maxTries = 25
@@ -197,7 +200,7 @@ $sqlReady = $false
 while (-not $sqlReady -and $tries -lt $maxTries) {
     $eap = $ErrorActionPreference
     $ErrorActionPreference = 'SilentlyContinue'
-    cmd /c "docker exec $sqlContainer /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ""$sqlPassword"" -C -Q ""SELECT 1"" >nul 2>&1"
+    cmd /c "docker exec -e SQLCMDPASSWORD $sqlContainer /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q ""SELECT 1"" >nul 2>&1"
     $code = $LASTEXITCODE
     $ErrorActionPreference = $eap
     if ($code -eq 0) {

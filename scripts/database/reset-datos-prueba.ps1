@@ -98,12 +98,16 @@ function Invoke-Docker {
 
 function Invoke-SqlInContainer {
     param([string]$Query, [string]$File, [string]$Db = 'master', [string[]]$Variables = @(), [switch]$Raw)
-    $a = @('exec', $script:ContainerName, '/opt/mssql-tools18/bin/sqlcmd', '-S', 'localhost', '-U', 'sa', '-P', $script:SqlPassword, '-C', '-b', '-I',
+    # La clave viaja en el entorno (docker exec -e SQLCMDPASSWORD sin valor), no como argumento: los argumentos de docker y
+    # de sqlcmd se ven en la lista de procesos del PC y del contenedor.
+    $a = @('exec', '-e', 'SQLCMDPASSWORD', $script:ContainerName, '/opt/mssql-tools18/bin/sqlcmd', '-S', 'localhost', '-U', 'sa', '-C', '-b', '-I',
            '-d', $Db, '-h', '-1', '-W', '-w', '4000', '-t', '1800')
     if ($Raw) { $a += @('-s', '|') }
     foreach ($v in $Variables) { $a += @('-v', $v) }
     if ($File) { $a += @('-i', $File) } else { $a += @('-Q', $Query) }
-    return Invoke-Docker -DockerArgs $a
+    $env:SQLCMDPASSWORD = $script:SqlPassword
+    try { return Invoke-Docker -DockerArgs $a }
+    finally { Remove-Item Env:\SQLCMDPASSWORD -ErrorAction SilentlyContinue }
 }
 
 function Assert-Ok($Result, [string]$What) {
