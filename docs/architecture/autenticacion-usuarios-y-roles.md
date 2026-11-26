@@ -39,7 +39,7 @@ Usuarios sincronizados entre **Keycloak** (Realm `asistencias-uco`) y **SQL Serv
 | **Backend REST API** | `http://localhost:8080` | `http://192.168.1.85:8080` | Bearer JWT | Spring Boot 4 / Java 25 |
 | **Keycloak Console** | `http://localhost:8081/admin` | `http://192.168.1.85:8081/admin` | `kcadmin` / `change-me` | Consola Realm `asistencias-uco` |
 | **Grafana Logs** | `http://localhost:3000` | `http://192.168.1.85:3000` | `admin` / `change-me` | [Dashboard Logs Backend](http://localhost:3000/d/asistencias-uco-logs/asistencias-uco-logs-del-backend) |
-| **SQL Server** | `localhost:1433` | `192.168.1.85:1433` | `sa` / `TuPasswordSeguro123` | Motor de base de datos relacional |
+| **SQL Server** | `localhost:1433` | `192.168.1.85:1433` | `sa` / `MSSQL_SA_PASSWORD` del `.env` (init-env la genera al azar) | Motor de base de datos relacional |
 
 ---
 

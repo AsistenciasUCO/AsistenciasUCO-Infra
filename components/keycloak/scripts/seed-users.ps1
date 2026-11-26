@@ -57,12 +57,20 @@ if ($null -eq $apiClient) {
     throw "Client $apiClientId no existe. Ejecuta .\bootstrap.ps1 primero."
 }
 
+# Contraseñas de los usuarios de prueba: obligatorias en el .env (init-env las genera al azar). Sin valor por defecto en el
+# código: una clave fija versionada sería la misma en todos los PC.
+function Get-ClaveUsuarioPrueba([string]$Clave) {
+    $valor = Get-KcRequiredEnvValue -EnvMap $envMap -Key $Clave
+    if ($valor -match '^(?i)change[-_]?me') { throw "$Clave sigue con la plantilla del .env.example. Defina una clave real o ejecute .\infra.ps1 init-env." }
+    return $valor
+}
+
 # Especificación de usuarios institucionales de prueba
 $userSpecs = @(
     @{
         Key        = 'DOCENTE'
         Username   = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_DOCENTE_USERNAME' -Default 'docente.prueba')
-        Password   = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_DOCENTE_PASSWORD' -Default 'Docente123456!')
+        Password   = (Get-ClaveUsuarioPrueba 'E2E_DOCENTE_PASSWORD')
         IdUsuario  = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_DOCENTE_ID_USUARIO' -Default 'f1a2b3c4-0000-0000-0000-000000000003')
         Email      = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_DOCENTE_EMAIL' -Default 'docente.prueba@uco.edu.co')
         FirstName  = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_DOCENTE_FIRST_NAME' -Default 'Docente')
@@ -72,7 +80,7 @@ $userSpecs = @(
     @{
         Key        = 'ADMIN'
         Username   = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_ADMIN_USERNAME' -Default 'admin.prueba')
-        Password   = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_ADMIN_PASSWORD' -Default 'Admin1234567!')
+        Password   = (Get-ClaveUsuarioPrueba 'E2E_ADMIN_PASSWORD')
         IdUsuario  = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_ADMIN_ID_USUARIO' -Default 'E1F2A3B4-0000-0000-0000-000000000000')
         Email      = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_ADMIN_EMAIL' -Default 'admin.prueba@uco.edu.co')
         FirstName  = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_ADMIN_FIRST_NAME' -Default 'Admin')

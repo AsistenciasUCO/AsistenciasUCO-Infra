@@ -64,8 +64,9 @@ $bootstrapAdminPass = Get-KcRequiredEnvValue -EnvMap $envMap -Key 'KC_BOOTSTRAP_
 $adminToken = Get-KcAdminToken -ServerUrl $serverUrl -Username $bootstrapAdminUser -Password $bootstrapAdminPass
 
 $diagnostics = @(
-    @{ Role = 'DOCENTE'; Username = 'docente.prueba'; DefaultPass = 'Docente123456!' },
-    @{ Role = 'ADMIN';   Username = 'admin.prueba';   DefaultPass = 'Admin1234567!' }
+    # Claves del .env (E2E_*_PASSWORD, generadas por init-env); no hay claves fijas en el codigo.
+    @{ Role = 'DOCENTE'; Username = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_DOCENTE_USERNAME' -Default 'docente.prueba'); PassKey = 'E2E_DOCENTE_PASSWORD' },
+    @{ Role = 'ADMIN';   Username = (Get-KcEnvValue -EnvMap $envMap -Key 'E2E_ADMIN_USERNAME' -Default 'admin.prueba');     PassKey = 'E2E_ADMIN_PASSWORD' }
 )
 
 Write-Host ''
@@ -77,7 +78,7 @@ Write-Host "====================================================================
 foreach ($diag in $diagnostics) {
     $username = $diag.Username
     $roleExpected = $diag.Role
-    $password = $diag.DefaultPass
+    $password = Get-KcEnvValue -EnvMap $envMap -Key $diag.PassKey
 
     Write-Host "`n--> Analizando usuario: $username ($roleExpected)" -ForegroundColor Yellow
 
@@ -91,6 +92,11 @@ foreach ($diag in $diagnostics) {
         $userObj.attributes.idUsuario[0]
     } else { 'NO_CONFIGURADO' }
     Write-Host "  1. Atributo en Admin REST   : $adminIdAttr" -ForegroundColor Gray
+
+    if ([string]::IsNullOrWhiteSpace($password)) {
+        Write-KcResult -Status 'WARN' -Message "$($diag.PassKey) no esta en el .env: se omite la prueba de token de $username"
+        continue
+    }
 
     # Solicitar token
     $tokenEndpoint = "$serverUrl/realms/$realmName/protocol/openid-connect/token"

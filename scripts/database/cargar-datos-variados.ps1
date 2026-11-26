@@ -86,10 +86,13 @@ function Invoke-Native {
 
 function Invoke-Sql {
     param([string]$Query, [string]$File, [string]$Db = 'master')
-    $a = @('exec', '-e', "SQLCMDPASSWORD=$script:SqlPassword", $ContainerName, '/opt/mssql-tools18/bin/sqlcmd',
+    # -e SQLCMDPASSWORD sin valor: docker toma la clave del entorno de este proceso y no queda en sus argumentos.
+    $a = @('exec', '-e', 'SQLCMDPASSWORD', $ContainerName, '/opt/mssql-tools18/bin/sqlcmd',
            '-S', 'localhost', '-U', 'sa', '-C', '-b', '-I', '-f', '65001', '-d', $Db, '-W', '-s', '|', '-t', '3600')
     if ($File) { $a += @('-i', $File) } else { $a += @('-Q', $Query) }
-    return Invoke-Native -Exe 'docker' -Arguments $a
+    $env:SQLCMDPASSWORD = $script:SqlPassword
+    try { return Invoke-Native -Exe 'docker' -Arguments $a }
+    finally { Remove-Item Env:\SQLCMDPASSWORD -ErrorAction SilentlyContinue }
 }
 
 function Assert-Ok($Result, [string]$What) {
@@ -202,8 +205,12 @@ function Invoke-Cargar {
     try {
         Write-Step 'Borrando la base y desplegando el esquema desde cero (unos 3 minutos).'
         Assert-Ok (Invoke-Sql -Query "IF DB_ID('$Database') IS NOT NULL BEGIN ALTER DATABASE [$Database] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$Database]; END") 'borrar la base'
-        $deploy = Invoke-Native -Exe 'powershell.exe' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $DbRepo 'deploy_schema.ps1'),
-                                                               '-ContainerName', $ContainerName, '-Password', $script:SqlPassword)
+        # La clave va por SQL_CONTAINER_PASSWORD (deploy_schema.ps1 la lee del entorno), no como -Password en la linea de comandos.
+        $env:SQL_CONTAINER_PASSWORD = $script:SqlPassword
+        try {
+            $deploy = Invoke-Native -Exe 'powershell.exe' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $DbRepo 'deploy_schema.ps1'),
+                                                                   '-ContainerName', $ContainerName)
+        } finally { Remove-Item Env:\SQL_CONTAINER_PASSWORD -ErrorAction SilentlyContinue }
         if ($deploy.ExitCode -ne 0 -or ($deploy.Lines -match '\[ERROR\]')) {
             throw ("deploy_schema.ps1 fallo (codigo $($deploy.ExitCode)).`n" + (($deploy.Lines | Select-Object -Last 15) -join "`n"))
         }

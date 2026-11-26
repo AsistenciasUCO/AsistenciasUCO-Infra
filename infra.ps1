@@ -34,8 +34,9 @@ param(
     [Parameter(Position = 0)]
     [string]$Command = "help",
 
+    # Sin ValidateSet: cada comando valida sus valores. all/up: core|storage|observability|proxy|azure|security|legacy|cache|full
+    # (start-dev.ps1); init-env: local|docker|ci (init-env.ps1).
     [Parameter(Mandatory = $false)]
-    [ValidateSet('core', 'storage', 'observability', 'proxy', 'azure', 'security', 'legacy', 'full')]
     [string]$Profile,
 
     [Parameter(Mandatory = $false)]
@@ -100,7 +101,7 @@ function Show-Help {
     Write-Host ""
     Write-Host "1. ORQUESTACION Y ENTORNO LOCAL:" -ForegroundColor Yellow
     Write-Host "  all | dev        Arranca TODO: Contenedores + Despliegue BD + Backend + Frontend." -ForegroundColor White
-    Write-Host "                   Opciones: -Profile core|observability|full, -SkipSeed, -ContainersOnly" -ForegroundColor Gray
+    Write-Host "                   Opciones: -Profile core|storage|observability|cache|full, -SkipSeed, -ContainersOnly" -ForegroundColor Gray
     Write-Host "  init-env         Construye y sincroniza atómicamente todos los .env y env.js del ecosistema." -ForegroundColor White
     Write-Host "                   Opciones: -Profile local|docker|ci, -Mode own|baseline, -Force, -CheckOnly" -ForegroundColor Gray
     Write-Host "  apps             Inicia Backend (Spring Boot) y Frontend (Angular) juntos en consolas." -ForegroundColor White
@@ -120,7 +121,6 @@ function Show-Help {
     Write-Host "  db-seed          Restablece la semilla limpia institucional (11 usuarios canonicos)." -ForegroundColor White
     Write-Host "  reload-db        Compila esquema DDL y restablece la semilla limpia en un solo paso." -ForegroundColor White
     Write-Host "  db-test          Ejecuta la suite transaccional de pruebas de BD (test_suite.sql)." -ForegroundColor White
-    Write-Host "  db-cupos         Amplia la capacidad de cupos de todos los grupos (+40 cupos) para pruebas." -ForegroundColor White
     Write-Host "  db-reset-qa      Estado base de pruebas ampliado: -Mode Base|Snapshot|Restore (-Backup, -StopBackend, -Yes)." -ForegroundColor White
     Write-Host "  datos-prueba cargar -Yes       Base desde cero con datos variados (73 usuarios), Seguridad y verificacion por rol." -ForegroundColor White
     Write-Host "  datos-prueba seguridad|verificar  Solo cuentas y perfiles de Seguridad | solo la verificacion por rol." -ForegroundColor White
@@ -189,44 +189,33 @@ function Invoke-TargetScript {
     exit $LASTEXITCODE
 }
 
-# Cargar / aportar MSSQL_SA_PASSWORD si falta (OBS-16 / F-TRX-011)
+# Cargar MSSQL_SA_PASSWORD si falta (OBS-16 / F-TRX-011). Orden: AsistenciasUCO-Infra/.env, stack/.env (el del laboratorio
+# por secciones) y GestioAsistenciaDB/.env. No hay valor por defecto: si no esta en ninguno, cada script muestra su propio
+# error (un valor inventado le ganaria a la clave real, porque los scripts leen primero el entorno).
+function Get-ValorEnv {
+    param([string]$Ruta, [string[]]$Claves)
+    if (-not (Test-Path -LiteralPath $Ruta)) { return $null }
+    foreach ($linea in (Get-Content -LiteralPath $Ruta)) {
+        $l = $linea.Trim()
+        if ($l -and -not $l.StartsWith("#") -and $l.Contains("=")) {
+            $p = $l.Split("=", 2)
+            $v = $p[1].Trim()
+            if ($p[0].Trim() -in $Claves -and $v -and $v -notmatch '^CHANGE_ME') { return $v }
+        }
+    }
+    return $null
+}
+
 if (-not $env:MSSQL_SA_PASSWORD) {
-    $infraEnv = Join-Path $infraRoot ".env"
-    if (Test-Path $infraEnv) {
-        Get-Content $infraEnv | ForEach-Object {
-            $line = $_.Trim()
-            if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
-                $p = $line.Split("=", 2)
-                if ($p[0].Trim() -eq "MSSQL_SA_PASSWORD") {
-                    $env:MSSQL_SA_PASSWORD = $p[1].Trim()
-                }
-            }
-        }
-    }
-    if (-not $env:MSSQL_SA_PASSWORD) {
-        $dbEnvCandidates = @(
-            (Join-Path (Join-Path $repoRoot "GestioAsistenciaDB") ".env"),
-            "C:\Proyectos\GestionAsistencia\GestioAsistenciaDB\.env"
-        )
-        foreach ($cand in $dbEnvCandidates) {
-            if (Test-Path $cand) {
-                Get-Content $cand | ForEach-Object {
-                    $l = $_.Trim()
-                    if ($l -and -not $l.StartsWith("#") -and $l.Contains("=")) {
-                        $p = $l.Split("=", 2)
-                        if ($p[0].Trim() -in @("MSSQL_SA_PASSWORD", "SA_PASSWORD")) {
-                            $env:MSSQL_SA_PASSWORD = $p[1].Trim()
-                        }
-                    }
-                }
-                if ($env:MSSQL_SA_PASSWORD) { break }
-            }
-        }
-    }
-    if (-not $env:MSSQL_SA_PASSWORD) {
-        # Valor de laboratorio documentado en AGENTS.md §7 / OBS-16
-        $labDefaultSaPassword = "TuPasswordSeguro123"
-        $env:MSSQL_SA_PASSWORD = $labDefaultSaPassword
+    $saCandidatos = @(
+        @{ Ruta = (Join-Path $infraRoot ".env"); Claves = @("MSSQL_SA_PASSWORD") },
+        @{ Ruta = (Join-Path (Join-Path $infraRoot "stack") ".env"); Claves = @("MSSQL_SA_PASSWORD") },
+        @{ Ruta = (Join-Path (Join-Path $repoRoot "GestioAsistenciaDB") ".env"); Claves = @("MSSQL_SA_PASSWORD", "SA_PASSWORD", "SQL_CONTAINER_PASSWORD") },
+        @{ Ruta = "C:\Proyectos\GestionAsistencia\GestioAsistenciaDB\.env"; Claves = @("MSSQL_SA_PASSWORD", "SA_PASSWORD", "SQL_CONTAINER_PASSWORD") }
+    )
+    foreach ($cand in $saCandidatos) {
+        $valor = Get-ValorEnv -Ruta $cand.Ruta -Claves $cand.Claves
+        if ($valor) { $env:MSSQL_SA_PASSWORD = $valor; break }
     }
 }
 
@@ -253,8 +242,8 @@ switch ($Command.ToLowerInvariant()) {
 
     { $_ -in "down", "stop" } {
         $stopDev = Join-Path $infraRoot "scripts\orchestration\stop-dev.ps1"
+        # stop-dev.ps1 no recibe -Profile: detiene todos los perfiles (--profile full).
         $splat = @{}
-        if ($PSBoundParameters.ContainsKey('Profile') -and -not [string]::IsNullOrWhiteSpace($Profile)) { $splat['Profile'] = $Profile }
         if ($RemainingArgs -and $RemainingArgs.Length -gt 0) {
             & $stopDev @splat @RemainingArgs
         } else {
@@ -396,12 +385,6 @@ switch ($Command.ToLowerInvariant()) {
             elseif (-not $datosArgs.ContainsKey('Accion')) { $datosArgs['Accion'] = $pending[$i] }
         }
         & $datosScript @datosArgs
-        exit $LASTEXITCODE
-    }
-
-    "db-cupos" {
-        $cuposScript = Join-Path $repoRoot "scripts\database\aumentar-cupos.ps1"
-        & $cuposScript
         exit $LASTEXITCODE
     }
 

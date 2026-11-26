@@ -134,12 +134,11 @@ if ($filesEnvPath -and (Test-Path -LiteralPath $filesEnvPath)) {
     $loadedCount += Import-EnvLines -FilePath $filesEnvPath
 }
 
-# Resolver contraseña sa con fallback seguro para desarrollo local
+# Resolver la contraseña sa: si falta, se toma SQL_CONTAINER_PASSWORD. No hay valor fijo de respaldo (un valor inventado
+# taparia la clave real y el error apareceria lejos, como login 18456); quien la necesite muestra su propio error.
 if ([string]::IsNullOrWhiteSpace($env:MSSQL_SA_PASSWORD) -or $env:MSSQL_SA_PASSWORD -eq "CHANGE_ME_MSSQL_PASSWORD") {
     if ($env:SQL_CONTAINER_PASSWORD) {
         [System.Environment]::SetEnvironmentVariable("MSSQL_SA_PASSWORD", $env:SQL_CONTAINER_PASSWORD, [System.EnvironmentVariableTarget]::Process)
-    } else {
-        [System.Environment]::SetEnvironmentVariable("MSSQL_SA_PASSWORD", "TuPasswordSeguro123", [System.EnvironmentVariableTarget]::Process)
     }
 }
 

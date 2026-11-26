@@ -68,7 +68,10 @@ function Invoke-PdpProvision {
         $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $out = @(& $PythonExe -X utf8 -I $script $cmd 2>&1 | ForEach-Object { "$_" }); $code = $LASTEXITCODE }
         finally { $ErrorActionPreference = $prev; Pop-Location }
-        [pscustomobject]@{ Code = $code; Lines = $out; Falta = @($out | Where-Object { $_ -match '^FALTA\b' }).Count; Sobra = @($out | Where-Object { $_ -match '^SOBRA\b' }).Count }
+        # verify termina con el informe JSON ("clean": true|false) y sale con 1 si hay diferencias (incluidas SOBRA, que
+        # no bloquean). Sin ese informe la verificacion no llego a correr (excepcion, PDP caido, lab.env incompleto).
+        [pscustomobject]@{ Code = $code; Lines = $out; Falta = @($out | Where-Object { $_ -match '^FALTA\b' }).Count; Sobra = @($out | Where-Object { $_ -match '^SOBRA\b' }).Count
+                           Informe = [bool]@($out | Where-Object { $_ -match '"clean"\s*:' }).Count }
     }
     Write-Host '  * PDP: verificando concesiones de los endpoints contra el catalogo.' -ForegroundColor Cyan
     $r = & $run 'verify'
@@ -78,6 +81,11 @@ function Invoke-PdpProvision {
         if ($p.Code -ne 0) { Write-Host "    !!  PDP: el aprovisionamiento termino con codigo $($p.Code)." -ForegroundColor Red; return $false }
         $r = & $run 'verify'
     }
-    Write-Host ("    PDP: FALTA={0}, SOBRA={1}, codigo={2}" -f $r.Falta, $r.Sobra, $r.Code) -ForegroundColor $(if ($r.Falta -eq 0) { 'Green' } else { 'Red' })
-    return ($r.Falta -eq 0)
+    $ok = ($r.Falta -eq 0) -and ($r.Code -eq 0 -or $r.Informe)
+    if (-not $r.Informe -and $r.Code -ne 0) {
+        # No se imprime la salida (puede traer datos del lab.env): se indica como repetirla a mano.
+        Write-Host "    !!  PDP: verify no pudo correr (codigo $($r.Code)). Revise con: python -X utf8 $script verify" -ForegroundColor Red
+    }
+    Write-Host ("    PDP: FALTA={0}, SOBRA={1}, codigo={2}" -f $r.Falta, $r.Sobra, $r.Code) -ForegroundColor $(if ($ok) { 'Green' } else { 'Red' })
+    return $ok
 }

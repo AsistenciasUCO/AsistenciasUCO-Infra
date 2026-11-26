@@ -22,7 +22,8 @@
 
 .PARAMETER Force
     Sobrescribir los archivos existentes incluso si ya contienen configuraciones personalizadas.
-    Sin este flag, se preservan contraseñas preexistentes y solo se completan archivos/claves faltantes.
+    Las contraseñas y secretos del .env existente se conservan siempre (también con -Force); los que faltan o siguen
+    con la plantilla CHANGE_ME se generan al azar. No hay contraseñas fijas en el código.
 
 .PARAMETER CheckOnly
     Solo audita y verifica el estado de las variables de entorno sin modificar ningún archivo.
@@ -138,42 +139,65 @@ $dbHost = if ($Profile -eq 'docker') { "sql_server_asistencias" } else { "127.0.
 $dbPort = 1433
 $dbName = "gestionasistenciadb"
 
-$saPassword = if ($existingInfra.ContainsKey('MSSQL_SA_PASSWORD') -and $existingInfra['MSSQL_SA_PASSWORD'] -ne 'CHANGE_ME_MSSQL_PASSWORD' -and -not $Force) {
-    $existingInfra['MSSQL_SA_PASSWORD']
-} else {
-    "TuPasswordSeguro123"
+# Secretos locales: se conserva el valor del .env existente (tambien con -Force, para no dejar a SQL Server, Keycloak o
+# MinIO con una clave distinta a la de sus volumenes) y, si falta o es la plantilla CHANGE_ME, se genera uno al azar.
+# Ya no hay claves fijas en el codigo. Para rotar una clave: borre la linea del .env y vuelva a ejecutar init-env.
+function New-ClaveLab {
+    param([int]$Longitud = 24)
+    # Letras y digitos mas '-', '_' y '.': cumple la complejidad de SQL Server y la politica del realm (mayuscula,
+    # minuscula, digito y especial) sin caracteres que haya que escapar en .env, URL o T-SQL.
+    $mayus = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; $minus = 'abcdefghijkmnopqrstuvwxyz'; $dig = '23456789'; $esp = '-_.'
+    $todos = $mayus + $minus + $dig
+    $rng = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+    try {
+        $b = New-Object byte[] (2 * $Longitud)
+        $rng.GetBytes($b)
+        # Empieza por mayuscula; luego minuscula, digito y especial obligatorios y el resto al azar.
+        $c = [char[]](@($mayus[$b[0] % $mayus.Length], $minus[$b[1] % $minus.Length], $dig[$b[2] % $dig.Length], $esp[$b[3] % $esp.Length]) +
+                      @(for ($i = 4; $i -lt $Longitud; $i++) { $todos[$b[$i] % $todos.Length] }))
+        # Mezcla (Fisher-Yates) de las posiciones 1..n-1 con los bytes restantes.
+        for ($i = $Longitud - 1; $i -gt 1; $i--) {
+            $j = 1 + ($b[$Longitud + $i] % $i)
+            $t = $c[$i]; $c[$i] = $c[$j]; $c[$j] = $t
+        }
+        return (-join $c)
+    } finally { $rng.Dispose() }
 }
 
-$appDbUser = "app_asistencias_user"
-$appDbPassword = if ($existingInfra.ContainsKey('APP_DB_PASSWORD') -and $existingInfra['APP_DB_PASSWORD'] -ne 'CHANGE_ME_APP_DB_PASSWORD' -and -not $Force) {
-    $existingInfra['APP_DB_PASSWORD']
-} else {
-    "TuPasswordSeguro123"
+function Resolve-Secreto {
+    # Devuelve el primer candidato con un valor real (ni vacio ni plantilla CHANGE_ME); si no hay, genera uno.
+    param([string[]]$Candidatos)
+    foreach ($v in $Candidatos) {
+        if (-not [string]::IsNullOrWhiteSpace($v) -and $v -notmatch '^(?i)change[-_]?me') { return $v }
+    }
+    return (New-ClaveLab)
 }
+
+# Cada clave tambien se busca en los otros .env que init-env genera (stack/.env, BD, Backend, infra/files): si los
+# contenedores ya existen, sus volumenes tienen esa clave y una nueva los dejaria inaccesibles.
+$existingStack = Import-EnvToHash -FilePath (Join-Path (Join-Path $infraRoot "stack") ".env")
+$existingDb = Import-EnvToHash -FilePath $dbEnv
+$existingBackend = Import-EnvToHash -FilePath $backendEnv
+$existingFiles = Import-EnvToHash -FilePath $backendFilesEnv
+$saPassword = Resolve-Secreto @($existingInfra['MSSQL_SA_PASSWORD'], $existingStack['MSSQL_SA_PASSWORD'], $existingDb['SQL_CONTAINER_PASSWORD'])
+
+$appDbUser = "app_asistencias_user"
+$appDbPassword = Resolve-Secreto @($existingInfra['APP_DB_PASSWORD'])
 
 $kcPort = if ($SecurityMode -eq 'own') { 8081 } else { 19090 }
 $kcRealm = if ($SecurityMode -eq 'own') { "asistencias-uco" } else { "security-baseline" }
 $kcHost = if ($Profile -eq 'docker') { "keycloak_asistencias" } else { "127.0.0.1" }
-$kcClientSecret = if ($existingInfra.ContainsKey('KEYCLOAK_ADMIN_CLIENT_SECRET') -and $existingInfra['KEYCLOAK_ADMIN_CLIENT_SECRET'] -ne 'change-me-backend-admin-secret-32chars' -and -not $Force) {
-    $existingInfra['KEYCLOAK_ADMIN_CLIENT_SECRET']
-} else {
-    "asistencias-secret-local-dev-32chars"
-}
+$kcClientSecret = Resolve-Secreto @($existingInfra['KEYCLOAK_ADMIN_CLIENT_SECRET'], $existingBackend['KEYCLOAK_ADMIN_CLIENT_SECRET'])
+# Usuarios de prueba del Keycloak propio (seed-users.ps1, get-token.ps1, diagnose-token.ps1)
+$e2eDocentePassword = Resolve-Secreto @($existingInfra['E2E_DOCENTE_PASSWORD'])
+$e2eAdminPassword = Resolve-Secreto @($existingInfra['E2E_ADMIN_PASSWORD'])
 
 $minioHost = if ($Profile -eq 'docker') { "asistencias-files-minio-1" } else { "127.0.0.1" }
 $minioPort = 9000
 $minioUser = "minio_admin"
-$minioPass = if ($existingInfra.ContainsKey('MINIO_ROOT_PASSWORD') -and $existingInfra['MINIO_ROOT_PASSWORD'] -ne 'CHANGE_ME_MINIO_ROOT_PASSWORD' -and -not $Force) {
-    $existingInfra['MINIO_ROOT_PASSWORD']
-} else {
-    "TuPasswordSeguro123"
-}
+$minioPass = Resolve-Secreto @($existingInfra['MINIO_ROOT_PASSWORD'], $existingFiles['MINIO_ROOT_PASSWORD'])
 $minioAppKey = "asistencias_app"
-$minioAppSecret = if ($existingInfra.ContainsKey('MINIO_SECRET_KEY') -and $existingInfra['MINIO_SECRET_KEY'] -ne 'CHANGE_ME_MINIO_SECRET_KEY' -and -not $Force) {
-    $existingInfra['MINIO_SECRET_KEY']
-} else {
-    "TuPasswordSeguro123"
-}
+$minioAppSecret = Resolve-Secreto @($existingInfra['MINIO_SECRET_KEY'], $existingFiles['MINIO_SECRET_KEY'], $existingBackend['MINIO_SECRET_KEY'])
 
 $clamavHost = if ($Profile -eq 'docker') { "asistencias-files-clamav-1" } else { "127.0.0.1" }
 $clamavPort = 3310
@@ -225,6 +249,10 @@ KC_FRONTEND_CLIENT_ID=asistencias-uco-frontend
 KC_BACKEND_ADMIN_CLIENT_ID=asistencias-backend-admin
 KEYCLOAK_ADMIN_CLIENT_SECRET=$kcClientSecret
 KC_PASSWORD_MIN_LENGTH=12
+E2E_DOCENTE_USERNAME=docente.prueba
+E2E_DOCENTE_PASSWORD=$e2eDocentePassword
+E2E_ADMIN_USERNAME=admin.prueba
+E2E_ADMIN_PASSWORD=$e2eAdminPassword
 
 AZURE_APPCONFIG_ENDPOINT=https://appcs-asist-dev-29183.azconfig.io
 AZURE_APPCONFIG_LABEL=es

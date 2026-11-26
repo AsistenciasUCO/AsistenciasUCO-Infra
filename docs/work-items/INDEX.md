@@ -141,6 +141,7 @@ Actualizada a mano el 2026-11-16: `sync-work-items.ps1` copia carpetas de los ot
 | INT-004-parametros-m2m-eventos | 1 | fase Infra y laboratorio: [ESTADO](INT-004-parametros-m2m-eventos/ESTADO.md) | [Ver carpeta](INT-004-parametros-m2m-eventos/) |
 | NOTOMA-001-aviso-coordinador-sesion-sin-toma | 3 | propuesto: [PLAN](NOTOMA-001-aviso-coordinador-sesion-sin-toma/PLAN.md) y [CONTRATO](NOTOMA-001-aviso-coordinador-sesion-sin-toma/CONTRATO.md) | [Ver carpeta](NOTOMA-001-aviso-coordinador-sesion-sin-toma/) |
 | P0-D-estabilizacion-workspace-oficial | 2 | active | [Ver carpeta](P0-D-estabilizacion-workspace-oficial/) |
+| REV-INFRA-001-revision-codigo-seguridad | 1 | en revision: [ESTADO](REV-INFRA-001-revision-codigo-seguridad/ESTADO.md) | [Ver carpeta](REV-INFRA-001-revision-codigo-seguridad/) |
 | VAL-migrar-detectar | 1 | active | [Ver carpeta](VAL-migrar-detectar/) |
 | VAL-oleada2-cumplimiento | 3 | N/A | [Ver carpeta](VAL-oleada2-cumplimiento/) |
 | VAL-oleada3-baul-secretos | 2 | N/A | [Ver carpeta](VAL-oleada3-baul-secretos/) |

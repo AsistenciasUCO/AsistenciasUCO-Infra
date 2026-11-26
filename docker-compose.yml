@@ -63,18 +63,9 @@ services:
     volumes:
       - asistencias_mssql_data:/var/opt/mssql
     healthcheck:
-      test:
-        - "CMD"
-        - "/opt/mssql-tools18/bin/sqlcmd"
-        - "-S"
-        - "localhost"
-        - "-U"
-        - "sa"
-        - "-P"
-        - "${MSSQL_SA_PASSWORD}"
-        - "-C"
-        - "-Q"
-        - "SELECT 1"
+      # La clave se lee del entorno del contenedor al ejecutar ($$ evita que Compose la interpole) y va por SQLCMDPASSWORD:
+      # con -P quedaba escrita en Healthcheck.Test (docker inspect) y en la lista de procesos. Igual que asis-datos.yml.
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q 'SELECT 1' -b -o /dev/null"]
       interval: 10s
       timeout: 5s
       retries: 10

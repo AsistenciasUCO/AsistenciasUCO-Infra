@@ -8,6 +8,7 @@
       list                      Secciones y escenarios disponibles.
       plan   <objetivos...>     Que se levantaria, en que orden y cuanta memoria (no cambia nada).
       up     <objetivos...>     Detiene lo que el objetivo no usa (salvo -Conservar), levanta en orden y espera la salud.
+                                Se niega si la memoria estimada supera limiteMemoriaMb, salvo -ForzarMemoria.
                                 Con asis-app genera stack/generado/{backend,frontend}.env segun las secciones activas.
       down   [secciones...]     Detiene secciones (sin argumentos: todo menos asis-datos). Nunca borra volumenes.
       status                    Estado y memoria por seccion.
@@ -41,7 +42,9 @@ param(
     # down: tambien detiene asis-datos.
     [switch]$IncluirDatos,
     # up: no verifica ni aprovisiona el PDP (concesiones de endpoints nuevos) al terminar.
-    [switch]$SinPdp
+    [switch]$SinPdp,
+    # up: levanta aunque la memoria estimada supere limiteMemoriaMb (riesgo de que Docker mate contenedores).
+    [switch]$ForzarMemoria
 )
 
 Set-StrictMode -Version Latest
@@ -57,6 +60,7 @@ foreach ($o in $Objetivo) {
         '^-(?i:SinEsperar)$' { $SinEsperar = [switch]::Present; continue }
         '^-(?i:IncluirDatos)$' { $IncluirDatos = [switch]::Present; continue }
         '^-(?i:SinPdp)$' { $SinPdp = [switch]::Present; continue }
+        '^-(?i:ForzarMemoria)$' { $ForzarMemoria = [switch]::Present; continue }
         default { $restantes += $o }
     }
 }
@@ -493,7 +497,12 @@ switch ($Accion) {
         $secciones = Resolve-Objetivo $Objetivo
         Write-Host "`n==> stack up $($Objetivo -join ' ')" -ForegroundColor Cyan
         $total = Show-Plan $secciones
-        if ($total -gt $manifiesto.limiteMemoriaMb) { throw "La memoria estimada ($total MB) supera el limite ($($manifiesto.limiteMemoriaMb) MB). Levante menos secciones." }
+        if ($total -gt $manifiesto.limiteMemoriaMb) {
+            if (-not $ForzarMemoria) {
+                throw "La memoria estimada ($total MB) supera el limite ($($manifiesto.limiteMemoriaMb) MB). Levante menos secciones, suba la memoria de la VM de Docker (.wslconfig) o use -ForzarMemoria (ver stack/README.md)."
+            }
+            Write-Host "  Aviso: la memoria estimada ($total MB) supera el limite ($($manifiesto.limiteMemoriaMb) MB); se continua por -ForzarMemoria." -ForegroundColor Yellow
+        }
         foreach ($n in $secciones) {
             $imgs = Get-Prop (Get-Seccion $n) 'requiereImagenes'
             if ($imgs) {
